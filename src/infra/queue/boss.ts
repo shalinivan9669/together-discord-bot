@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import PgBoss from 'pg-boss';
 import {
+  AllJobNames,
   duelRoundClosePayloadSchema,
   duelScoreboardRefreshPayloadSchema,
   genericScheduledPayloadSchema,
+  type JobName,
   JobNames,
   publicPostPublishPayloadSchema,
   raidProgressRefreshPayloadSchema
@@ -28,6 +30,47 @@ export type QueueRuntime = {
   isReady: () => boolean;
   setMessageEditor: (editor: ThrottledMessageEditor) => void;
 };
+
+type PgErrorLike = {
+  code?: string;
+  message?: string;
+};
+
+function isQueueExistsError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const parsed = error as PgErrorLike;
+
+  if (parsed.code === '23505') {
+    return true;
+  }
+
+  const message = parsed.message?.toLowerCase() ?? '';
+  return message.includes('queue') && message.includes('already exists');
+}
+
+export async function ensureQueues(boss: PgBoss, jobNames: readonly JobName[]): Promise<void> {
+  logger.info(
+    { feature: 'queue', action: 'ensureQueues', queue_count: jobNames.length },
+    'Ensuring pg-boss queues',
+  );
+
+  for (const name of jobNames) {
+    try {
+      await boss.createQueue(name);
+    } catch (error) {
+      if (isQueueExistsError(error)) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  logger.info({ feature: 'queue', action: 'ensureQueues' }, 'pg-boss queues ensured');
+}
 
 export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
   const boss = new PgBoss({
@@ -154,6 +197,7 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
     async start() {
       try {
         await boss.start();
+        await ensureQueues(boss, AllJobNames);
         await registerHandlers();
         await configureRecurringSchedules(boss);
         ready = true;

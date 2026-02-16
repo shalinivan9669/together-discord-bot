@@ -12,6 +12,10 @@ export const JobNames = {
   DailyRaidOffersGenerate: 'daily.raid.offers.generate'
 } as const;
 
+export type JobName = (typeof JobNames)[keyof typeof JobNames];
+
+export const AllJobNames = Object.values(JobNames) as readonly JobName[];
+
 export const baseJobSchema = z.object({
   correlationId: z.string().uuid(),
   interactionId: z.string().optional(),
