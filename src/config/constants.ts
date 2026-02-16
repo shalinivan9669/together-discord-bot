@@ -1,0 +1,13 @@
+export const APP_VERSION = '0.1.0';
+
+export const JOB_RETRY_LIMIT = 5;
+export const JOB_RETRY_DELAY_SECONDS = 30;
+
+export const DEFAULT_SCOREBOARD_DEBOUNCE_SECONDS = 8;
+export const DEFAULT_RAID_PROGRESS_DEBOUNCE_SECONDS = 12;
+
+export const DUEL_MIN_ROUND_MINUTES = 5;
+export const DUEL_MAX_ROUND_MINUTES = 720;
+
+export const ANON_MAX_LENGTH = 400;
+export const ANON_DAILY_PENDING_LIMIT = 3;

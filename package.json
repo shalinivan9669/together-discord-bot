@@ -1,0 +1,49 @@
+{
+  "name": "together-discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactions-first Discord bot for relationship server loops",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@10.4.1",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "format": "prettier -w .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "seed": "tsx scripts/seed.ts",
+    "discord:deploy-commands": "tsx scripts/deploy-commands.ts"
+  },
+  "dependencies": {
+    "@discordjs/rest": "2.4.3",
+    "@sentry/node": "8.35.0",
+    "discord.js": "14.16.3",
+    "dotenv": "16.4.5",
+    "drizzle-orm": "0.36.4",
+    "fastify": "4.28.1",
+    "pg": "8.13.1",
+    "pg-boss": "10.1.5",
+    "pino": "9.4.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.1",
+    "@types/pg": "8.11.10",
+    "@typescript-eslint/eslint-plugin": "8.15.0",
+    "@typescript-eslint/parser": "8.15.0",
+    "drizzle-kit": "0.29.1",
+    "eslint": "8.57.1",
+    "eslint-config-prettier": "9.1.0",
+    "prettier": "3.3.3",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vitest": "2.1.5"
+  }
+}
