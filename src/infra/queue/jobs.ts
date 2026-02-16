@@ -4,6 +4,7 @@ export const JobNames = {
   DuelRoundClose: 'duel.round.close',
   DuelScoreboardRefresh: 'duel.scoreboard.refresh',
   RaidProgressRefresh: 'raid.progress.refresh',
+  PairHomeRefresh: 'pair.home.refresh',
   PublicPostPublish: 'public.post.publish',
   WeeklyHoroscopePublish: 'weekly.horoscope.publish',
   WeeklyCheckinNudge: 'weekly.checkin.nudge',
@@ -40,6 +41,11 @@ export const raidProgressRefreshPayloadSchema = baseJobSchema.extend({
   raidId: z.string().optional()
 });
 
+export const pairHomeRefreshPayloadSchema = baseJobSchema.extend({
+  pairId: z.string(),
+  reason: z.string().default('unknown')
+});
+
 export const publicPostPublishPayloadSchema = baseJobSchema.extend({
   scheduledPostId: z.string().optional()
 });
@@ -51,5 +57,6 @@ export const genericScheduledPayloadSchema = baseJobSchema.extend({
 export type DuelRoundClosePayload = z.infer<typeof duelRoundClosePayloadSchema>;
 export type DuelScoreboardRefreshPayload = z.infer<typeof duelScoreboardRefreshPayloadSchema>;
 export type RaidProgressRefreshPayload = z.infer<typeof raidProgressRefreshPayloadSchema>;
+export type PairHomeRefreshPayload = z.infer<typeof pairHomeRefreshPayloadSchema>;
 export type PublicPostPublishPayload = z.infer<typeof publicPostPublishPayloadSchema>;
 export type GenericScheduledPayload = z.infer<typeof genericScheduledPayloadSchema>;

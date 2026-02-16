@@ -19,6 +19,7 @@ const discordRuntime = createDiscordRuntime({
   token: env.DISCORD_TOKEN,
   boss: queueRuntime.boss
 });
+queueRuntime.setDiscordClient(discordRuntime.client);
 
 const messageEditor = new ThrottledMessageEditor(discordRuntime.client, env.SCOREBOARD_EDIT_THROTTLE_SECONDS);
 queueRuntime.setMessageEditor(messageEditor);

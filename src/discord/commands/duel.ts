@@ -9,6 +9,7 @@ import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import { buildDuelSubmitButton } from '../interactions/components';
+import { sendComponentsV2Message, textBlock, uiCard } from '../ui-v2';
 import type { CommandModule } from './types';
 
 function canSend(channel: GuildBasedChannel): channel is GuildBasedChannel & {
@@ -71,7 +72,16 @@ export const duelCommand: CommandModule = {
         guildId: interaction.guildId,
         publicChannelId: publicChannel.id,
         createScoreboardMessage: async (content) => {
-          const sent = await publicChannel.send({ content });
+          const sent = await sendComponentsV2Message(interaction.client, publicChannel.id, {
+            components: [
+              uiCard({
+                title: 'Butler Duel Scoreboard',
+                status: 'initializing',
+                accentColor: 0xc44536,
+                components: [textBlock(content)]
+              })
+            ]
+          });
           return sent.id;
         },
         boss: ctx.boss,

@@ -10,6 +10,8 @@ import { duelRounds, duelSubmissions, duels, pairs } from '../../infra/db/schema
 import { JobNames } from '../../infra/queue/jobs';
 import { addMinutes } from '../../lib/time';
 import { requestScoreboardRefresh } from '../projections/scoreboardProjection';
+import { requestPairHomeRefresh } from '../projections/pairHomeProjection';
+import { awardPairReward } from './rewardsService';
 
 export type DuelScoreboardPairRow = {
   pairId: string;
@@ -233,6 +235,15 @@ export async function startRound(params: {
       roundNo: txResult.round.roundNo,
       endsAt
     });
+
+    await requestPairHomeRefresh(params.boss, {
+      guildId: params.guildId,
+      pairId: pair.id,
+      reason: 'duel_round_started',
+      interactionId: params.interactionId,
+      userId: params.userId,
+      correlationId: params.correlationId
+    });
   }
 
   await params.boss.send(
@@ -392,6 +403,17 @@ export async function submitRoundAnswer(params: {
     .returning({ id: duelSubmissions.id });
 
   if (inserted.length > 0) {
+    await awardPairReward({
+      guildId: params.guildId,
+      pairId: pair.id,
+      userIds: [pair.user1Id, pair.user2Id],
+      kind: 'duel',
+      amount: 1,
+      key: `duel:${params.roundId}:${params.pairId}`,
+      sourceType: 'duel_submission',
+      sourceId: params.roundId
+    });
+
     await requestScoreboardRefresh(params.boss, {
       guildId: params.guildId,
       duelId: params.duelId,
@@ -399,6 +421,15 @@ export async function submitRoundAnswer(params: {
       userId: params.userId,
       correlationId: params.correlationId,
       reason: 'submission'
+    });
+
+    await requestPairHomeRefresh(params.boss, {
+      guildId: params.guildId,
+      pairId: params.pairId,
+      interactionId: params.interactionId,
+      userId: params.userId,
+      correlationId: params.correlationId,
+      reason: 'duel_submission_accepted'
     });
   }
 

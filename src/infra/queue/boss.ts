@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { Client } from 'discord.js';
 import PgBoss from 'pg-boss';
 import {
   AllJobNames,
@@ -7,6 +8,7 @@ import {
   genericScheduledPayloadSchema,
   type JobName,
   JobNames,
+  pairHomeRefreshPayloadSchema,
   publicPostPublishPayloadSchema,
   raidProgressRefreshPayloadSchema
 } from './jobs';
@@ -17,7 +19,17 @@ import { duelCloseRoundUsecase } from '../../app/usecases/duelUsecases';
 import { refreshDuelScoreboardProjection } from '../../discord/projections/scoreboard';
 import type { ThrottledMessageEditor } from '../../discord/projections/messageEditor';
 import { refreshRaidProgressProjection } from '../../discord/projections/raidProgress';
+import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
+import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
 import { configureRecurringSchedules } from './scheduler';
+import { publishDueScheduledPosts } from '../../app/services/publicPostService';
+import { scheduleWeeklyHoroscopePosts } from '../../app/services/horoscopeService';
+import { scheduleWeeklyCheckinNudges } from '../../app/services/checkinService';
+import {
+  endExpiredRaids,
+  generateDailyRaidOffers,
+  startWeeklyRaidsForConfiguredGuilds
+} from '../../app/services/raidService';
 
 type QueueRuntimeParams = {
   databaseUrl: string;
@@ -29,6 +41,7 @@ export type QueueRuntime = {
   stop: () => Promise<void>;
   isReady: () => boolean;
   setMessageEditor: (editor: ThrottledMessageEditor) => void;
+  setDiscordClient: (client: Client) => void;
 };
 
 type PgErrorLike = {
@@ -85,6 +98,7 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
 
   let ready = false;
   let messageEditor: ThrottledMessageEditor | null = null;
+  let discordClient: Client | null = null;
 
   async function registerHandlers(): Promise<void> {
     await boss.work(JobNames.DuelRoundClose, async (jobs) => {
@@ -146,7 +160,33 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
       for (const job of jobs) {
         const parsed = raidProgressRefreshPayloadSchema.parse(job.data);
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
-        await refreshRaidProgressProjection();
+        if (!messageEditor) {
+          throw new Error('Message editor not initialized');
+        }
+
+        await refreshRaidProgressProjection(messageEditor, parsed.raidId);
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.PairHomeRefresh, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = pairHomeRefreshPayloadSchema.parse(job.data);
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+
+        if (!messageEditor) {
+          throw new Error('Message editor not initialized');
+        }
+
+        if (!discordClient) {
+          throw new Error('Discord client not initialized');
+        }
+
+        await refreshPairHomeProjection({
+          pairId: parsed.pairId,
+          messageEditor,
+          client: discordClient
+        });
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job completed');
       }
     });
@@ -154,34 +194,148 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
     await boss.work(JobNames.PublicPostPublish, async (jobs) => {
       for (const job of jobs) {
         const parsed = publicPostPublishPayloadSchema.parse(job.data);
-        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
-        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'public post publish stub');
+        logger.info(
+          {
+            feature: parsed.feature,
+            action: parsed.action,
+            guild_id: parsed.guildId,
+            job_id: job.id,
+            scheduled_post_id: parsed.scheduledPostId ?? null
+          },
+          'job started',
+        );
+
+        if (!discordClient) {
+          throw new Error('Discord client not initialized for public post publish');
+        }
+
+        const result = await publishDueScheduledPosts({
+          client: discordClient,
+          scheduledPostId: parsed.scheduledPostId,
+          limit: 20
+        });
+
+        logger.info(
+          {
+            feature: parsed.feature,
+            action: parsed.action,
+            guild_id: parsed.guildId,
+            job_id: job.id,
+            processed: result.processed,
+            sent: result.sent,
+            failed: result.failed,
+            skipped: result.skipped
+          },
+          'job completed',
+        );
       }
     });
 
-    const scheduledJobs = [
-      JobNames.WeeklyHoroscopePublish,
-      JobNames.WeeklyCheckinNudge,
-      JobNames.WeeklyRaidStart,
-      JobNames.WeeklyRaidEnd,
-      JobNames.DailyRaidOffersGenerate
-    ] as const;
+    await boss.work(JobNames.WeeklyHoroscopePublish, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = genericScheduledPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.WeeklyHoroscopePublish,
+            action: 'tick'
+          },
+        );
 
-    for (const name of scheduledJobs) {
-      await boss.work(name, async (jobs) => {
-        for (const job of jobs) {
-          const parsed = genericScheduledPayloadSchema.parse(
-            job.data ?? {
-              correlationId: randomUUID(),
-              guildId: 'scheduler',
-              feature: name,
-              action: 'tick'
-            },
-          );
-          logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'scheduled job stub');
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+        const created = await scheduleWeeklyHoroscopePosts();
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, created }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.WeeklyCheckinNudge, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = genericScheduledPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.WeeklyCheckinNudge,
+            action: 'tick'
+          },
+        );
+
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+        const created = await scheduleWeeklyCheckinNudges();
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, created }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.WeeklyRaidStart, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = genericScheduledPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.WeeklyRaidStart,
+            action: 'tick'
+          },
+        );
+
+        const readyClient = discordClient;
+        if (!readyClient) {
+          throw new Error('Discord client not initialized for weekly raid start');
         }
-      });
-    }
+
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+        const created = await startWeeklyRaidsForConfiguredGuilds({
+          boss,
+          correlationId: parsed.correlationId,
+          createProgressMessage: async ({ channelId, content }) => {
+            const sent = await sendComponentsV2Message(readyClient, channelId, {
+              components: [
+                uiCard({
+                  title: 'Cooperative Raid Progress',
+                  status: 'initializing',
+                  accentColor: 0x1e6f9f,
+                  components: [textBlock(content)]
+                })
+              ]
+            });
+            return sent.id;
+          }
+        });
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, created }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.WeeklyRaidEnd, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = genericScheduledPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.WeeklyRaidEnd,
+            action: 'tick'
+          },
+        );
+
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+        const ended = await endExpiredRaids();
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, ended }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.DailyRaidOffersGenerate, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = genericScheduledPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.DailyRaidOffersGenerate,
+            action: 'tick'
+          },
+        );
+
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+        const generated = await generateDailyRaidOffers();
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, generated }, 'job completed');
+      }
+    });
   }
 
   boss.on('error', (error) => {
@@ -193,6 +347,9 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
     boss,
     setMessageEditor(editor) {
       messageEditor = editor;
+    },
+    setDiscordClient(client) {
+      discordClient = client;
     },
     async start() {
       try {

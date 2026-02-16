@@ -26,9 +26,10 @@ describe('scoreboard renderer', () => {
       updatedAt: new Date('2025-01-08T10:00:00Z')
     });
 
-    expect(result).toContain('## Butler Duel Scoreboard');
-    expect(result).toContain('Round: **#2** (active)');
-    expect(result).toContain('<@u1> + <@u2>');
-    expect(result).toContain('Last updated: 2025-01-08T10:00:00.000Z');
+    const serialized = JSON.stringify(result);
+    expect(serialized).toContain('Butler Duel Scoreboard');
+    expect(serialized).toContain('Round #2');
+    expect(serialized).toContain('<@u1> + <@u2>');
+    expect(serialized).toContain('Submissions: **3**');
   });
 });

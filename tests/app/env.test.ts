@@ -4,6 +4,10 @@ function setBaseEnv() {
   process.env.NODE_ENV = 'test';
   process.env.LOG_LEVEL = 'info';
   process.env.DATABASE_URL = 'https://example.com';
+  process.env.DISCORD_TOKEN = '';
+  process.env.DISCORD_APP_ID = '';
+  process.env.DISCORD_GUILD_ID = '';
+  process.env.SENTRY_DSN = '';
   process.env.TZ = 'Asia/Almaty';
   process.env.DEFAULT_TIMEZONE = 'Asia/Almaty';
   process.env.PHASE2_HOROSCOPE_ENABLED = 'false';
@@ -26,5 +30,7 @@ describe('env parsing', () => {
     const module = await import('../../src/config/env');
     expect(module.env.NODE_ENV).toBe('test');
     expect(module.env.DEFAULT_TIMEZONE).toBe('Asia/Almaty');
+    expect(module.env.DISCORD_GUILD_ID).toBeUndefined();
+    expect(module.env.SENTRY_DSN).toBeUndefined();
   });
 });

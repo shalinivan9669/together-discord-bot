@@ -34,3 +34,26 @@ export async function getPairForUser(guildId: string, userId: string) {
 
   return rows.find((row) => row.user1Id === userId || row.user2Id === userId) ?? null;
 }
+
+export async function getPairByPrivateChannel(guildId: string, privateChannelId: string) {
+  const rows = await db
+    .select()
+    .from(pairs)
+    .where(
+      and(
+        eq(pairs.guildId, guildId),
+        eq(pairs.privateChannelId, privateChannelId),
+        eq(pairs.status, 'active'),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function listActivePairsByGuild(guildId: string) {
+  return db
+    .select()
+    .from(pairs)
+    .where(and(eq(pairs.guildId, guildId), eq(pairs.status, 'active')));
+}

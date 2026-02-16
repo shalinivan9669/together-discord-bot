@@ -8,14 +8,32 @@ const booleanFromString = z
   .transform((value) => value === 'true')
   .default('false');
 
+const optionalNonEmptyString = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value.trim();
+  return normalized === '' ? undefined : normalized;
+}, z.string().min(1).optional());
+
+const optionalUrlString = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const normalized = value.trim();
+  return normalized === '' ? undefined : normalized;
+}, z.string().url().optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   DATABASE_URL: z.string().url(),
-  DISCORD_TOKEN: z.string().min(1).optional(),
-  DISCORD_APP_ID: z.string().min(1).optional(),
-  DISCORD_GUILD_ID: z.string().min(1).optional(),
-  SENTRY_DSN: z.string().url().optional(),
+  DISCORD_TOKEN: optionalNonEmptyString,
+  DISCORD_APP_ID: optionalNonEmptyString,
+  DISCORD_GUILD_ID: optionalNonEmptyString,
+  SENTRY_DSN: optionalUrlString,
   TZ: z.string().default('Asia/Almaty'),
   DEFAULT_TIMEZONE: z.string().default('Asia/Almaty'),
   PHASE2_HOROSCOPE_ENABLED: booleanFromString,

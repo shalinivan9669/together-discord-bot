@@ -1,11 +1,18 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { Client } from 'discord.js';
+import {
+  Routes,
+  type APIMessageTopLevelComponent,
+  type RESTPatchAPIChannelMessageJSONBody,
+} from '../ui-v2/api';
 import { logger } from '../../lib/logger';
 
-type EditPayload = {
+export type EditPayload = {
   channelId: string;
   messageId: string;
-  content: string;
+  content?: string | null;
+  components?: APIMessageTopLevelComponent[];
+  flags?: number;
 };
 
 type Slot = {
@@ -65,15 +72,22 @@ export class ThrottledMessageEditor {
   private async editWithRetry(payload: EditPayload): Promise<void> {
     const maxAttempts = 4;
 
+    const body: RESTPatchAPIChannelMessageJSONBody = {};
+    if (payload.content !== undefined) {
+      body.content = payload.content;
+    }
+    if (payload.components !== undefined) {
+      body.components = payload.components;
+    }
+    if (payload.flags !== undefined) {
+      body.flags = payload.flags;
+    }
+
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
-        const channel = await this.client.channels.fetch(payload.channelId);
-        if (!channel?.isTextBased()) {
-          throw new Error('Target channel is not text based');
-        }
-
-        const message = await channel.messages.fetch(payload.messageId);
-        await message.edit({ content: payload.content });
+        await this.client.rest.patch(Routes.channelMessage(payload.channelId, payload.messageId), {
+          body
+        });
         return;
       } catch (error) {
         const anyError = error as { status?: number; data?: { retry_after?: number } };

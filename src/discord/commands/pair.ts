@@ -1,4 +1,5 @@
 import { ChannelType, SlashCommandBuilder } from 'discord.js';
+import { requestPairHomeRefresh } from '../../app/projections/pairHomeProjection';
 import { pairCreateUsecase, pairRoomUsecase } from '../../app/usecases/pairUsecases';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
@@ -78,6 +79,15 @@ export const pairCommand: CommandModule = {
       await interaction.editReply(
         `${prefix} pair room: <#${result.pair.privateChannelId}> for <@${result.pair.user1Id}> + <@${result.pair.user2Id}>`,
       );
+
+      await requestPairHomeRefresh(ctx.boss, {
+        guildId: interaction.guildId,
+        pairId: result.pair.id,
+        reason: result.created ? 'pair_created' : 'pair_room_opened',
+        correlationId,
+        interactionId: interaction.id,
+        userId: interaction.user.id
+      });
       return;
     }
 

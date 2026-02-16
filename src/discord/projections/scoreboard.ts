@@ -2,6 +2,7 @@ import { duelScoreboardSnapshotUsecase } from '../../app/usecases/duelUsecases';
 import { logger } from '../../lib/logger';
 import type { ThrottledMessageEditor } from './messageEditor';
 import { renderDuelScoreboard } from './scoreboardRenderer';
+import { COMPONENTS_V2_FLAGS } from '../ui-v2';
 
 export { renderDuelScoreboard } from './scoreboardRenderer';
 
@@ -15,11 +16,13 @@ export async function refreshDuelScoreboardProjection(
     return;
   }
 
-  const content = renderDuelScoreboard(snapshot);
+  const view = renderDuelScoreboard(snapshot);
 
   await messageEditor.queueEdit({
     channelId: snapshot.publicChannelId,
     messageId: snapshot.scoreboardMessageId,
-    content
+    content: view.content ?? null,
+    components: view.components,
+    flags: COMPONENTS_V2_FLAGS
   });
 }

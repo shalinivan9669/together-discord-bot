@@ -6,7 +6,7 @@ export const seasonCommand: CommandModule = {
   name: 'season',
   data: new SlashCommandBuilder()
     .setName('season')
-    .setDescription('Season and capsule info (phase 2)')
+    .setDescription('Season and capsule info')
     .addSubcommand((sub) => sub.setName('status').setDescription('Show current season status')),
   async execute(_ctx, interaction) {
     await interaction.deferReply({ ephemeral: true });
@@ -15,6 +15,6 @@ export const seasonCommand: CommandModule = {
       return;
     }
 
-    await interaction.editReply('Season feature wiring is present. Complete handlers are TODO.');
+    await interaction.editReply('Seasons are enabled, but advanced capsule logic is not yet configured.');
   }
 };

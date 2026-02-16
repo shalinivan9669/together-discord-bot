@@ -38,6 +38,9 @@ export const pairs = pgTable(
     userLow: varchar('user_low', { length: 32 }).notNull(),
     userHigh: varchar('user_high', { length: 32 }).notNull(),
     privateChannelId: varchar('private_channel_id', { length: 32 }).notNull(),
+    pairHomeMessageId: varchar('pair_home_message_id', { length: 32 }),
+    pairHomePinnedAt: timestamp('pair_home_pinned_at', { withTimezone: true }),
+    pairHomePinAttemptedAt: timestamp('pair_home_pin_attempted_at', { withTimezone: true }),
     status: varchar('status', { length: 24 }).notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
@@ -100,7 +103,10 @@ export const scheduledPosts = pgTable('scheduled_posts', {
   status: varchar('status', { length: 24 }).notNull().default('pending'),
   idempotencyKey: varchar('idempotency_key', { length: 200 }).notNull().unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  sentAt: timestamp('sent_at', { withTimezone: true })
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  publishedMessageId: varchar('published_message_id', { length: 32 }),
+  lastError: text('last_error'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
 
 export const opDedup = pgTable('op_dedup', {
@@ -159,6 +165,9 @@ export const horoscopeClaims = pgTable(
     userId: varchar('user_id', { length: 32 }).notNull(),
     pairId: varchar('pair_id', { length: 36 }),
     deliveredTo: varchar('delivered_to', { length: 32 }).notNull(),
+    mode: varchar('mode', { length: 16 }),
+    context: varchar('context', { length: 24 }),
+    claimText: varchar('claim_text', { length: 600 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
@@ -332,6 +341,8 @@ export const raidClaims = pgTable(
     status: varchar('status', { length: 24 }).notNull().default('pending_confirm'),
     basePoints: integer('base_points').notNull(),
     bonusPoints: integer('bonus_points').notNull().default(0),
+    requestedByUserId: varchar('requested_by_user_id', { length: 32 }),
+    confirmedByUserId: varchar('confirmed_by_user_id', { length: 32 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true })
   },

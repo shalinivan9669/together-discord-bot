@@ -50,7 +50,13 @@ export function createDiscordRuntime(params: CreateDiscordClientParams): Discord
       return;
     }
 
-    if (interaction.isButton() || interaction.isModalSubmit() || interaction.isStringSelectMenu()) {
+    if (
+      interaction.isButton()
+      || interaction.isModalSubmit()
+      || interaction.isStringSelectMenu()
+      || interaction.isChannelSelectMenu()
+      || interaction.isRoleSelectMenu()
+    ) {
       await routeInteractionComponent(
         {
           client,
