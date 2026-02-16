@@ -6,6 +6,7 @@ import { DomainError } from '../../domain/errors';
 import { computeSubmissionScore, type DuelSubmissionPayload } from '../../domain/duels/scoring';
 import { db } from '../../infra/db/drizzle';
 import { listActivePairs } from '../../infra/db/queries/duels';
+import { getPairForUser } from '../../infra/db/queries/pairs';
 import { duelRounds, duelSubmissions, duels, pairs } from '../../infra/db/schema';
 import { JobNames } from '../../infra/queue/jobs';
 import { addMinutes } from '../../lib/time';
@@ -529,5 +530,45 @@ export async function getScoreboardSnapshot(duelId: string): Promise<DuelScorebo
     totalPairs: duelPairs.length,
     totalSubmissions: submissions.length,
     updatedAt: new Date()
+  };
+}
+
+export async function getDuelContributionForUser(input: {
+  guildId: string;
+  userId: string;
+}): Promise<{
+  duelId: string;
+  pairId: string;
+  submissions: number;
+  points: number;
+} | null> {
+  const duel = await getActiveDuelForGuild(input.guildId);
+  if (!duel) {
+    return null;
+  }
+
+  const pair = await getPairForUser(input.guildId, input.userId);
+  if (!pair) {
+    return null;
+  }
+
+  const submissions = await db
+    .select({
+      payloadJson: duelSubmissions.payloadJson
+    })
+    .from(duelSubmissions)
+    .innerJoin(duelRounds, eq(duelRounds.id, duelSubmissions.roundId))
+    .where(and(eq(duelRounds.duelId, duel.id), eq(duelSubmissions.pairId, pair.id)));
+
+  const points = submissions.reduce((total, row) => {
+    const payload = row.payloadJson as DuelSubmissionPayload;
+    return total + computeSubmissionScore(payload);
+  }, 0);
+
+  return {
+    duelId: duel.id,
+    pairId: pair.id,
+    submissions: submissions.length,
+    points
   };
 }

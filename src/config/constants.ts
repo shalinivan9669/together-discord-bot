@@ -11,6 +11,8 @@ export const DUEL_MAX_ROUND_MINUTES = 720;
 
 export const ANON_MAX_LENGTH = 400;
 export const ANON_DAILY_PENDING_LIMIT = 3;
+export const ANON_PROPOSE_DAILY_LIMIT = 6;
+export const ANON_MASCOT_DAILY_LIMIT = 8;
 
 export const CHECKIN_SCALE_MIN = 1;
 export const CHECKIN_SCALE_MAX = 10;
@@ -18,3 +20,9 @@ export const CHECKIN_SCALE_MAX = 10;
 export const RAID_DEFAULT_GOAL_POINTS = 500;
 export const RAID_DAILY_OFFERS_COUNT = 3;
 export const RAID_DAILY_PAIR_CAP_POINTS = 60;
+
+export const MEDIATOR_SAY_MAX_LENGTH = 320;
+export const MEDIATOR_REPAIR_STEP_INTERVAL_MINUTES = 2;
+export const MEDIATOR_REPAIR_TOTAL_MINUTES = 7;
+
+export const DATE_IDEA_CARDS_COUNT = 3;

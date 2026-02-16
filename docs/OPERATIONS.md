@@ -23,6 +23,8 @@ Registered jobs:
 - `duel.round.close`
 - `duel.scoreboard.refresh`
 - `raid.progress.refresh`
+- `pair.home.refresh`
+- `mediator.repair.tick`
 - `public.post.publish`
 - `weekly.horoscope.publish`
 - `weekly.checkin.nudge`
@@ -38,6 +40,9 @@ Recurring schedules (enabled by feature flags where applicable):
 - Raid daily offers generation: daily `09:00` (`daily.raid.offers.generate`)
 - Raid projection refresh: every 10 minutes (`raid.progress.refresh`)
 - Public post publish sweep: every 2 minutes (`public.post.publish`)
+
+One-shot delayed jobs:
+- Mediator repair flow ticks (`mediator.repair.tick`) are created on `/repair` start and scheduled at `+2`, `+4`, `+6` minutes.
 
 ## Logs and tracing
 All interactions/jobs emit structured logs with:
@@ -57,7 +62,8 @@ Use these IDs to reconstruct retries and dedupe behavior.
 3. Confirm payload schema compatibility after deploy.
 4. Inspect pg-boss queue depth via SQL/admin tooling.
 5. For `public.post.publish`, inspect `scheduled_posts.status`, `last_error`, `updated_at`.
-6. If required, restart process gracefully and let retry-safe jobs re-run.
+6. For `mediator.repair.tick`, inspect `mediator_repair_sessions` (`status`, `current_step`, `last_tick_at`, `completed_at`).
+7. If required, restart process gracefully and let retry-safe jobs re-run.
 
 ## Runbook: Discord outage / rate limits
 1. Expect projection editor retries with backoff (`messageEditor`).
@@ -69,7 +75,7 @@ Use these IDs to reconstruct retries and dedupe behavior.
 1. `/healthz` will show `db=fail`.
 2. Interactions/jobs fail fast and re-enter retry paths where configured.
 3. Restore Neon availability.
-4. Verify new rows appear again in `scheduled_posts`, `raid_claims`, `checkins`.
+4. Verify new rows appear again in `scheduled_posts`, `raid_claims`, `checkins`, `mediator_*`, `date_weekend_plans`.
 
 ## Graceful shutdown sequence
 On `SIGTERM` / `SIGINT`:

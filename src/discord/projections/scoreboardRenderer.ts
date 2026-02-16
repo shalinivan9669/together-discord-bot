@@ -43,13 +43,19 @@ export function renderDuelScoreboard(snapshot: DuelScoreboardSnapshot): Componen
 
   const participateId = encodeCustomId({
     feature: 'duel_board',
-    action: 'participate',
+    action: 'how',
     payload: { d: snapshot.duelId }
   });
 
   const myRoomId = encodeCustomId({
     feature: 'duel_board',
     action: 'open_room',
+    payload: { d: snapshot.duelId }
+  });
+
+  const contributionId = encodeCustomId({
+    feature: 'duel_board',
+    action: 'my_contribution',
     payload: { d: snapshot.duelId }
   });
 
@@ -78,13 +84,19 @@ export function renderDuelScoreboard(snapshot: DuelScoreboardSnapshot): Componen
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: participateId,
-              label: 'How to participate'
+              label: 'How'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
               custom_id: myRoomId,
               label: 'Open my room'
+            },
+            {
+              type: ComponentType.Button,
+              style: ButtonStyle.Secondary,
+              custom_id: contributionId,
+              label: 'My contribution'
             }
           ])
         ]

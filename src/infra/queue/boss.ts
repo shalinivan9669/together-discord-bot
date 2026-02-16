@@ -8,6 +8,7 @@ import {
   genericScheduledPayloadSchema,
   type JobName,
   JobNames,
+  mediatorRepairTickPayloadSchema,
   pairHomeRefreshPayloadSchema,
   publicPostPublishPayloadSchema,
   raidProgressRefreshPayloadSchema
@@ -30,6 +31,7 @@ import {
   generateDailyRaidOffers,
   startWeeklyRaidsForConfiguredGuilds
 } from '../../app/services/raidService';
+import { runMediatorRepairTick } from '../../app/services/mediatorService';
 
 type QueueRuntimeParams = {
   databaseUrl: string;
@@ -187,6 +189,26 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
           messageEditor,
           client: discordClient
         });
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.MediatorRepairTick, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = mediatorRepairTickPayloadSchema.parse(job.data);
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+
+        if (!discordClient) {
+          throw new Error('Discord client not initialized for mediator repair tick');
+        }
+
+        await runMediatorRepairTick({
+          guildId: parsed.guildId,
+          sessionId: parsed.sessionId,
+          stepNumber: parsed.stepNumber,
+          client: discordClient
+        });
+
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job completed');
       }
     });

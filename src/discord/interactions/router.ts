@@ -6,11 +6,23 @@ import type {
   RoleSelectMenuInteraction,
   StringSelectMenuInteraction
 } from 'discord.js';
+import { createHash } from 'node:crypto';
 import { PermissionFlagsBits } from 'discord.js';
 import type PgBoss from 'pg-boss';
 import { z } from 'zod';
+import { rememberOperation } from '../../infra/db/queries/dedupe';
+import { consumeDailyQuota } from '../../app/policies/rateLimitPolicy';
 import { requestPublicPostPublish } from '../../app/projections/publicPostProjection';
 import { requestPairHomeRefresh } from '../../app/projections/pairHomeProjection';
+import { buildDateIdeas, saveDateIdeasForWeekend } from '../../app/services/dateService';
+import {
+  createMediatorSaySession,
+  getMediatorSaySelectedText,
+  getMediatorSaySessionForUser,
+  markMediatorSaySentToPair,
+  renderMediatorSayReply,
+  setMediatorSayTone,
+} from '../../app/services/mediatorService';
 import {
   getPairForCheckinChannel,
   listActiveAgreements,
@@ -18,22 +30,28 @@ import {
   submitWeeklyCheckin,
 } from '../../app/services/checkinService';
 import { getPairHomeSnapshot } from '../../app/services/pairHomeService';
+import { getDuelContributionForUser } from '../../app/services/duelService';
 import { duelSubmitUsecase } from '../../app/usecases/duelUsecases';
 import { createCorrelationId } from '../../lib/correlation';
 import { logger } from '../../lib/logger';
+import { dateOnly } from '../../lib/time';
 import { logInteraction } from '../interactionLog';
 import {
+  buildAnonAskModal,
   buildCheckinAgreementSelect,
   buildCheckinShareButton,
   buildCheckinSubmitModal,
+  buildDateGeneratorPicker,
   buildDuelSubmissionModal,
   buildHoroscopeClaimModal,
+  buildMediatorSayToneButtons,
   buildRaidClaimButton,
   buildRaidConfirmButton
 } from './components';
 import { decodeCustomId } from './customId';
 import {
   approveAnonQuestion,
+  buildAnonMascotAnswer,
   createAnonQuestion,
   rejectAnonQuestion
 } from '../../app/services/anonService';
@@ -46,7 +64,11 @@ import {
 import { getPairForUser } from '../../infra/db/queries/pairs';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { claimRaidQuest, confirmRaidClaim, getRaidContributionForUser, getTodayRaidOffers } from '../../app/services/raidService';
+import { renderDateIdeasResult } from '../projections/dateIdeasRenderer';
+import { COMPONENTS_V2_FLAGS } from '../ui-v2';
+import { parseDateBudget, parseDateEnergy, parseDateTimeWindow, type DateFilters } from '../../domain/date';
 import { handleSetupWizardComponent } from './setupWizard';
+import { ANON_MASCOT_DAILY_LIMIT, ANON_PROPOSE_DAILY_LIMIT } from '../../config/constants';
 
 export type InteractionContext = {
   client: Client;
@@ -80,6 +102,50 @@ function isAdminOrConfiguredModeratorForComponent(
 const duelBoardPayloadSchema = z.object({ d: z.string().min(1) });
 const raidBoardPayloadSchema = z.object({ r: z.string().min(1) });
 const pairHomePayloadSchema = z.object({ p: z.string().uuid() });
+const mediatorSessionPayloadSchema = z.object({ s: z.string().uuid() });
+const datePayloadSchema = z.object({
+  e: z.string().min(1),
+  b: z.string().min(1),
+  t: z.string().min(1)
+});
+const anonQuestionPayloadSchema = z.object({ q: z.string().uuid() });
+
+function parseDateFilters(payload: Record<string, string>): DateFilters | null {
+  const parsed = datePayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const energy = parseDateEnergy(parsed.data.e);
+  const budget = parseDateBudget(parsed.data.b);
+  const timeWindow = parseDateTimeWindow(parsed.data.t);
+
+  if (!energy || !budget || !timeWindow) {
+    return null;
+  }
+
+  return {
+    energy,
+    budget,
+    timeWindow
+  };
+}
+
+function formatDatePickerSummary(filters: DateFilters): string {
+  return `Energy: **${filters.energy}** | Budget: **${filters.budget}** | Time: **${filters.timeWindow}**`;
+}
+
+function parseSayToneOrDefault(value: string): 'soft' | 'direct' | 'short' {
+  if (value === 'direct') {
+    return 'direct';
+  }
+
+  if (value === 'short') {
+    return 'short';
+  }
+
+  return 'soft';
+}
 
 async function handleButton(ctx: InteractionContext, interaction: ButtonInteraction): Promise<void> {
   const decoded = decodeCustomId(interaction.customId);
@@ -103,7 +169,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  if (decoded.feature === 'duel_board' && decoded.action === 'participate') {
+  if (decoded.feature === 'duel_board' && (decoded.action === 'participate' || decoded.action === 'how')) {
     duelBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
       ephemeral: true,
@@ -111,6 +177,31 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         'How to participate: join your pair room, wait for a round start message, press Submit answer, ' +
         'then complete the modal once before the timer ends.',
     });
+    return;
+  }
+
+  if (decoded.feature === 'duel_board' && decoded.action === 'my_contribution') {
+    duelBoardPayloadSchema.parse(decoded.payload);
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    const contribution = await getDuelContributionForUser({
+      guildId: interaction.guildId,
+      userId: interaction.user.id
+    });
+
+    if (!contribution) {
+      await interaction.editReply('No active duel contribution found for your pair yet.');
+      return;
+    }
+
+    await interaction.editReply(
+      `My duel contribution: **${contribution.submissions}** submission(s), ` +
+      `**${contribution.points}** point(s) total.`,
+    );
     return;
   }
 
@@ -136,6 +227,32 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       content:
         'Raid rules: claim one of today quests, then your partner confirms in the pair room. ' +
         'Daily pair cap applies automatically.',
+    });
+    return;
+  }
+
+  if (decoded.feature === 'raid_board' && decoded.action === 'how') {
+    raidBoardPayloadSchema.parse(decoded.payload);
+    await interaction.reply({
+      ephemeral: true,
+      content:
+        'How it works: open your pair room, pick one today quest, claim it, then ask your partner to confirm. ' +
+        'Progress and contribution update automatically.',
+    });
+    return;
+  }
+
+  if (decoded.feature === 'raid_board' && decoded.action === 'open_room') {
+    raidBoardPayloadSchema.parse(decoded.payload);
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    await interaction.reply({
+      ephemeral: true,
+      content: pair ? `Your pair room: <#${pair.privateChannelId}>` : 'You do not have an active pair room yet.',
     });
     return;
   }
@@ -187,6 +304,237 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       `My contribution (${contribution.dayDate}): **${contribution.todayPoints}** today, ` +
       `**${contribution.weekPoints}** this raid week.`,
     );
+    return;
+  }
+
+  if (decoded.feature === 'mediator' && decoded.action.startsWith('say_tone_')) {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const payload = mediatorSessionPayloadSchema.parse(decoded.payload);
+    const tone = decoded.action.replace('say_tone_', '');
+
+    const session = await setMediatorSayTone({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      sessionId: payload.s,
+      tone
+    });
+
+    if (!session) {
+      await interaction.reply({ ephemeral: true, content: 'Session expired. Run `/say` again.' });
+      return;
+    }
+
+    await interaction.update({
+      content: renderMediatorSayReply(session),
+      components: buildMediatorSayToneButtons({
+        sessionId: session.id,
+        selectedTone: parseSayToneOrDefault(session.selectedTone),
+        canSendToPairRoom: Boolean(session.pairId),
+        alreadySent: Boolean(session.sentToPairAt)
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'mediator' && decoded.action === 'say_send_pair') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const payload = mediatorSessionPayloadSchema.parse(decoded.payload);
+    await interaction.deferUpdate();
+
+    const existingSession = await getMediatorSaySessionForUser({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      sessionId: payload.s
+    });
+    if (!existingSession) {
+      await interaction.followUp({ ephemeral: true, content: 'Session expired. Run `/say` again.' });
+      return;
+    }
+
+    if (!existingSession.pairId) {
+      await interaction.followUp({ ephemeral: true, content: 'No active pair room found for this account.' });
+      await interaction.editReply({
+        content: renderMediatorSayReply(existingSession),
+        components: buildMediatorSayToneButtons({
+          sessionId: existingSession.id,
+          selectedTone: parseSayToneOrDefault(existingSession.selectedTone),
+          canSendToPairRoom: false,
+          alreadySent: Boolean(existingSession.sentToPairAt)
+        }) as never
+      });
+      return;
+    }
+
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    if (!pair || pair.id !== existingSession.pairId) {
+      await interaction.followUp({ ephemeral: true, content: 'Pair room is not available anymore.' });
+      await interaction.editReply({
+        content: renderMediatorSayReply(existingSession),
+        components: buildMediatorSayToneButtons({
+          sessionId: existingSession.id,
+          selectedTone: parseSayToneOrDefault(existingSession.selectedTone),
+          canSendToPairRoom: false,
+          alreadySent: Boolean(existingSession.sentToPairAt)
+        }) as never
+      });
+      return;
+    }
+
+    const pairChannel = await interaction.client.channels.fetch(pair.privateChannelId);
+    if (!pairChannel?.isTextBased() || !('send' in pairChannel) || typeof pairChannel.send !== 'function') {
+      await interaction.followUp({ ephemeral: true, content: 'Pair room channel is not sendable.' });
+      await interaction.editReply({
+        content: renderMediatorSayReply(existingSession),
+        components: buildMediatorSayToneButtons({
+          sessionId: existingSession.id,
+          selectedTone: parseSayToneOrDefault(existingSession.selectedTone),
+          canSendToPairRoom: false,
+          alreadySent: Boolean(existingSession.sentToPairAt)
+        }) as never
+      });
+      return;
+    }
+
+    const marked = await markMediatorSaySentToPair({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      sessionId: existingSession.id
+    });
+
+    const session = marked.session;
+    if (!session) {
+      await interaction.followUp({ ephemeral: true, content: 'Session not found.' });
+      return;
+    }
+
+    if (marked.changed) {
+      await pairChannel.send({
+        content: `<@${interaction.user.id}> drafted this with /say:\n\n${getMediatorSaySelectedText(session)}`
+      });
+      await interaction.followUp({ ephemeral: true, content: 'Sent to your pair room.' });
+    } else {
+      await interaction.followUp({ ephemeral: true, content: 'Already sent to pair room earlier.' });
+    }
+
+    await interaction.editReply({
+      content: renderMediatorSayReply(session),
+      components: buildMediatorSayToneButtons({
+        sessionId: session.id,
+        selectedTone: parseSayToneOrDefault(session.selectedTone),
+        canSendToPairRoom: Boolean(session.pairId),
+        alreadySent: Boolean(session.sentToPairAt)
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'date' && decoded.action === 'generate_ideas') {
+    const filters = parseDateFilters(decoded.payload);
+    if (!filters) {
+      await interaction.reply({ ephemeral: true, content: 'Malformed date generator payload.' });
+      return;
+    }
+
+    await interaction.deferUpdate();
+
+    const ideas = buildDateIdeas(filters);
+    const view = renderDateIdeasResult({
+      filters,
+      ideas
+    });
+
+    await interaction.editReply({
+      content: null,
+      components: view.components as never,
+      flags: COMPONENTS_V2_FLAGS
+    } as never);
+    return;
+  }
+
+  if (decoded.feature === 'date' && decoded.action === 'save_weekend') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const filters = parseDateFilters(decoded.payload);
+    if (!filters) {
+      await interaction.reply({ ephemeral: true, content: 'Malformed date save payload.' });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    const ideas = buildDateIdeas(filters);
+    const saved = await saveDateIdeasForWeekend({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      pairId: pair?.id ?? null,
+      filters,
+      ideas
+    });
+    const weekendDate = saved.row?.weekendDate ?? 'current';
+
+    await interaction.editReply(
+      saved.created
+        ? `Saved for weekend (${weekendDate}).`
+        : `Already saved for weekend (${weekendDate}).`,
+    );
+    return;
+  }
+
+  if (decoded.feature === 'anon_qotd' && decoded.action === 'propose_question') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const modal = buildAnonAskModal(interaction.guildId);
+    await interaction.showModal(modal as never);
+    return;
+  }
+
+  if (decoded.feature === 'anon_qotd' && decoded.action === 'mascot_answer') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const payload = anonQuestionPayloadSchema.parse(decoded.payload);
+    await interaction.deferReply({ ephemeral: true });
+
+    const quota = await consumeDailyQuota({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      actionKey: 'anon_mascot_answer',
+      limit: ANON_MASCOT_DAILY_LIMIT
+    });
+    if (!quota.allowed) {
+      await interaction.editReply('Mascot answer daily limit reached. Try again tomorrow.');
+      return;
+    }
+
+    const opDate = dateOnly(new Date());
+    const dedupeKey = `anon:mascot:${interaction.guildId}:${payload.q}:${interaction.user.id}:${opDate}`;
+    const firstRun = await rememberOperation(dedupeKey, {
+      questionId: payload.q,
+      userId: interaction.user.id
+    });
+
+    const answer = await buildAnonMascotAnswer({
+      guildId: interaction.guildId,
+      questionId: payload.q
+    });
+
+    await interaction.editReply(firstRun ? answer.answer : `${answer.answer}\n(Already generated today.)`);
     return;
   }
 
@@ -582,6 +930,34 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     return;
   }
 
+  if (decoded.feature === 'mediator' && decoded.action === 'say_submit') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+    const source = interaction.fields.getTextInputValue('source');
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    const session = await createMediatorSaySession({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      pairId: pair?.id ?? null,
+      sourceText: source
+    });
+
+    await interaction.editReply({
+      content: renderMediatorSayReply(session),
+      components: buildMediatorSayToneButtons({
+        sessionId: session.id,
+        selectedTone: parseSayToneOrDefault(session.selectedTone),
+        canSendToPairRoom: Boolean(session.pairId),
+        alreadySent: Boolean(session.sentToPairAt)
+      }) as never
+    });
+    return;
+  }
+
   if (decoded.feature === 'anon' && decoded.action === 'ask_modal') {
     if (!interaction.guildId) {
       await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
@@ -589,7 +965,28 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     }
 
     await interaction.deferReply({ ephemeral: true });
-    const question = interaction.fields.getTextInputValue('question');
+    const question = interaction.fields.getTextInputValue('question').trim();
+
+    const quota = await consumeDailyQuota({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      actionKey: 'anon_propose_question',
+      limit: ANON_PROPOSE_DAILY_LIMIT
+    });
+    if (!quota.allowed) {
+      await interaction.editReply('Question submit daily limit reached. Try again tomorrow.');
+      return;
+    }
+
+    const opDate = dateOnly(new Date());
+    const digest = createHash('sha256').update(question).digest('hex').slice(0, 16);
+    const dedupeKey = `anon:submit:${interaction.guildId}:${interaction.user.id}:${opDate}:${digest}`;
+    const firstRun = await rememberOperation(dedupeKey, { question });
+    if (!firstRun) {
+      await interaction.editReply('This exact question was already submitted today.');
+      return;
+    }
+
     const created = await createAnonQuestion({
       guildId: interaction.guildId,
       authorUserId: interaction.user.id,
@@ -769,6 +1166,70 @@ async function handleSelect(
 
     const modal = buildCheckinSubmitModal(agreementKey);
     await interaction.showModal(modal as never);
+    return;
+  }
+
+  if (
+    decoded.feature === 'date'
+    && (decoded.action === 'pick_energy' || decoded.action === 'pick_budget' || decoded.action === 'pick_time')
+  ) {
+    if (!interaction.isStringSelectMenu()) {
+      await interaction.reply({ ephemeral: true, content: 'Unsupported date selector.' });
+      return;
+    }
+
+    const current = parseDateFilters(decoded.payload);
+    if (!current) {
+      await interaction.reply({ ephemeral: true, content: 'Malformed date selector payload.' });
+      return;
+    }
+
+    const selected = interaction.values[0];
+    if (!selected) {
+      await interaction.reply({ ephemeral: true, content: 'No selection value.' });
+      return;
+    }
+
+    const next: DateFilters = {
+      energy: current.energy,
+      budget: current.budget,
+      timeWindow: current.timeWindow
+    };
+
+    if (decoded.action === 'pick_energy') {
+      const parsed = parseDateEnergy(selected);
+      if (!parsed) {
+        await interaction.reply({ ephemeral: true, content: 'Invalid energy option.' });
+        return;
+      }
+      next.energy = parsed;
+    }
+
+    if (decoded.action === 'pick_budget') {
+      const parsed = parseDateBudget(selected);
+      if (!parsed) {
+        await interaction.reply({ ephemeral: true, content: 'Invalid budget option.' });
+        return;
+      }
+      next.budget = parsed;
+    }
+
+    if (decoded.action === 'pick_time') {
+      const parsed = parseDateTimeWindow(selected);
+      if (!parsed) {
+        await interaction.reply({ ephemeral: true, content: 'Invalid time option.' });
+        return;
+      }
+      next.timeWindow = parsed;
+    }
+
+    await interaction.update({
+      content: [
+        'Pick your constraints, then press **Generate 3 ideas**.',
+        formatDatePickerSummary(next)
+      ].join('\n'),
+      components: buildDateGeneratorPicker(next) as never
+    });
     return;
   }
 

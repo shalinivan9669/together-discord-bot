@@ -73,6 +73,18 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
     payload: { r: snapshot.raidId }
   });
 
+  const howId = encodeCustomId({
+    feature: 'raid_board',
+    action: 'how',
+    payload: { r: snapshot.raidId }
+  });
+
+  const openRoomId = encodeCustomId({
+    feature: 'raid_board',
+    action: 'open_room',
+    payload: { r: snapshot.raidId }
+  });
+
   return {
     components: [
       uiCard({
@@ -94,21 +106,35 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
           actionRowButtons([
             {
               type: ComponentType.Button,
-              style: ButtonStyle.Primary,
-              custom_id: takeTodayId,
-              label: 'Take today quests'
+              style: ButtonStyle.Secondary,
+              custom_id: rulesId,
+              label: 'Rules'
+            },
+            {
+              type: ComponentType.Button,
+              style: ButtonStyle.Secondary,
+              custom_id: howId,
+              label: 'How'
+            },
+            {
+              type: ComponentType.Button,
+              style: ButtonStyle.Success,
+              custom_id: openRoomId,
+              label: 'Open my room'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: contributionId,
               label: 'My contribution'
-            },
+            }
+          ]),
+          actionRowButtons([
             {
               type: ComponentType.Button,
-              style: ButtonStyle.Secondary,
-              custom_id: rulesId,
-              label: 'Rules'
+              style: ButtonStyle.Primary,
+              custom_id: takeTodayId,
+              label: 'Take today quests'
             }
           ])
         ]

@@ -1,10 +1,49 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { and, desc, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import { ANON_DAILY_PENDING_LIMIT, ANON_MAX_LENGTH } from '../../config/constants';
 import { isFeatureEnabled } from '../../config/featureFlags';
 import { db } from '../../infra/db/drizzle';
 import { anonQuestions, guildSettings } from '../../infra/db/schema';
 import { createScheduledPost } from './publicPostService';
+
+const mascotAnswerTemplates = {
+  connection: [
+    'Start with one appreciation, then ask the real question directly.',
+    'Keep it short: one feeling, one need, one clear ask.',
+    'Choose a calm moment and ask for 10 focused minutes.'
+  ],
+  repair: [
+    'Use this format: “I felt ___, I need ___, can we ___ tonight?”',
+    'Name your part first, then ask for one next action.',
+    'Aim for repair, not winning. One concrete step beats long debate.'
+  ],
+  boundaries: [
+    'State the boundary kindly and include the reason in one sentence.',
+    'Ask for transparency, not control. Keep the request specific.',
+    'Boundary + reassurance works best when both are explicit.'
+  ]
+} as const;
+
+type MascotBucket = keyof typeof mascotAnswerTemplates;
+
+function hashIndex(seed: string, size: number): number {
+  const digest = createHash('sha256').update(seed).digest();
+  return digest.readUInt32BE(0) % size;
+}
+
+function detectMascotBucket(text: string): MascotBucket {
+  const normalized = text.toLowerCase();
+
+  if (/(boundary|jealous|trust|privacy|respect|limit)/.test(normalized)) {
+    return 'boundaries';
+  }
+
+  if (/(fight|argue|repair|sorry|conflict|apolog)/.test(normalized)) {
+    return 'repair';
+  }
+
+  return 'connection';
+}
 
 export function ensureAnonEnabled(): void {
   if (!isFeatureEnabled('anon')) {
@@ -69,6 +108,41 @@ export async function listPendingAnonQuestions(guildId: string, limit = 5) {
     .where(and(eq(anonQuestions.guildId, guildId), eq(anonQuestions.status, 'pending')))
     .orderBy(desc(anonQuestions.createdAt))
     .limit(limit);
+}
+
+export async function getAnonQuestionById(guildId: string, questionId: string) {
+  const rows = await db
+    .select()
+    .from(anonQuestions)
+    .where(and(eq(anonQuestions.guildId, guildId), eq(anonQuestions.id, questionId)))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function buildAnonMascotAnswer(input: {
+  guildId: string;
+  questionId: string;
+}) {
+  ensureAnonEnabled();
+
+  const row = await getAnonQuestionById(input.guildId, input.questionId);
+  if (!row) {
+    throw new Error('Question not found');
+  }
+
+  if (row.status !== 'approved' && row.status !== 'published') {
+    throw new Error('Question is not published yet');
+  }
+
+  const bucket = detectMascotBucket(row.questionText);
+  const templates = mascotAnswerTemplates[bucket];
+  const selected = templates[hashIndex(`${row.id}:${row.questionText}`, templates.length)] ?? templates[0];
+
+  return {
+    questionId: row.id,
+    answer: `Mascot says: ${selected}`
+  };
 }
 
 export async function rejectAnonQuestion(input: {

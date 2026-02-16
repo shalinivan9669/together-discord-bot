@@ -84,6 +84,86 @@ export function renderPairHomePanel(snapshot: PairHomeSnapshot): ComponentsV2Mes
     ? `Raid points today: **${snapshot.raid.pointsToday}/${snapshot.raid.dailyCap}**`
     : 'Raid points today: no active raid.';
 
+  const contextButtons: Array<{
+    type: ComponentType.Button;
+    style: ButtonStyle.Primary | ButtonStyle.Secondary | ButtonStyle.Success | ButtonStyle.Danger;
+    custom_id: string;
+    label: string;
+  }> = [];
+
+  if (snapshot.duel.active && snapshot.duel.duelId) {
+    contextButtons.push(
+      {
+        type: ComponentType.Button,
+        style: ButtonStyle.Secondary,
+        custom_id: encodeCustomId({
+          feature: 'duel_board',
+          action: 'rules',
+          payload: { d: snapshot.duel.duelId }
+        }),
+        label: 'Duel rules'
+      },
+      {
+        type: ComponentType.Button,
+        style: ButtonStyle.Secondary,
+        custom_id: encodeCustomId({
+          feature: 'duel_board',
+          action: 'how',
+          payload: { d: snapshot.duel.duelId }
+        }),
+        label: 'Duel how'
+      }
+    );
+
+    if (!snapshot.raid.active) {
+      contextButtons.push({
+        type: ComponentType.Button,
+        style: ButtonStyle.Secondary,
+        custom_id: encodeCustomId({
+          feature: 'duel_board',
+          action: 'my_contribution',
+          payload: { d: snapshot.duel.duelId }
+        }),
+        label: 'Duel contribution'
+      });
+    }
+  }
+
+  if (snapshot.raid.active && snapshot.raid.raidId) {
+    contextButtons.push(
+      {
+        type: ComponentType.Button,
+        style: ButtonStyle.Secondary,
+        custom_id: encodeCustomId({
+          feature: 'raid_board',
+          action: 'rules',
+          payload: { r: snapshot.raid.raidId }
+        }),
+        label: 'Raid rules'
+      },
+      {
+        type: ComponentType.Button,
+        style: ButtonStyle.Secondary,
+        custom_id: encodeCustomId({
+          feature: 'raid_board',
+          action: 'how',
+          payload: { r: snapshot.raid.raidId }
+        }),
+        label: 'Raid how'
+      },
+      {
+        type: ComponentType.Button,
+        style: ButtonStyle.Secondary,
+        custom_id: encodeCustomId({
+          feature: 'raid_board',
+          action: 'my_contribution',
+          payload: { r: snapshot.raid.raidId }
+        }),
+        label: 'Raid contribution'
+      }
+    );
+  }
+
   return {
     components: [
       uiCard({
@@ -115,7 +195,8 @@ export function renderPairHomePanel(snapshot: PairHomeSnapshot): ComponentsV2Mes
               custom_id: duelButton.customId,
               label: duelButton.label
             }
-          ])
+          ]),
+          ...(contextButtons.length > 0 ? [actionRowButtons(contextButtons.slice(0, 5))] : [])
         ]
       })
     ]

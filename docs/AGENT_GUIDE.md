@@ -20,12 +20,18 @@
 - [ ] `/anon ask` -> queue -> approve/reject -> publish works.
 - [ ] `/raid start|quests|progress` and claim-confirm loop work.
 - [ ] Rewards helper writes idempotent `rewards_ledger` entries.
+- [ ] `/say` modal flow returns deterministic soft/direct/short variants and optional pair-room send.
+- [ ] `/repair` runs one-message 7-minute flow via scheduled `mediator.repair.tick` edits.
+- [ ] `/date` picker returns 3 deterministic V2 cards and `Save for weekend` writes deduped rows.
+- [ ] Published anon QoTD buttons (`Mascot answer`, `Propose question`) work with rate limits + idempotency.
+- [ ] Duel/Raid public cards expose spectator CTA set (`Rules`, `How`, `Open room`, `My contribution`).
 
 ## Idempotency checklist
 - Use unique constraints first.
 - Use transactions for multi-table writes.
 - Use advisory locks for race-prone starts/confirms.
 - Use deterministic idempotency keys for weekly and claim flows.
+- Use operation dedupe keys for repeated button/modal paths (`/anon`, mascot answer, mediator send).
 
 ## Migration rules
 - Never edit already-applied SQL migration files in deployed environments.
@@ -43,3 +49,4 @@
 - Include correlation IDs in logs/jobs.
 - Keep secrets out of logs.
 - Keep migrations and seeds repeatable.
+- Keep deterministic template libraries in code/DB; no runtime LLM generation in production loops.

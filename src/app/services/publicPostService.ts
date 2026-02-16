@@ -4,6 +4,7 @@ import type { Client, MessageCreateOptions } from 'discord.js';
 import { z } from 'zod';
 import { renderWeeklyHoroscopePost } from '../../discord/projections/horoscopeWeeklyRenderer';
 import { sendComponentsV2Message, type ComponentsV2Message } from '../../discord/ui-v2';
+import { buildAnonPublishedButtons } from '../../discord/interactions/components';
 import { db } from '../../infra/db/drizzle';
 import { anonQuestions, scheduledPosts } from '../../infra/db/schema';
 import { logger } from '../../lib/logger';
@@ -102,7 +103,8 @@ function buildMessageOptions(row: typeof scheduledPosts.$inferSelect): BuiltMess
     return {
       kind: 'legacy',
       options: {
-        content: `## Anonymous Question\n${payload.questionText}`
+        content: `## Anonymous Question\n${payload.questionText}`,
+        components: [buildAnonPublishedButtons(payload.questionId) as never]
       }
     };
   }

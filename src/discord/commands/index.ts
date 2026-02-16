@@ -4,11 +4,14 @@ import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
 import { anonCommand } from './anon';
 import { checkinCommand } from './checkin';
+import { dateCommand } from './date';
 import { duelCommand } from './duel';
 import { horoscopeCommand } from './horoscope';
 import { pairCommand } from './pair';
 import { pingCommand } from './ping';
 import { raidCommand } from './raid';
+import { repairCommand } from './repair';
+import { sayCommand } from './say';
 import { seasonCommand } from './season';
 import { setupCommand } from './setup';
 import type { CommandContext, CommandModule } from './types';
@@ -17,6 +20,9 @@ const commandModules: CommandModule[] = [
   pingCommand,
   setupCommand,
   pairCommand,
+  sayCommand,
+  repairCommand,
+  dateCommand,
   duelCommand,
   horoscopeCommand,
   checkinCommand,

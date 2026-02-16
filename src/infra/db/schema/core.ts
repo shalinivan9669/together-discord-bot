@@ -133,6 +133,60 @@ export const commandRateLimits = pgTable(
   }),
 );
 
+export const mediatorSaySessions = pgTable('mediator_say_sessions', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  guildId: varchar('guild_id', { length: 32 }).notNull(),
+  userId: varchar('user_id', { length: 32 }).notNull(),
+  pairId: varchar('pair_id', { length: 36 }),
+  sourceText: varchar('source_text', { length: 400 }).notNull(),
+  softText: varchar('soft_text', { length: 600 }).notNull(),
+  directText: varchar('direct_text', { length: 600 }).notNull(),
+  shortText: varchar('short_text', { length: 600 }).notNull(),
+  selectedTone: varchar('selected_tone', { length: 16 }).notNull().default('soft'),
+  sentToPairAt: timestamp('sent_to_pair_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+export const mediatorRepairSessions = pgTable('mediator_repair_sessions', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  guildId: varchar('guild_id', { length: 32 }).notNull(),
+  pairId: varchar('pair_id', { length: 36 }).notNull(),
+  channelId: varchar('channel_id', { length: 32 }).notNull(),
+  messageId: varchar('message_id', { length: 32 }).notNull(),
+  startedByUserId: varchar('started_by_user_id', { length: 32 }).notNull(),
+  status: varchar('status', { length: 24 }).notNull().default('active'),
+  currentStep: integer('current_step').notNull().default(1),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  lastTickAt: timestamp('last_tick_at', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true })
+});
+
+export const dateWeekendPlans = pgTable(
+  'date_weekend_plans',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    guildId: varchar('guild_id', { length: 32 }).notNull(),
+    userId: varchar('user_id', { length: 32 }).notNull(),
+    pairId: varchar('pair_id', { length: 36 }),
+    weekendDate: text('weekend_date').notNull(),
+    energy: varchar('energy', { length: 16 }).notNull(),
+    budget: varchar('budget', { length: 16 }).notNull(),
+    timeWindow: varchar('time_window', { length: 16 }).notNull(),
+    ideasJson: jsonb('ideas_json').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    uniqueSavedPlan: unique('date_weekend_plans_user_weekend_profile_uq').on(
+      table.guildId,
+      table.userId,
+      table.weekendDate,
+      table.energy,
+      table.budget,
+      table.timeWindow,
+    )
+  }),
+);
+
 export const contentHoroscopeArchetypes = pgTable('content_horoscope_archetypes', {
   key: varchar('key', { length: 64 }).primaryKey(),
   title: varchar('title', { length: 100 }).notNull(),

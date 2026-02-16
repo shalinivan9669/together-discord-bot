@@ -3,6 +3,8 @@
 Migrations:
 - `src/infra/db/migrations/0000_init.sql`
 - `src/infra/db/migrations/0001_phase2_runtime.sql`
+- `src/infra/db/migrations/0002_step1_ui_v2.sql`
+- `src/infra/db/migrations/0003_step2_activities.sql`
 
 ## Core
 - `guild_settings(guild_id PK, timezone, configured channel ids, moderator_role_id, timestamps)`
@@ -18,6 +20,11 @@ Migrations:
 - `scheduled_posts(id PK, guild_id, type, target_channel_id, payload_json, scheduled_for, status, idempotency_key UNIQUE, sent_at, published_message_id, last_error, updated_at)`
 - `op_dedup(operation_key PK, payload_hash, created_at)`
 - `command_rate_limits(guild_id,user_id,action_key,day_date,count,updated_at, PK composite)`
+
+## Mediator + Date Activities (Step 2)
+- `mediator_say_sessions(id PK, guild_id, user_id, pair_id, source_text, soft_text, direct_text, short_text, selected_tone, sent_to_pair_at, created_at)`
+- `mediator_repair_sessions(id PK, guild_id, pair_id, channel_id, message_id, started_by_user_id, status, current_step, started_at, last_tick_at, completed_at)`
+- `date_weekend_plans(id PK, guild_id, user_id, pair_id, weekend_date, energy, budget, time_window, ideas_json, created_at, UNIQUE(guild_id,user_id,weekend_date,energy,budget,time_window))`
 
 ## Horoscope (Phase 2)
 - `content_horoscope_archetypes(key PK, title, variants_json, active, created_at)`

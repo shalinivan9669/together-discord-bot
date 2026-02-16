@@ -1,16 +1,11 @@
 import {
-  ActionRowBuilder,
-  ModalBuilder,
   SlashCommandBuilder,
-  TextInputBuilder,
-  TextInputStyle
 } from 'discord.js';
 import { ensureAnonEnabled, listPendingAnonQuestions } from '../../app/services/anonService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
-import { buildAnonModerationButtons } from '../interactions/components';
-import { encodeCustomId } from '../interactions/customId';
+import { buildAnonAskModal, buildAnonModerationButtons } from '../interactions/components';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
@@ -37,25 +32,7 @@ export const anonCommand: CommandModule = {
     }
 
     if (sub === 'ask') {
-      const modal = new ModalBuilder()
-        .setTitle('Anonymous question')
-        .setCustomId(
-          encodeCustomId({
-            feature: 'anon',
-            action: 'ask_modal',
-            payload: { g: interaction.guildId }
-          }),
-        )
-        .addComponents(
-          new ActionRowBuilder<TextInputBuilder>().addComponents(
-            new TextInputBuilder()
-              .setCustomId('question')
-              .setLabel('Your anonymous question')
-              .setStyle(TextInputStyle.Paragraph)
-              .setMaxLength(400)
-              .setRequired(true),
-          ),
-        );
+      const modal = buildAnonAskModal(interaction.guildId);
 
       logInteraction({
         interaction,

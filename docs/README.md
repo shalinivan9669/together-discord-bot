@@ -4,7 +4,7 @@ Production-focused Discord bot for relationship server engagement loops.
 
 ## Scope
 - Phase 1 (enabled and working): boot/runtime, `/healthz`, command deploy script, `/setup`, pair private text channels, duel rounds with modal submissions, single editable scoreboard.
-- Phase 2 (implemented, default OFF by flags): weekly horoscope loop, weekly check-in, anonymous moderation queue, rewards helper, raid cooperative loop, seasons basic status.
+- Phase 2 (implemented, default OFF by flags where applicable): weekly horoscope loop, weekly check-in, anonymous moderation queue + QoTD UX, rewards helper, raid cooperative loop, seasons basic status, mediator `/say` + `/repair`, date generator `/date`.
 
 ## Stack
 - Node.js 20+, TypeScript
