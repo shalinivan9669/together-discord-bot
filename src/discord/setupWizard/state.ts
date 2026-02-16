@@ -11,6 +11,7 @@ export type SetupWizardDraft = {
   horoscopeChannelId: string | null;
   questionsChannelId: string | null;
   raidChannelId: string | null;
+  hallChannelId: string | null;
   moderatorRoleId: string | null;
   updatedAtMs: number;
 };
@@ -41,6 +42,7 @@ function toDraft(guildId: string, userId: string, settings: GuildSettingsRow): S
     horoscopeChannelId: settings?.horoscopeChannelId ?? null,
     questionsChannelId: settings?.questionsChannelId ?? null,
     raidChannelId: settings?.raidChannelId ?? null,
+    hallChannelId: settings?.hallChannelId ?? null,
     moderatorRoleId: settings?.moderatorRoleId ?? null,
     updatedAtMs: nowMs()
   };

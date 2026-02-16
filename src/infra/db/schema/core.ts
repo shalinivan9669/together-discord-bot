@@ -18,6 +18,7 @@ export const guildSettings = pgTable('guild_settings', {
   questionsChannelId: varchar('questions_channel_id', { length: 32 }),
   raidChannelId: varchar('raid_channel_id', { length: 32 }),
   duelPublicChannelId: varchar('duel_public_channel_id', { length: 32 }),
+  hallChannelId: varchar('hall_channel_id', { length: 32 }),
   moderatorRoleId: varchar('moderator_role_id', { length: 32 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
@@ -27,6 +28,39 @@ export const users = pgTable('users', {
   userId: varchar('user_id', { length: 32 }).primaryKey(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
+
+export const monthlyHallCards = pgTable(
+  'monthly_hall_cards',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    guildId: varchar('guild_id', { length: 32 }).notNull(),
+    monthKey: varchar('month_key', { length: 7 }).notNull(),
+    channelId: varchar('channel_id', { length: 32 }).notNull(),
+    messageId: varchar('message_id', { length: 32 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    uniqueGuildMonth: unique('monthly_hall_cards_guild_month_uq').on(table.guildId, table.monthKey)
+  }),
+);
+
+export const monthlyHallOptIns = pgTable(
+  'monthly_hall_opt_ins',
+  {
+    guildId: varchar('guild_id', { length: 32 }).notNull(),
+    userId: varchar('user_id', { length: 32 }).notNull(),
+    category: varchar('category', { length: 24 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    pk: primaryKey({
+      name: 'monthly_hall_opt_ins_pk',
+      columns: [table.guildId, table.userId, table.category]
+    })
+  }),
+);
 
 export const pairs = pgTable(
   'pairs',

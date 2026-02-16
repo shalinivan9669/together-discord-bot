@@ -5,6 +5,7 @@ export const JobNames = {
   DuelScoreboardRefresh: 'duel.scoreboard.refresh',
   RaidProgressRefresh: 'raid.progress.refresh',
   PairHomeRefresh: 'pair.home.refresh',
+  MonthlyHallRefresh: 'monthly.hall.refresh',
   MediatorRepairTick: 'mediator.repair.tick',
   PublicPostPublish: 'public.post.publish',
   WeeklyHoroscopePublish: 'weekly.horoscope.publish',
@@ -47,6 +48,13 @@ export const pairHomeRefreshPayloadSchema = baseJobSchema.extend({
   reason: z.string().default('unknown')
 });
 
+export const monthlyHallRefreshPayloadSchema = baseJobSchema.extend({
+  monthKey: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/)
+    .optional()
+});
+
 export const mediatorRepairTickPayloadSchema = baseJobSchema.extend({
   sessionId: z.string(),
   stepNumber: z.number().int().positive()
@@ -64,6 +72,7 @@ export type DuelRoundClosePayload = z.infer<typeof duelRoundClosePayloadSchema>;
 export type DuelScoreboardRefreshPayload = z.infer<typeof duelScoreboardRefreshPayloadSchema>;
 export type RaidProgressRefreshPayload = z.infer<typeof raidProgressRefreshPayloadSchema>;
 export type PairHomeRefreshPayload = z.infer<typeof pairHomeRefreshPayloadSchema>;
+export type MonthlyHallRefreshPayload = z.infer<typeof monthlyHallRefreshPayloadSchema>;
 export type MediatorRepairTickPayload = z.infer<typeof mediatorRepairTickPayloadSchema>;
 export type PublicPostPublishPayload = z.infer<typeof publicPostPublishPayloadSchema>;
 export type GenericScheduledPayload = z.infer<typeof genericScheduledPayloadSchema>;

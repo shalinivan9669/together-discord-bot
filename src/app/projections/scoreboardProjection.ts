@@ -1,6 +1,6 @@
 import type PgBoss from 'pg-boss';
 import { createCorrelationId } from '../../lib/correlation';
-import { JobNames } from '../../infra/queue/jobs';
+import { enqueueProjectionRefresh } from './refreshQueue';
 
 export async function requestScoreboardRefresh(
   boss: PgBoss,
@@ -14,8 +14,9 @@ export async function requestScoreboardRefresh(
   },
 ): Promise<string | null> {
   const correlationId = params.correlationId ?? createCorrelationId();
-  const jobId = await boss.send(
-    JobNames.DuelScoreboardRefresh,
+  const jobId = await enqueueProjectionRefresh(
+    boss,
+    'duel_scoreboard',
     {
       correlationId,
       interactionId: params.interactionId,
@@ -25,11 +26,6 @@ export async function requestScoreboardRefresh(
       action: 'scoreboard.refresh',
       duelId: params.duelId,
       reason: params.reason
-    },
-    {
-      singletonKey: `duel-scoreboard:${params.guildId}:${params.duelId}`,
-      singletonSeconds: 8,
-      retryLimit: 3
     },
   );
 

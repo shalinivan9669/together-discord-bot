@@ -6,6 +6,7 @@ import { anonCommand } from './anon';
 import { checkinCommand } from './checkin';
 import { dateCommand } from './date';
 import { duelCommand } from './duel';
+import { hallCommand } from './hall';
 import { horoscopeCommand } from './horoscope';
 import { pairCommand } from './pair';
 import { pingCommand } from './ping';
@@ -24,6 +25,7 @@ const commandModules: CommandModule[] = [
   repairCommand,
   dateCommand,
   duelCommand,
+  hallCommand,
   horoscopeCommand,
   checkinCommand,
   anonCommand,

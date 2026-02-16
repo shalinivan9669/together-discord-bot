@@ -1,6 +1,6 @@
 import type PgBoss from 'pg-boss';
 import { createCorrelationId } from '../../lib/correlation';
-import { JobNames } from '../../infra/queue/jobs';
+import { enqueueProjectionRefresh } from './refreshQueue';
 
 export async function requestRaidProgressRefresh(
   boss: PgBoss,
@@ -8,19 +8,15 @@ export async function requestRaidProgressRefresh(
 ): Promise<string | null> {
   const correlationId = params.correlationId ?? createCorrelationId();
 
-  return boss.send(
-    JobNames.RaidProgressRefresh,
+  return enqueueProjectionRefresh(
+    boss,
+    'raid_progress',
     {
       correlationId,
       guildId: params.guildId,
       feature: 'raid',
       action: 'progress.refresh',
       raidId: params.raidId
-    },
-    {
-      singletonKey: `raid-progress:${params.guildId}:${params.raidId ?? 'active'}`,
-      singletonSeconds: 12,
-      retryLimit: 2
     },
   );
 }

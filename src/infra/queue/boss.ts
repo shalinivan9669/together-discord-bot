@@ -9,6 +9,7 @@ import {
   type JobName,
   JobNames,
   mediatorRepairTickPayloadSchema,
+  monthlyHallRefreshPayloadSchema,
   pairHomeRefreshPayloadSchema,
   publicPostPublishPayloadSchema,
   raidProgressRefreshPayloadSchema
@@ -21,6 +22,7 @@ import { refreshDuelScoreboardProjection } from '../../discord/projections/score
 import type { ThrottledMessageEditor } from '../../discord/projections/messageEditor';
 import { refreshRaidProgressProjection } from '../../discord/projections/raidProgress';
 import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
+import { refreshMonthlyHallProjection } from '../../discord/projections/monthlyHall';
 import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
 import { configureRecurringSchedules } from './scheduler';
 import { publishDueScheduledPosts } from '../../app/services/publicPostService';
@@ -190,6 +192,72 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
           client: discordClient
         });
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job completed');
+      }
+    });
+
+    await boss.work(JobNames.MonthlyHallRefresh, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = monthlyHallRefreshPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.MonthlyHallRefresh,
+            action: 'tick'
+          },
+        );
+
+        logger.info(
+          {
+            feature: parsed.feature,
+            action: parsed.action,
+            job_id: job.id,
+            month_key: parsed.monthKey ?? null
+          },
+          'job started',
+        );
+
+        if (!messageEditor) {
+          throw new Error('Message editor not initialized for monthly hall refresh');
+        }
+
+        if (!discordClient) {
+          throw new Error('Discord client not initialized for monthly hall refresh');
+        }
+
+        const refreshed = await refreshMonthlyHallProjection({
+          client: discordClient,
+          messageEditor,
+          monthKey: parsed.monthKey
+        });
+
+        if (refreshed.failed > 0) {
+          logger.warn(
+            {
+              feature: parsed.feature,
+              action: parsed.action,
+              job_id: job.id,
+              processed: refreshed.processed,
+              created: refreshed.created,
+              updated: refreshed.updated,
+              failed: refreshed.failed
+            },
+            'monthly hall refresh had failures',
+          );
+          throw new Error(`Monthly hall refresh failed for ${refreshed.failed} guild(s)`);
+        }
+
+        logger.info(
+          {
+            feature: parsed.feature,
+            action: parsed.action,
+            job_id: job.id,
+            processed: refreshed.processed,
+            created: refreshed.created,
+            updated: refreshed.updated,
+            failed: refreshed.failed
+          },
+          'job completed',
+        );
       }
     });
 

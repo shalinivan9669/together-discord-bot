@@ -45,6 +45,12 @@ export async function configureRecurringSchedules(boss: PgBoss): Promise<void> {
   }
 
   await boss.schedule(
+    JobNames.MonthlyHallRefresh,
+    '0 10 1 * *',
+    schedulerPayload('monthly_hall', 'refresh'),
+  );
+
+  await boss.schedule(
     JobNames.PublicPostPublish,
     '*/2 * * * *',
     schedulerPayload('public_post', 'publish_pending'),

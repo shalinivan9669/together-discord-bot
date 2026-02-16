@@ -49,6 +49,7 @@ export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Mes
     channelLine('Weekly horoscope', draft.horoscopeChannelId),
     channelLine('Questions inbox', draft.questionsChannelId),
     channelLine('Raid progress', draft.raidChannelId),
+    channelLine('Monthly hall', draft.hallChannelId),
     roleLine(draft.moderatorRoleId),
   ].join('\n');
 
@@ -64,6 +65,7 @@ export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Mes
           channelSelect('pick_horoscope_channel', 'Select weekly horoscope channel'),
           channelSelect('pick_questions_channel', 'Select questions channel'),
           channelSelect('pick_raid_channel', 'Select raid progress channel'),
+          channelSelect('pick_hall_channel', 'Select monthly hall channel'),
           actionRowSelects([
             {
               type: ComponentType.RoleSelect,

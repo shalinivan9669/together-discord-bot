@@ -6,6 +6,7 @@ export type GuildSettingsPatch = Partial<{
   questionsChannelId: string | null;
   raidChannelId: string | null;
   duelPublicChannelId: string | null;
+  hallChannelId: string | null;
   moderatorRoleId: string | null;
 }>;
 

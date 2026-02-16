@@ -5,11 +5,14 @@ Migrations:
 - `src/infra/db/migrations/0001_phase2_runtime.sql`
 - `src/infra/db/migrations/0002_step1_ui_v2.sql`
 - `src/infra/db/migrations/0003_step2_activities.sql`
+- `src/infra/db/migrations/0004_step3_stability.sql`
 
 ## Core
-- `guild_settings(guild_id PK, timezone, configured channel ids, moderator_role_id, timestamps)`
+- `guild_settings(guild_id PK, timezone, configured channel ids including hall_channel_id, moderator_role_id, timestamps)`
 - `users(user_id PK, created_at)`
 - `pairs(id PK, guild_id, user1_id, user2_id, user_low, user_high, private_channel_id, status, created_at, UNIQUE(guild_id,user_low,user_high))`
+- `monthly_hall_cards(id PK, guild_id, month_key, channel_id, message_id, timestamps, UNIQUE(guild_id,month_key))`
+- `monthly_hall_opt_ins(guild_id,user_id,category,timestamps, PK composite)`
 
 ## Duels (Phase 1)
 - `duels(id PK, guild_id, status, public_channel_id, scoreboard_message_id, timestamps)`

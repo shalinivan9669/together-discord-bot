@@ -1,6 +1,6 @@
-﻿import type PgBoss from 'pg-boss';
+import type PgBoss from 'pg-boss';
 import { createCorrelationId } from '../../lib/correlation';
-import { JobNames } from '../../infra/queue/jobs';
+import { enqueueProjectionRefresh } from './refreshQueue';
 
 export async function requestPairHomeRefresh(
   boss: PgBoss,
@@ -15,8 +15,9 @@ export async function requestPairHomeRefresh(
 ): Promise<string | null> {
   const correlationId = params.correlationId ?? createCorrelationId();
 
-  return boss.send(
-    JobNames.PairHomeRefresh,
+  return enqueueProjectionRefresh(
+    boss,
+    'pair_home',
     {
       correlationId,
       interactionId: params.interactionId,
@@ -26,11 +27,6 @@ export async function requestPairHomeRefresh(
       action: 'refresh',
       pairId: params.pairId,
       reason: params.reason
-    },
-    {
-      singletonKey: `pair-home:${params.guildId}:${params.pairId}`,
-      singletonSeconds: 6,
-      retryLimit: 2
     },
   );
 }

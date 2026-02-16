@@ -29,7 +29,7 @@ This keeps cost and ops predictable on Railway.
   - `guild_id`, `user_id`, `pair_id`, `correlation_id`, `interaction_id`, `feature`, `job_id`
 
 ## Projection model
-- Scoreboard and raid progress use single-message updates.
+- Scoreboard, raid progress, pair home, and monthly hall use single-message updates.
 - Requests are coalesced by pg-boss singleton keys.
 - `ThrottledMessageEditor` enforces per-message edit throttle and retry.
 

@@ -6,6 +6,7 @@ import {
   type RESTPatchAPIChannelMessageJSONBody,
 } from '../ui-v2/api';
 import { logger } from '../../lib/logger';
+import { withDiscordApiRetry } from './discordApiRetry';
 
 export type EditPayload = {
   channelId: string;
@@ -70,8 +71,6 @@ export class ThrottledMessageEditor {
   }
 
   private async editWithRetry(payload: EditPayload): Promise<void> {
-    const maxAttempts = 4;
-
     const body: RESTPatchAPIChannelMessageJSONBody = {};
     if (payload.content !== undefined) {
       body.content = payload.content;
@@ -83,44 +82,20 @@ export class ThrottledMessageEditor {
       body.flags = payload.flags;
     }
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
+    await withDiscordApiRetry({
+      feature: 'projection.message_editor',
+      action: 'edit',
+      maxAttempts: 5,
+      baseDelayMs: 400,
+      context: {
+        channel_id: payload.channelId,
+        message_id: payload.messageId
+      },
+      execute: async () => {
         await this.client.rest.patch(Routes.channelMessage(payload.channelId, payload.messageId), {
           body
         });
-        return;
-      } catch (error) {
-        const anyError = error as { status?: number; data?: { retry_after?: number } };
-        const retryAfterSeconds = anyError.data?.retry_after;
-
-        if ((anyError.status === 429 || retryAfterSeconds) && attempt < maxAttempts) {
-          const backoff = retryAfterSeconds ? retryAfterSeconds * 1000 : 500 * 2 ** attempt;
-          logger.warn(
-            {
-              feature: 'projection.message_editor',
-              channel_id: payload.channelId,
-              message_id: payload.messageId,
-              attempt,
-              backoff_ms: backoff
-            },
-            'Rate limited while editing message, retrying',
-          );
-          await sleep(backoff);
-          continue;
-        }
-
-        logger.error(
-          {
-            feature: 'projection.message_editor',
-            channel_id: payload.channelId,
-            message_id: payload.messageId,
-            attempt,
-            error
-          },
-          'Failed to edit message',
-        );
-        throw error;
       }
-    }
+    });
   }
 }

@@ -25,6 +25,7 @@ const actionSchema = z.enum([
   'pick_horoscope_channel',
   'pick_questions_channel',
   'pick_raid_channel',
+  'pick_hall_channel',
   'pick_mod_role',
   'save',
   'reset',
@@ -62,6 +63,7 @@ async function updatePanel(interaction: SetupWizardInteraction, draft: SetupWiza
 function selectTargetChannel(draft: SetupWizardDraft): string | null {
   return draft.duelPublicChannelId
     ?? draft.raidChannelId
+    ?? draft.hallChannelId
     ?? draft.horoscopeChannelId
     ?? draft.questionsChannelId
     ?? null;
@@ -130,8 +132,10 @@ export async function handleSetupWizardComponent(
       ? { duelPublicChannelId: channelId }
       : action === 'pick_horoscope_channel'
         ? { horoscopeChannelId: channelId }
-        : action === 'pick_questions_channel'
+      : action === 'pick_questions_channel'
           ? { questionsChannelId: channelId }
+      : action === 'pick_hall_channel'
+          ? { hallChannelId: channelId }
           : { raidChannelId: channelId };
 
     const next = patchSetupWizardDraft(interaction.guildId, interaction.user.id, patch);
@@ -154,6 +158,7 @@ export async function handleSetupWizardComponent(
       horoscopeChannelId: draft.horoscopeChannelId,
       questionsChannelId: draft.questionsChannelId,
       raidChannelId: draft.raidChannelId,
+      hallChannelId: draft.hallChannelId,
       moderatorRoleId: draft.moderatorRoleId
     });
 
