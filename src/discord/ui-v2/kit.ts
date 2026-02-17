@@ -74,7 +74,7 @@ export function uiCard(params: {
 }): APIContainerComponent {
   const headerLines = [
     `## ${truncateSafe(params.title.trim(), 120)}`,
-    params.status ? `Status: **${truncateSafe(params.status.trim(), 80)}**` : null
+    params.status ? `Статус: **${truncateSafe(params.status.trim(), 80)}**` : null
   ].filter((value): value is string => Boolean(value));
 
   return {

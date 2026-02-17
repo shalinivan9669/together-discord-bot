@@ -16,7 +16,6 @@ async function refreshOneRaid(raidId: string, messageEditor: ThrottledMessageEdi
   await messageEditor.queueEdit({
     channelId: snapshot.publicChannelId,
     messageId: snapshot.progressMessageId,
-    content: view.content ?? null,
     components: view.components,
     flags: COMPONENTS_V2_FLAGS
   });

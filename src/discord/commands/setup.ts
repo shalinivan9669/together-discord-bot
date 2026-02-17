@@ -5,7 +5,7 @@ import { logInteraction } from '../interactionLog';
 import { assertGuildOnly, hasAdminPermission } from '../middleware/guard';
 import { sendComponentsV2Message } from '../ui-v2';
 import { ensureSetupWizardDraft } from '../setupWizard/state';
-import { renderSetupWizardPanel } from '../setupWizard/view';
+import { buildSetupWizardV2View } from '../setupWizard/view';
 import { t } from '../../i18n';
 import type { CommandModule } from './types';
 
@@ -46,7 +46,7 @@ export const setupCommand: CommandModule = {
     const correlationId = createCorrelationId();
     const config = await getGuildConfig(interaction.guildId);
     const draft = ensureSetupWizardDraft(interaction.guildId, interaction.user.id, config);
-    const panel = renderSetupWizardPanel(draft, locale);
+    const panel = buildSetupWizardV2View(draft, locale);
 
     const created = await sendComponentsV2Message(interaction.client, interaction.channelId, panel);
     const jumpUrl = `https://discord.com/channels/${interaction.guildId}/${interaction.channelId}/${created.id}`;

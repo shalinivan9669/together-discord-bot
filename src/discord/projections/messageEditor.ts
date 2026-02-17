@@ -3,17 +3,16 @@ import type { Client } from 'discord.js';
 import {
   Routes,
   type APIMessageTopLevelComponent,
-  type RESTPatchAPIChannelMessageJSONBody,
 } from '../ui-v2/api';
+import { toComponentsV2EditBody } from '../ui-v2';
 import { logger } from '../../lib/logger';
 import { withDiscordApiRetry } from './discordApiRetry';
 
 export type EditPayload = {
   channelId: string;
   messageId: string;
-  content?: string | null;
-  components?: APIMessageTopLevelComponent[];
-  flags?: number;
+  components: APIMessageTopLevelComponent[];
+  flags?: number | null;
 };
 
 type Slot = {
@@ -71,16 +70,10 @@ export class ThrottledMessageEditor {
   }
 
   private async editWithRetry(payload: EditPayload): Promise<void> {
-    const body: RESTPatchAPIChannelMessageJSONBody = {};
-    if (payload.content !== undefined) {
-      body.content = payload.content;
-    }
-    if (payload.components !== undefined) {
-      body.components = payload.components;
-    }
-    if (payload.flags !== undefined) {
-      body.flags = payload.flags;
-    }
+    const body = toComponentsV2EditBody({
+      components: payload.components,
+      flags: payload.flags
+    });
 
     await withDiscordApiRetry({
       feature: 'projection.message_editor',

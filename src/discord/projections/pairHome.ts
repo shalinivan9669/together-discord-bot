@@ -57,7 +57,6 @@ export async function refreshPairHomeProjection(input: {
     await input.messageEditor.queueEdit({
       channelId: snapshot.privateChannelId,
       messageId: snapshot.pairHomeMessageId,
-      content: view.content ?? null,
       components: view.components,
       flags: COMPONENTS_V2_FLAGS
     });
@@ -86,7 +85,6 @@ export async function refreshPairHomeProjection(input: {
       await input.messageEditor.queueEdit({
         channelId: snapshot.privateChannelId,
         messageId: latestMessageId,
-        content: view.content ?? null,
         components: view.components,
         flags: COMPONENTS_V2_FLAGS
       });

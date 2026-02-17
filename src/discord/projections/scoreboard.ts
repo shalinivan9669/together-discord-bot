@@ -21,7 +21,6 @@ export async function refreshDuelScoreboardProjection(
   await messageEditor.queueEdit({
     channelId: snapshot.publicChannelId,
     messageId: snapshot.scoreboardMessageId,
-    content: view.content ?? null,
     components: view.components,
     flags: COMPONENTS_V2_FLAGS
   });

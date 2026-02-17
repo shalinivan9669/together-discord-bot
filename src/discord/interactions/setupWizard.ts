@@ -26,6 +26,7 @@ import { t, type AppLocale } from '../../i18n';
 import { createCorrelationId } from '../../lib/correlation';
 import { formatRequirementLabel } from '../featureErrors';
 import { logInteraction } from '../interactionLog';
+import { editComponentsV2Message, toComponentsV2EditBody } from '../ui-v2';
 import type { CustomIdEnvelope } from './customId';
 import {
   clearSetupWizardDraft,
@@ -37,7 +38,7 @@ import {
 } from '../setupWizard/state';
 import { isSupportedSetupWizardTimezone, isValidIanaTimezone } from '../setupWizard/timezones';
 import {
-  renderSetupWizardPanel,
+  buildSetupWizardV2View,
   type SetupWizardPanelMode,
 } from '../setupWizard/view';
 
@@ -101,20 +102,15 @@ async function updatePanel(
   locale: AppLocale,
   mode: SetupWizardPanelMode = 'draft',
 ): Promise<void> {
-  const panel = renderSetupWizardPanel(draft, locale, { mode });
+  const panel = buildSetupWizardV2View(draft, locale, { mode });
+  const payload = toComponentsV2EditBody(panel);
 
   if ('message' in interaction && interaction.message) {
-    await interaction.message.edit({
-      content: panel.content ?? null,
-      components: panel.components as never
-    });
+    await editComponentsV2Message(interaction.client, interaction.channelId, interaction.message.id, panel);
     return;
   }
 
-  await interaction.editReply({
-    content: panel.content ?? null,
-    components: panel.components as never
-  });
+  await interaction.editReply(payload as never);
 }
 
 function selectTargetChannel(draft: SetupWizardDraft): string | null {

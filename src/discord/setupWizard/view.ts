@@ -4,6 +4,8 @@ import {
   ButtonStyle,
   ChannelType,
   ComponentType,
+  COMPONENTS_V2_FLAGS,
+  textBlock,
   uiCard,
   type ComponentsV2Message,
 } from '../ui-v2';
@@ -102,7 +104,7 @@ function statusLine(
     : t(locale, 'setup.wizard.status.incomplete', { count: missingCount });
 }
 
-export function renderSetupWizardPanel(
+export function buildSetupWizardV2View(
   draft: SetupWizardDraft,
   locale: AppLocale,
   options?: {
@@ -113,18 +115,22 @@ export function renderSetupWizardPanel(
   const missingLabels = missingKeys.map((key) => formatRequirementLabel(locale, key));
   const mode = options?.mode ?? 'draft';
 
-  const summaryLines = [
+  const instructionSummary = [
     t(locale, 'setup.wizard.step1'),
     t(locale, 'setup.wizard.step2'),
     t(locale, 'setup.wizard.step3'),
-    '',
+  ].join('\n');
+
+  const statusSummary = [
     `${t(locale, 'setup.wizard.line.status')}: ${statusLine(locale, mode, missingKeys.length)}`,
     missingKeys.length === 0
       ? t(locale, 'setup.wizard.line.missing.none')
       : t(locale, 'setup.wizard.line.missing.some', {
           missing: missingLabels.join(', ')
         }),
-    '',
+  ].join('\n');
+
+  const selectionsSummary = [
     categoryLine(locale, draft.pairCategoryId),
     channelLine(locale, t(locale, 'setup.wizard.line.horoscope_channel'), draft.horoscopeChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.raid_channel'), draft.raidChannelId),
@@ -134,16 +140,22 @@ export function renderSetupWizardPanel(
     roleLine(locale, draft.anonModRoleId),
     timezoneLine(locale, draft.timezone),
     localeLine(locale),
-  ];
-
-  const summary = summaryLines.join('\n');
+  ].join('\n');
 
   return {
-    content: summary,
+    flags: COMPONENTS_V2_FLAGS,
     components: [
       uiCard({
         title: t(locale, 'setup.wizard.title'),
-        status: statusLine(locale, mode, missingKeys.length),
+        accentColor: 0x3d5a80,
+        components: [
+          textBlock(instructionSummary),
+          textBlock(statusSummary),
+          textBlock(selectionsSummary),
+        ]
+      }),
+      uiCard({
+        title: 'Поля настройки',
         accentColor: 0x3d5a80,
         components: [
           categorySelect('pick_pair_category', t(locale, 'setup.wizard.placeholder.pair_category'), draft.userId),
@@ -196,3 +208,5 @@ export function renderSetupWizardPanel(
     ]
   };
 }
+
+export const renderSetupWizardPanel = buildSetupWizardV2View;

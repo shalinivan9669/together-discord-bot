@@ -81,7 +81,6 @@ async function refreshOneGuild(input: {
       await input.messageEditor.queueEdit({
         channelId,
         messageId: card.messageId,
-        content: view.content ?? null,
         components: view.components,
         flags: COMPONENTS_V2_FLAGS
       });
@@ -137,7 +136,6 @@ async function refreshOneGuild(input: {
     await input.messageEditor.queueEdit({
       channelId: latest.channelId,
       messageId: latest.messageId,
-      content: view.content ?? null,
       components: view.components,
       flags: COMPONENTS_V2_FLAGS
     });

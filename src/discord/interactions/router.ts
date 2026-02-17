@@ -66,7 +66,7 @@ import { getPairForUser } from '../../infra/db/queries/pairs';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { claimRaidQuest, confirmRaidClaim, getRaidContributionForUser, getTodayRaidOffers } from '../../app/services/raidService';
 import { renderDateIdeasResult } from '../projections/dateIdeasRenderer';
-import { COMPONENTS_V2_FLAGS } from '../ui-v2';
+import { COMPONENTS_V2_FLAGS, toComponentsV2EditBody } from '../ui-v2';
 import { parseDateBudget, parseDateEnergy, parseDateTimeWindow, type DateFilters } from '../../domain/date';
 import { handleSetupWizardComponent } from './setupWizard';
 import { ANON_MASCOT_DAILY_LIMIT, ANON_PROPOSE_DAILY_LIMIT } from '../../config/constants';
@@ -534,11 +534,12 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       locale: tr.locale
     });
 
-    await interaction.editReply({
-      content: null,
-      components: view.components as never,
-      flags: COMPONENTS_V2_FLAGS
-    } as never);
+    await interaction.editReply(
+      toComponentsV2EditBody({
+        components: view.components,
+        flags: COMPONENTS_V2_FLAGS
+      }) as never,
+    );
     return;
   }
 

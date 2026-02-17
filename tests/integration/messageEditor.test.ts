@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { COMPONENTS_V2_FLAGS, ComponentType } from '../../src/discord/ui-v2';
 
 function createClientWithPatch(patch: ReturnType<typeof vi.fn>) {
   return {
@@ -31,7 +32,8 @@ describe('ThrottledMessageEditor Discord retry behavior', () => {
     const queued = editor.queueEdit({
       channelId: 'c1',
       messageId: 'm1',
-      content: 'hello'
+      flags: COMPONENTS_V2_FLAGS,
+      components: [{ type: ComponentType.TextDisplay, content: 'hello' }]
     });
 
     await vi.runAllTimersAsync();
@@ -49,7 +51,8 @@ describe('ThrottledMessageEditor Discord retry behavior', () => {
       editor.queueEdit({
         channelId: 'c1',
         messageId: 'm1',
-        content: 'hello'
+        flags: COMPONENTS_V2_FLAGS,
+        components: [{ type: ComponentType.TextDisplay, content: 'hello' }]
       }),
     ).rejects.toEqual(expect.objectContaining({ status: 400 }));
 

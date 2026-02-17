@@ -143,7 +143,6 @@ export async function refreshWeeklyHoroscopeProjection(input: {
           await input.messageEditor.queueEdit({
             channelId,
             messageId: row.horoscopeMessageId,
-            content: view.content ?? null,
             components: view.components,
             flags: COMPONENTS_V2_FLAGS
           });
@@ -183,7 +182,6 @@ export async function refreshWeeklyHoroscopeProjection(input: {
         await input.messageEditor.queueEdit({
           channelId: latest.horoscopeChannelId ?? channelId,
           messageId: latest.horoscopeMessageId,
-          content: view.content ?? null,
           components: view.components,
           flags: COMPONENTS_V2_FLAGS
         });
