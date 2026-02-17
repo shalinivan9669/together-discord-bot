@@ -1,4 +1,4 @@
-﻿import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { Routes } from '../ui-v2/api';
 import type { Client } from 'discord.js';
 import { getPairHomeSnapshot } from '../../app/services/pairHomeService';

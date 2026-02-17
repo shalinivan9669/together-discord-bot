@@ -1,4 +1,4 @@
-﻿import type { getGuildSettings } from '../../infra/db/queries/guildSettings';
+import type { getGuildSettings } from '../../infra/db/queries/guildSettings';
 
 type GuildSettingsRow = Awaited<ReturnType<typeof getGuildSettings>>;
 

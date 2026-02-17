@@ -1,4 +1,4 @@
-﻿export enum ComponentType {
+export enum ComponentType {
   ActionRow = 1,
   Button = 2,
   StringSelect = 3,

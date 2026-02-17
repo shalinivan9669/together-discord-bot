@@ -1,4 +1,4 @@
-﻿import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 import { createCorrelationId } from '../../lib/correlation';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { logInteraction } from '../interactionLog';

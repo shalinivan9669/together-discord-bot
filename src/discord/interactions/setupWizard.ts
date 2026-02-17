@@ -1,4 +1,4 @@
-﻿import { PermissionFlagsBits, type ButtonInteraction, type ChannelSelectMenuInteraction, type RoleSelectMenuInteraction } from 'discord.js';
+import { PermissionFlagsBits, type ButtonInteraction, type ChannelSelectMenuInteraction, type RoleSelectMenuInteraction } from 'discord.js';
 import type PgBoss from 'pg-boss';
 import { z } from 'zod';
 import { requestPublicPostPublish } from '../../app/projections/publicPostProjection';

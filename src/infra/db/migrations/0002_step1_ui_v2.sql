@@ -1,4 +1,4 @@
-﻿ALTER TABLE "pairs"
+ALTER TABLE "pairs"
   ADD COLUMN IF NOT EXISTS "pair_home_message_id" varchar(32);
 
 ALTER TABLE "pairs"

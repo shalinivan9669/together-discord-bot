@@ -1,17 +1,21 @@
 import { access, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const META_DIR = path.resolve(process.cwd(), 'src/infra/db/migrations/meta');
+const MIGRATIONS_DIR = path.resolve(process.cwd(), 'src/infra/db/migrations');
+const ALLOWED_EXTENSIONS = new Set(['.json', '.sql']);
 
-async function walkJsonFiles(dir: string): Promise<string[]> {
+async function walkMigrationFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
     entries.map(async (entry) => {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        return walkJsonFiles(fullPath);
+        return walkMigrationFiles(fullPath);
       }
-      if (entry.isFile() && entry.name.toLowerCase().endsWith('.json')) {
+      if (
+        entry.isFile() &&
+        ALLOWED_EXTENSIONS.has(path.extname(entry.name).toLowerCase())
+      ) {
         return [fullPath];
       }
       return [];
@@ -49,27 +53,27 @@ async function stripBom(filePath: string): Promise<boolean> {
 
 async function main(): Promise<void> {
   try {
-    await access(META_DIR);
+    await access(MIGRATIONS_DIR);
   } catch (error: unknown) {
     const errno = error as NodeJS.ErrnoException;
     if (errno.code === 'ENOENT') {
-      console.log('Migration meta directory not found. Skipping BOM strip.');
+      console.log('Migrations directory not found. Skipping BOM strip.');
       return;
     }
     throw error;
   }
 
-  const jsonFiles = await walkJsonFiles(META_DIR);
+  const migrationFiles = await walkMigrationFiles(MIGRATIONS_DIR);
   const stripped: string[] = [];
 
-  for (const filePath of jsonFiles) {
+  for (const filePath of migrationFiles) {
     if (await stripBom(filePath)) {
       stripped.push(path.relative(process.cwd(), filePath));
     }
   }
 
   if (stripped.length === 0) {
-    console.log('No UTF-8 BOM found in migration meta JSON files.');
+    console.log('No UTF-8 BOM found in migration files.');
     return;
   }
 
@@ -80,7 +84,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error('Failed to strip BOM from migration meta JSON files.');
+  console.error('Failed to strip BOM from migration files.');
   console.error(error);
   process.exit(1);
 });

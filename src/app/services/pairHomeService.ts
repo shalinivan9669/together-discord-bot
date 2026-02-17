@@ -1,4 +1,4 @@
-﻿import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { RAID_DAILY_PAIR_CAP_POINTS } from '../../config/constants';
 import { dateOnly, startOfWeekIso } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
