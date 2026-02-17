@@ -1,13 +1,25 @@
-# Raid Loop Skill
+﻿# Raid Loop Skill
+
+## Цель
+
+Сделать рейдовый цикл предсказуемым, неуязвимым к фарму и устойчивым к дублям событий.
 
 ## Do
-- Keep raid week unique per guild.
-- Use claim uniqueness per day/pair/quest.
-- Route progress updates through one editable message.
-- Apply anti-farm limits with daily totals table.
+
+- Держать уникальность активного рейда на нужном периоде.
+- Защищать claim-операции ограничениями уникальности по дню/паре/квесту.
+- Начисление очков делать только после валидного partner confirm.
+- Использовать daily caps и агрегаты по дню.
+- Прогресс выводить через single-message projection.
 
 ## Don't
-- Don't allow unbounded repeated claims.
 
-## Example
-- `UNIQUE(raid_id, day_date, pair_id, quest_key)` on `raid_claims`.
+- Не разрешать unbounded repeated claim.
+- Не начислять очки на этапе "claim без confirm".
+- Не позволять одному пользователю подтверждать собственный claim.
+
+## Проверка качества
+
+- Повторный claim того же квеста в тот же день не дает вторую награду.
+- Повторный confirm не удваивает очки.
+- При retries итоговый progress корректный и консистентный.

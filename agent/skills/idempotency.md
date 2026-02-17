@@ -1,14 +1,32 @@
-# Idempotency Skill
+﻿# Idempotency Skill
+
+## Цель
+
+Гарантировать корректный конечный результат при retry, double-click и повторной доставке job.
 
 ## Do
-- Use DB unique constraints as first-line dedupe.
-- Wrap multi-write flows in transactions.
-- Build deterministic keys: `feature:guild:pair:week:quest`.
-- Use advisory locks for start/close race points.
+
+- Сначала проектировать уникальные ограничения на уровне БД.
+- Оборачивать multi-write flows в транзакции.
+- Использовать deterministic dedupe keys для interaction-path.
+- Использовать advisory locks в race-чувствительных стартах/закрытиях.
+- Возвращать "already processed" как корректный результат, где это допустимо.
 
 ## Don't
-- Don't dedupe only in memory.
-- Don't treat retries as failures by default.
 
-## Example
-- Duel submission: `UNIQUE(round_id, pair_id)` + on-conflict-do-nothing returns existing success.
+- Не полагаться только на in-memory dedupe.
+- Не считать retry ошибкой по умолчанию.
+- Не начислять очки/создавать сущности без idempotency-гарантий.
+
+## Типовой паттерн
+
+1. Сформировать idempotency key.
+2. Попробовать зафиксировать операцию (`op_dedup`/unique insert).
+3. Если операция уже была - вернуть existing/accepted результат.
+4. Иначе выполнить транзакцию и зафиксировать состояние.
+
+## Проверка качества
+
+- Повтор того же действия не создает вторую запись.
+- Повтор job не вызывает рассинхрон.
+- На гонке между двумя запросами выигрывает один, второй корректно отклоняется/сливается.

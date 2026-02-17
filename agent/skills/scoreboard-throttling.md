@@ -1,14 +1,24 @@
-# Scoreboard Throttling Skill
+﻿# Scoreboard Throttling Skill
+
+## Цель
+
+Держать публичные проекции стабильными: одна поверхность, один message-id, edit-only апдейты.
 
 ## Do
-- Keep one public scoreboard message ID per duel.
-- Queue refresh jobs with singleton keys.
-- Throttle edits per message key.
-- Recompute content from DB each refresh.
+
+- Хранить message id проекции в БД.
+- Запрашивать refresh через очередь с singleton/coalescing.
+- Применять per-message throttling в редакторе проекций.
+- Каждый refresh пересчитывать from DB snapshot.
 
 ## Don't
-- Don't post a new message for each submission.
-- Don't trust Discord message content as source of truth.
 
-## Example
-- `duel.scoreboard.refresh` uses `singletonKey=duel-scoreboard:<guild>:<duel>`.
+- Не публиковать новое сообщение при каждом изменении состояния.
+- Не использовать текущее Discord-сообщение как источник истины.
+- Не редактировать проекции напрямую в обход общего projection path.
+
+## Проверка качества
+
+- При интенсивной нагрузке нет "message spam".
+- После временной ошибки Discord проекция догоняет целевое состояние.
+- Очередь не взрывается дубликатами refresh jobs.

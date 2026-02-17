@@ -1,63 +1,102 @@
-# Components V2 Patterns
+﻿# Components V2: Стандарты и практики
 
-This repo uses raw Discord API Components V2 payloads through `src/discord/ui-v2/`.
+Этот проект использует raw Discord API Components V2 через `src/discord/ui-v2/*`.
 
-## Core Principles
-- Use one `Container` card for each logical surface.
-- Keep public loop surfaces to one edited message.
-- Use concise, scannable `TextDisplay` blocks.
-- Prefer ephemeral replies for button help/details.
+## Базовые принципы
 
-## Do
-- Build cards via `uiCard(...)` for consistent headers and accent styling.
-- Use `textBlock(...)` for all text content (automatic truncation guard).
-- Use `separator()` to break dense content sections.
-- Keep action rows purposeful:
-  - one row for dashboard CTA groups
-  - one row per select control in setup wizard
-- Set `MessageFlags.IsComponentsV2` when creating/editing V2 messages.
+- Один логический surface = один `Container` card.
+- Публичные циклы (duel/raid/hall/horoscope) живут как single-message projection (edit-only).
+- Любая интеракция должна подтверждаться <= 3 сек (`deferReply`, `deferUpdate`, `showModal`).
+- Длинные тексты разбиваются на короткие `TextDisplay` блоки.
 
-## Don�t
-- Don�t mix spammy follow-up public posts for normal state updates.
-- Don�t bypass `ThrottledMessageEditor` for projection edits.
-- Don�t encode unvalidated payloads directly from user input.
-- Don�t place long prose into one giant text block.
+## Каноничные helpers
 
-## Examples
+- `uiCard(...)` - единая карточка с title/status/accent.
+- `textBlock(...)` - safe text guard (ограничение длины).
+- `separator()` - отделение плотных секций.
+- `actionRowButtons(...)` - до 5 кнопок.
+- `actionRowSelects(...)` - один select на ряд.
+- `sendComponentsV2Message(...)` / `editComponentsV2Message(...)` - отправка/редактирование V2.
 
-### Duel scoreboard card
-```ts
-const view = renderDuelScoreboard(snapshot);
-await messageEditor.queueEdit({
-  channelId: snapshot.publicChannelId,
-  messageId: snapshot.scoreboardMessageId,
-  content: view.content ?? null,
-  components: view.components,
-  flags: COMPONENTS_V2_FLAGS,
-});
-```
+## Жесткие ограничения
 
-### Weekly horoscope V2 post
-```ts
-const message = renderWeeklyHoroscopePost({ guildId, weekStartDate });
-await sendComponentsV2Message(client, channelId, message);
-```
+- Если есть `MessageFlags.IsComponentsV2`, нельзя смешивать legacy поля (`content`, `embeds`, `attachments`, ...).
+- Нельзя обходить `ThrottledMessageEditor` для projection refresh.
+- Нельзя делать спам-постинг вместо edit одной проекции.
 
-### Setup wizard panel
-```ts
-const panel = renderSetupWizardPanel(draft);
-await interaction.editReply({
-  content: panel.content ?? null,
-  components: panel.components as never,
-  flags: COMPONENTS_V2_FLAGS,
-} as never);
-```
+## Ключевые UI-поверхности
 
-## Custom ID Pattern
-- Encode every interactive control with `encodeCustomId`.
-- Keep `feature/action/payload` compact.
-- Validate `action` and payload shape with `zod` in handlers.
+### 1. Setup Wizard (persistent panel)
 
-## Text Guard Pattern
-- `textBlock` applies safe truncation for `TextDisplay` limits.
-- Use short structured lines instead of long paragraphs.
+- Рендер: `src/discord/setupWizard/view.ts`
+- Действия: `pick_*`, `complete`, `reset`, `test_post`
+- Особенности:
+  - Draft на пользователя хранится in-memory с TTL.
+  - Commit валидирует типы каналов, timezone и existence role.
+  - После commit автовключаются безопасные feature/schedule при выполненных требованиях.
+
+### 2. Duel Scoreboard
+
+- Рендер: `src/discord/projections/scoreboardRenderer.ts`
+- CTA: `rules`, `how`, `open_room`
+- Source of truth: snapshot из DB, не содержимое Discord-сообщения.
+
+### 3. Raid Progress
+
+- Рендер: `src/discord/projections/raidProgressRenderer.ts`
+- CTA: `take_quests`, `my_contribution`, `rules`
+- Обновление: queue refresh + throttled edit.
+
+### 4. Pair Home Panel
+
+- Рендер: `src/discord/projections/pairHomeRenderer.ts`
+- CTA: `checkin`, `raid`, `duel submit/info`
+- В комнате пары должен быть ровно один bot-owned panel message.
+
+### 5. Weekly Horoscope Card
+
+- Рендер: `src/discord/projections/horoscopeWeeklyRenderer.ts`
+- CTA: `claim_open`, `about`, `start_pair_ritual`
+
+### 6. Monthly Hall Card
+
+- Рендер: `src/discord/projections/monthlyHallRenderer.ts`
+- Показывает только opt-in участников.
+
+### 7. Date Generator Results
+
+- Рендер: `src/discord/projections/dateIdeasRenderer.ts`
+- Три карточки идей + кнопка `save_weekend`.
+
+## Custom ID контракт
+
+- Кодирование: `encodeCustomId({ feature, action, payload })`
+- Декодирование и роутинг: `src/discord/interactions/router.ts`
+- Валидация payload/action: через `zod` схемы или строгое ручное парсинг-ветвление.
+
+Рекомендация по payload:
+- Минимальный объем (только нужные ключи).
+- Никаких невалидированных свободных текстов в custom_id.
+- UUID/id/shallow enums вместо длинных строк.
+
+## Паттерн ACK -> Work -> Reply
+
+1. Сразу ACK (`defer*`/`showModal`)
+2. Выполнить DB/queue операции
+3. Ответить `editReply`/`followUp`
+4. Для публичных поверхностей - запросить projection refresh, а не писать напрямую новый пост
+
+## Антипаттерны
+
+- Новое публичное сообщение на каждый state-change.
+- Бизнес-решение на основе текста текущего Discord-сообщения.
+- Игнор retry/duplicate path (double-click, network retry).
+- Встраивание user raw input в V2 payload без ограничений длины/формата.
+
+## Definition of Done для новой UI-фичи
+
+- Есть deterministic renderer.
+- Есть явная схема custom id действий.
+- Есть защита от дублей (db unique/op_dedup/tx).
+- Есть smoke-кейс и негативные кейсы (не тот канал/нет прав/expired session).
+- Есть telemetry-поля в structured logs.

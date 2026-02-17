@@ -1,14 +1,23 @@
-# Content Systems Skill
+﻿# Content Systems Skill
+
+## Цель
+
+Поддерживать deterministic контентные механики без случайных LLM-отклонений в production loop.
 
 ## Do
-- Store template libraries in DB.
-- Use deterministic seed/week selection.
-- Version and review content changes via seed scripts.
-- Keep deterministic in-code template libraries for interaction-only microcopy (`/say`, `/date`, mascot answers) when DB seeding is unnecessary.
+
+- Хранить контентные библиотеки в коде/БД с версионированием.
+- Использовать deterministic выбор шаблонов по параметрам (week/mode/context/filters).
+- Изменения контента проводить через review и seed/commit.
+- Для микро-интеракций (например `/say`, `/date`, mascot answers) использовать проверяемые шаблоны.
 
 ## Don't
-- Don't generate production loop text from ad-hoc LLM prompts.
 
-## Example
-- Horoscope uses seeded archetype variants for mode/context combinations.
-- Date generator uses deterministic template ranking by selected filters (energy/budget/time).
+- Не генерировать production-текст ad-hoc LLM prompt-ами в рантайме.
+- Не выпускать контент без обратной совместимости с существующими ключами.
+
+## Проверка качества
+
+- Одинаковый input дает одинаковый output.
+- Тексты локализованы (минимум `ru`).
+- Нет пустых/битых шаблонов в активном сценарии.

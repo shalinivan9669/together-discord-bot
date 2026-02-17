@@ -1,16 +1,28 @@
-# Discord Interactions Skill
+﻿# Discord Interactions Skill
+
+## Цель
+
+Делать interaction-пути предсказуемыми, быстрыми и безопасными для пользователя.
 
 ## Do
-- ACK within 3 seconds (`deferReply`, `showModal`, `deferUpdate`).
-- Use slash commands + buttons + selects + modals.
-- Keep user replies ephemeral by default for admin/private flows.
-- Prefer editing one existing message for guided flows (`/repair`) instead of posting step spam.
-- Reuse the same modal builder for command and button entry points (`/anon ask` and QoTD propose).
+
+- ACK любой интеракции в пределах 3 секунд (`deferReply`, `deferUpdate`, `showModal`).
+- Использовать только slash/buttons/select/modals как входы.
+- Делать приватные ответы ephemeral по умолчанию для персональных/админских действий.
+- Для длительных сценариев использовать одну редактируемую message-сессию.
+- Переиспользовать один и тот же modal builder в эквивалентных входах (command и button entry).
+- Валидировать custom id payload перед использованием.
 
 ## Don't
-- Don't request Message Content intent.
-- Don't parse arbitrary chat messages as command inputs.
-- Don't fan out multi-message repair or wizard updates when one editable message is enough.
 
-## Example
-- Duel submit button opens modal immediately; modal handler defers and writes to DB.
+- Не требовать Message Content intent.
+- Не читать произвольные сообщения чата как команды.
+- Не оставлять действие без ACK/reply path.
+- Не распылять один flow на множество публичных сообщений.
+
+## Проверка качества
+
+- Есть быстрый ACK.
+- Есть happy-path и error-path ответы.
+- Нет unhandled interaction timeout.
+- Нажатие кнопки 2 раза не ломает состояние.

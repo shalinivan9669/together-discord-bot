@@ -1,93 +1,142 @@
-# Smoke Test
+﻿# Smoke Test
 
-Run this after deploy, in one test guild, with two human test accounts (`UserA`, `UserB`) and one admin/mod account.
+Запускать после каждого деплоя в тестовой гильдии с минимум тремя аккаунтами:
+
+- `UserA`, `UserB` (обычные участники)
+- `Admin` (администратор/модератор)
 
 ## 0) Runtime smoke
+
 1. `pnpm smoke`
-Expected:
-- Environment schema prints OK.
-- Database connection prints OK.
-- pg-boss ping prints OK.
-- Schedule list prints runtime `enabled`/`disabled` and DB `present`/`missing`.
+Ожидается:
+- env schema OK
+- db connect OK
+- pg-boss ping OK
+- список schedule с флагами enable/disable
 
 2. `GET /healthz`
-Expected:
+Ожидается:
 - `ok: true`
 - `db: "ok"`
 - `discord: "ready"`
 - `boss: "ok"`
 
-## 1) Discord command smoke (ordered)
-1. `/setup`
-Expected:
-- Ephemeral Setup Wizard card with Channel Select and Role Select controls.
+## 1) Setup и admin
 
-2. In `/setup` panel, select all required channels and optional moderator role, then press `Save` and `Test Post`.
-Expected:
-- `Guild settings saved.`
-- `Test post queued...` and a post appears in configured channel.
+1. `/setup start` (Admin)
+Ожидается:
+- в текущем канале появляется persistent setup panel (Components V2)
+- команда возвращает ссылку на панель
 
-3. `/pair create user:@UserB` (run by admin/mod)
-Expected:
-- Private pair room created (or reused).
-- Exactly one Pair Home panel message appears in the pair room.
+2. На setup panel выбрать category/channels/role/timezone, нажать `Complete`.
+Ожидается:
+- панель показывает completed статус
+- конфиг сохранен
 
-4. In pair room, `/pair room` from `UserA` and `UserB`.
-Expected:
-- Both get the same room reference.
+3. Нажать `Test post`.
+Ожидается:
+- queued/уже queued сообщение
+- тестовый пост появляется в целевом канале
 
-5. `/duel start public_channel:#duel-channel`
-Expected:
-- Duel scoreboard message exists as one public dashboard message.
+4. `/admin status`, `/admin doctor`
+Ожидается:
+- нет критичных ошибок
+- feature/config/schedule диагностируются корректно
 
-6. `/duel round start duration_minutes:10`
-Expected:
-- Pair room gets duel round notification with submit button.
-- Pair Home panel updates and shows `Duel submit` button.
+## 2) Pair, duel, raid
 
-7. `UserA` clicks `Duel submit` from Pair Home and submits modal.
-Expected:
-- Ephemeral confirmation.
-- Scoreboard message edits in place (no new message).
+1. `/pair create user:@UserB` (Admin/Mod)
+Ожидается:
+- приватная pair room создана/переиспользована
+- в комнате есть один Pair Home panel
 
-8. `/raid start channel:#raid-channel`
-Expected:
-- Raid progress dashboard message exists as one public dashboard message.
-- Pair Home panel refreshes with raid daily points line.
+2. `/pair room` от `UserA` и `UserB`
+Ожидается:
+- оба получают ссылку на одну и ту же комнату
 
-9. In raid dashboard, click `Take quests`, claim one quest, then partner confirms in pair room.
-Expected:
-- Confirmation succeeds.
-- Raid dashboard edits in place.
-- Pair Home panel edits in place with updated raid points.
+3. `/duel start public_channel:#duel-channel`
+Ожидается:
+- создано одно публичное duel scoreboard сообщение
 
-10. `/horoscope publish-now` (admin/mod)
-Expected:
-- Weekly horoscope dashboard exists as one message in horoscope channel.
-- Re-running command edits same message (no extra post).
+4. `/duel round start duration_minutes:10`
+Ожидается:
+- в pair room кнопка submit
+- Pair Home обновлен
 
-11. In weekly horoscope dashboard, click `Get privately`.
-Expected:
-- Ephemeral picker with Mode + Context selects.
-- After submit, delivery message indicates DM or pair-room fallback.
+5. `UserA` отправляет ответ через modal.
+Ожидается:
+- ephemeral подтверждение
+- scoreboard редактируется in-place
 
-12. `/checkin start` inside pair room.
-Expected:
-- Agreement select appears.
-- Submit modal accepts 5 scores.
-- Pair Home panel edits in place to submitted check-in status.
+6. `/raid start channel:#raid-channel`
+Ожидается:
+- создано одно публичное raid progress сообщение
 
-13. `/anon ask` from normal user, then `/anon queue` from admin/mod.
-Expected:
-- Queue is pageable (`Prev`/`Next`) and admin-only.
-- Approve/reject updates queue message cleanly and returns ephemeral moderation feedback.
+7. В raid dashboard нажать `Взять квесты` -> claim -> partner confirm.
+Ожидается:
+- подтверждение проходит
+- raid dashboard и pair home обновляются edit-ом
 
-14. `/hall status`, then `/hall optin category:all`, then `/hall status`.
-Expected:
-- Opt-in status reflects updates correctly.
+## 3) Horoscope, checkin, anon, hall
+
+1. `/horoscope publish-now` (Admin/Mod)
+Ожидается:
+- weekly horoscope card существует как одна запись
+- повторный publish обновляет/дедупит, не спамит канал
+
+2. В weekly horoscope нажать `Получить в личку`.
+Ожидается:
+- mode/context picker
+- корректная delivery логика
+
+3. `/checkin start` в pair room
+Ожидается:
+- select agreement
+- modal на 5 оценок
+- pair home обновлен
+
+4. `/anon ask` от обычного пользователя, затем `/anon queue` от Admin/Mod
+Ожидается:
+- queue paginated
+- approve/reject обновляют очередь и дают ephemeral feedback
+
+5. `/hall status` -> `/hall optin category:all` -> `/hall status`
+Ожидается:
+- opt-in состояние изменяется корректно
+
+## 4) Mediator и date
+
+1. `/say`
+Ожидается:
+- открывается modal
+- после submit доступны `soft/direct/short`
+- `Send to pair room` срабатывает один раз на сессию
+
+2. `/repair` в pair room
+Ожидается:
+- стартует 7-минутный flow
+- в комнате одна bot-message редактируется на шагах `+2/+4/+6`
+
+3. `/date`
+Ожидается:
+- picker energy/budget/time
+- `Generate 3 ideas` отдает 3 карточки
+- `Save for weekend` подтверждает сохранение
+
+## 5) Дополнительные команды
+
+1. `/ping`
+Ожидается: быстрый ephemeral ответ.
+
+2. `/season status`
+Ожидается:
+- при выключенной фиче - понятный disabled ответ
+- при включенной фиче - current placeholder статус
 
 ## Pass criteria
-- No interaction timeout errors.
-- No dashboard spam (single-message edit behavior preserved).
-- No permission bypass for admin/mod-only flows.
-- `/healthz` remains healthy throughout.
+
+- Нет interaction timeout.
+- Нет дублированного публичного спама в проекциях.
+- Нет permission bypass в admin/mod потоках.
+- Повторные клики не приводят к двойным начислениям/двойным публикациям.
+- `/healthz` остается здоровым во время всего smoke.

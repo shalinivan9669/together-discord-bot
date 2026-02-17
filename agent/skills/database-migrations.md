@@ -1,14 +1,26 @@
-# Database Migrations Skill
+﻿# Database Migrations Skill
+
+## Цель
+
+Развивать схему БД без риска поломки прод-данных и откатов поведения.
 
 ## Do
-- Add forward-only SQL migration files.
-- Keep `drizzle` schema in sync with migrations.
-- Validate unique constraints for dedupe-critical flows.
-- Keep seeds idempotent with upsert semantics.
-- Add unique/dedupe constraints for interaction saves (`date_weekend_plans`) and use status columns for scheduled-flow sessions (`mediator_repair_sessions`).
+
+- Добавлять только forward-only SQL migration файлы.
+- Синхронизировать SQL миграции с Drizzle schema.
+- Заранее закладывать уникальные ограничения для dedupe-критичных flow.
+- Делать seed-скрипты idempotent (upsert/re-runnable).
+- Для долгоживущих сценариев хранить явные status/step/timestamp поля.
 
 ## Don't
-- Don't edit already-applied migration files in deployed environments.
 
-## Example
-- Pair uniqueness: `UNIQUE(guild_id,user_low,user_high)`.
+- Не редактировать миграции, которые уже применялись в проде.
+- Не добавлять таблицы интеракций без индексов на hot-path выборки.
+- Не переносить ответственность за целостность только на код приложения.
+
+## Мини-чеклист
+
+- Есть PK и необходимые UNIQUE.
+- Есть индексы для частых WHERE/JOIN.
+- Есть nullable-стратегия для backfill.
+- Есть план обратной совместимости для старого кода (если нужно).

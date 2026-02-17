@@ -1,25 +1,29 @@
-# Ops Runbooks Skill
+﻿# Ops Runbooks Skill
+
+## Цель
+
+Сократить MTTR при инцидентах и не ухудшить состояние системы ручными действиями.
 
 ## Do
-- Check `/healthz` first.
-- Correlate failures with `correlation_id`, `interaction_id`, `job_id`.
-- Pause/restart safely with graceful shutdown path.
-- Verify queue depth and retry behavior.
-- Inspect `mediator_repair_sessions` when guided repair ticks look stalled.
+
+- Всегда начинать с `/healthz`.
+- Коррелировать события по `correlation_id`, `interaction_id`, `job_id`.
+- Проверять queue depth и retry поведение перед ручным вмешательством.
+- Предпочитать graceful restart вместо импровизированных hotfix в проде.
+- Для repair-инцидентов смотреть `mediator_repair_sessions`.
 
 ## Don't
-- Don't bypass projection jobs with manual spam posts.
-- Don't expose secrets while debugging.
 
-## Operational Safety Checklist
-- Always defer interactions.
-- Never read message content.
-- Use DB constraints + tx for dedupe.
-- Edit-only public projection messages.
-- No spam posting.
-- Scheduled jobs idempotent.
-- correlation_id everywhere.
-- No secrets in logs.
-- Repeatable migrations + seeds.
-- Phase 2 flags OFF by default.
-- One-message flows stay one-message (repair ticks edit in place).
+- Не публиковать вручную посты в projection channels как "временный фикс".
+- Не логировать секреты в процессе диагностики.
+- Не выполнять destructive команды БД без явной задачи/плана.
+
+## Operational safety checklist
+
+- ACK интеракций соблюдается.
+- Message content не используется как вход.
+- DB constraints + tx защищают от дублей.
+- Public projections edit-only.
+- Schedules idempotent.
+- Логи трассируются по correlation id.
+- Миграции и seed повторяемы.
