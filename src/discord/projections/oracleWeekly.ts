@@ -1,41 +1,41 @@
-import { eq, sql } from 'drizzle-orm';
+﻿import { eq, sql } from 'drizzle-orm';
 import type { Client } from 'discord.js';
-import { ensureHoroscopeWeek } from '../../app/services/horoscopeService';
+import { ensureOracleWeek } from '../../app/services/oracleService';
 import { getGuildFeatureState } from '../../app/services/guildConfigService';
 import { startOfWeekIso } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
 import { guildSettings } from '../../infra/db/schema';
 import { logger } from '../../lib/logger';
-import { renderWeeklyHoroscopePost } from './horoscopeWeeklyRenderer';
+import { renderWeeklyOraclePost } from './oracleWeeklyRenderer';
 import type { ThrottledMessageEditor } from './messageEditor';
 import { COMPONENTS_V2_FLAGS, sendComponentsV2Message } from '../ui-v2';
 import { getDiscordErrorStatus, withDiscordApiRetry } from './discordApiRetry';
 import { Routes } from '../ui-v2/api';
 
-export type WeeklyHoroscopeRefreshStats = {
+export type WeeklyOracleRefreshStats = {
   processed: number;
   created: number;
   updated: number;
   failed: number;
 };
 
-async function clearHoroscopeMessageId(guildId: string): Promise<void> {
+async function clearOracleMessageId(guildId: string): Promise<void> {
   await db.execute(sql`
     update guild_settings
-    set horoscope_message_id = null, updated_at = now()
+    set oracle_message_id = null, updated_at = now()
     where guild_id = ${guildId}
   `);
 }
 
-async function setHoroscopeMessageIdIfUnset(input: {
+async function setOracleMessageIdIfUnset(input: {
   guildId: string;
   messageId: string;
 }): Promise<boolean> {
   const updated = await db.execute<{ guild_id: string }>(sql`
     update guild_settings
-    set horoscope_message_id = ${input.messageId}, updated_at = now()
+    set oracle_message_id = ${input.messageId}, updated_at = now()
     where guild_id = ${input.guildId}
-      and horoscope_message_id is null
+      and oracle_message_id is null
     returning guild_id
   `);
 
@@ -45,53 +45,53 @@ async function setHoroscopeMessageIdIfUnset(input: {
 async function deleteMessageBestEffort(client: Client, channelId: string, messageId: string): Promise<void> {
   try {
     await withDiscordApiRetry({
-      feature: 'horoscope_weekly',
+      feature: 'oracle_weekly',
       action: 'delete_duplicate',
       maxAttempts: 3,
       baseDelayMs: 300,
       context: {
         channel_id: channelId,
-        message_id: messageId
+        message_id: messageId,
       },
       execute: async () => {
         await client.rest.delete(Routes.channelMessage(channelId, messageId));
-      }
+      },
     });
   } catch {
     logger.warn(
       {
-        feature: 'horoscope_weekly',
+        feature: 'oracle_weekly',
         channel_id: channelId,
-        message_id: messageId
+        message_id: messageId,
       },
-      'Failed to delete duplicate weekly horoscope message',
+      'Failed to delete duplicate weekly oracle message',
     );
   }
 }
 
-export async function refreshWeeklyHoroscopeProjection(input: {
+export async function refreshWeeklyOracleProjection(input: {
   client: Client;
   messageEditor: ThrottledMessageEditor;
   weekStartDate?: string;
   guildId?: string;
   now?: Date;
-}): Promise<WeeklyHoroscopeRefreshStats> {
+}): Promise<WeeklyOracleRefreshStats> {
   const weekStartDate = input.weekStartDate ?? startOfWeekIso(input.now ?? new Date());
 
   const rows = input.guildId
     ? await db
         .select({
           guildId: guildSettings.guildId,
-          horoscopeChannelId: guildSettings.horoscopeChannelId,
-          horoscopeMessageId: sql<string | null>`horoscope_message_id`
+          oracleChannelId: guildSettings.oracleChannelId,
+          oracleMessageId: sql<string | null>`oracle_message_id`,
         })
         .from(guildSettings)
         .where(eq(guildSettings.guildId, input.guildId))
     : await db
         .select({
           guildId: guildSettings.guildId,
-          horoscopeChannelId: guildSettings.horoscopeChannelId,
-          horoscopeMessageId: sql<string | null>`horoscope_message_id`
+          oracleChannelId: guildSettings.oracleChannelId,
+          oracleMessageId: sql<string | null>`oracle_message_id`,
         })
         .from(guildSettings);
 
@@ -101,28 +101,28 @@ export async function refreshWeeklyHoroscopeProjection(input: {
   let failed = 0;
 
   for (const row of rows) {
-    const state = await getGuildFeatureState(row.guildId, 'horoscope');
+    const state = await getGuildFeatureState(row.guildId, 'oracle');
     if (!state.enabled || !state.configured) {
       logger.info(
         {
-          feature: 'horoscope_weekly',
+          feature: 'oracle_weekly',
           action: 'refresh_skipped',
           guild_id: row.guildId,
-          reason: state.reason
+          reason: state.reason,
         },
         'skipped: missing channel config',
       );
       continue;
     }
 
-    const channelId = row.horoscopeChannelId;
+    const channelId = row.oracleChannelId;
     if (!channelId) {
       logger.info(
         {
-          feature: 'horoscope_weekly',
+          feature: 'oracle_weekly',
           action: 'refresh_skipped',
           guild_id: row.guildId,
-          reason: 'horoscope channel not configured'
+          reason: 'oracle channel not configured',
         },
         'skipped: missing channel config',
       );
@@ -132,19 +132,19 @@ export async function refreshWeeklyHoroscopeProjection(input: {
     processed += 1;
 
     try {
-      await ensureHoroscopeWeek(row.guildId, weekStartDate);
-      const view = renderWeeklyHoroscopePost({
+      await ensureOracleWeek(row.guildId, weekStartDate);
+      const view = renderWeeklyOraclePost({
         guildId: row.guildId,
-        weekStartDate
+        weekStartDate,
       });
 
-      if (row.horoscopeMessageId) {
+      if (row.oracleMessageId) {
         try {
           await input.messageEditor.queueEdit({
             channelId,
-            messageId: row.horoscopeMessageId,
+            messageId: row.oracleMessageId,
             components: view.components,
-            flags: COMPONENTS_V2_FLAGS
+            flags: COMPONENTS_V2_FLAGS,
           });
           updated += 1;
           continue;
@@ -153,14 +153,14 @@ export async function refreshWeeklyHoroscopeProjection(input: {
             throw error;
           }
 
-          await clearHoroscopeMessageId(row.guildId);
+          await clearOracleMessageId(row.guildId);
         }
       }
 
       const createdMessage = await sendComponentsV2Message(input.client, channelId, view);
-      const claimed = await setHoroscopeMessageIdIfUnset({
+      const claimed = await setOracleMessageIdIfUnset({
         guildId: row.guildId,
-        messageId: createdMessage.id
+        messageId: createdMessage.id,
       });
 
       if (claimed) {
@@ -170,39 +170,39 @@ export async function refreshWeeklyHoroscopeProjection(input: {
 
       const latestRows = await db
         .select({
-          horoscopeMessageId: sql<string | null>`horoscope_message_id`,
-          horoscopeChannelId: guildSettings.horoscopeChannelId
+          oracleMessageId: sql<string | null>`oracle_message_id`,
+          oracleChannelId: guildSettings.oracleChannelId,
         })
         .from(guildSettings)
         .where(eq(guildSettings.guildId, row.guildId))
         .limit(1);
 
       const latest = latestRows[0];
-      if (latest?.horoscopeMessageId) {
+      if (latest?.oracleMessageId) {
         await input.messageEditor.queueEdit({
-          channelId: latest.horoscopeChannelId ?? channelId,
-          messageId: latest.horoscopeMessageId,
+          channelId: latest.oracleChannelId ?? channelId,
+          messageId: latest.oracleMessageId,
           components: view.components,
-          flags: COMPONENTS_V2_FLAGS
+          flags: COMPONENTS_V2_FLAGS,
         });
         updated += 1;
       } else {
         created += 1;
       }
 
-      if (latest?.horoscopeMessageId !== createdMessage.id) {
+      if (latest?.oracleMessageId !== createdMessage.id) {
         await deleteMessageBestEffort(input.client, channelId, createdMessage.id);
       }
     } catch (error) {
       failed += 1;
       logger.error(
         {
-          feature: 'horoscope_weekly',
+          feature: 'oracle_weekly',
           guild_id: row.guildId,
           week_start_date: weekStartDate,
-          error
+          error,
         },
-        'Weekly horoscope projection refresh failed',
+        'Weekly oracle projection refresh failed',
       );
     }
   }
@@ -211,6 +211,6 @@ export async function refreshWeeklyHoroscopeProjection(input: {
     processed,
     created,
     updated,
-    failed
+    failed,
   };
 }

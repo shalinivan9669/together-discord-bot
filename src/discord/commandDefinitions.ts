@@ -1,11 +1,11 @@
-import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord.js';
+﻿import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord.js';
 import { adminCommand } from './commands/admin';
 import { anonCommand } from './commands/anon';
 import { checkinCommand } from './commands/checkin';
 import { dateCommand } from './commands/date';
 import { duelCommand } from './commands/duel';
 import { hallCommand } from './commands/hall';
-import { horoscopeCommand } from './commands/horoscope';
+import { oracleCommand } from './commands/oracle';
 import { pairCommand } from './commands/pair';
 import { pingCommand } from './commands/ping';
 import { raidCommand } from './commands/raid';
@@ -25,7 +25,7 @@ export const commandModules: readonly CommandModule[] = [
   dateCommand,
   duelCommand,
   hallCommand,
-  horoscopeCommand,
+  oracleCommand,
   checkinCommand,
   anonCommand,
   raidCommand,
@@ -35,3 +35,4 @@ export const commandModules: readonly CommandModule[] = [
 export const commandDefinitions: RESTPostAPIApplicationCommandsJSONBody[] = commandModules.map(
   (command) => command.data.toJSON(),
 );
+

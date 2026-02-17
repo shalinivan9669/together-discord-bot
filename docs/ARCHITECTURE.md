@@ -47,7 +47,7 @@
 - Duel scoreboard
 - Raid progress
 - Pair home panel
-- Weekly horoscope card
+- Oracle card (weekly cycle)
 - Monthly hall card
 
 Обновления идут через queue jobs с coalescing по singleton ключам. Для rate-limit устойчивости используется `ThrottledMessageEditor`.
@@ -71,3 +71,4 @@
 - Очередь decouple-ит пользовательский вход и тяжелые апдейты.
 - Повторные события (double-click, retries) приводят к same state.
 - Multi-guild конфигурация хранится в DB и переключается без redeploy.
+

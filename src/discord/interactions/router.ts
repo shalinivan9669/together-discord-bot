@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ButtonInteraction,
   ChannelSelectMenuInteraction,
   Client,
@@ -43,13 +43,14 @@ import {
   buildCheckinSubmitModal,
   buildDateGeneratorPicker,
   buildDuelSubmissionModal,
-  buildHoroscopeClaimPicker,
+  buildOracleClaimPicker,
   buildMediatorSayToneButtons,
   buildRaidClaimButton,
   buildRaidConfirmButton
 } from './components';
 import { buildAnonQueueView } from './anonQueueView';
 import { decodeCustomId } from './customId';
+import type { CustomIdEnvelope } from './customId';
 import {
   approveAnonQuestion,
   buildAnonMascotAnswer,
@@ -57,11 +58,11 @@ import {
   rejectAnonQuestion
 } from '../../app/services/anonService';
 import {
-  claimHoroscope,
-  markHoroscopeClaimDelivery,
-  parseHoroscopeContext,
-  parseHoroscopeMode
-} from '../../app/services/horoscopeService';
+  claimOracle,
+  markOracleClaimDelivery,
+  parseOracleContext,
+  parseOracleMode
+} from '../../app/services/oracleService';
 import { getPairForUser } from '../../infra/db/queries/pairs';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { claimRaidQuest, confirmRaidClaim, getRaidContributionForUser, getTodayRaidOffers } from '../../app/services/raidService';
@@ -73,6 +74,19 @@ import { ANON_MASCOT_DAILY_LIMIT, ANON_PROPOSE_DAILY_LIMIT } from '../../config/
 import { t, type AppLocale } from '../../i18n';
 import { createInteractionTranslator } from '../locale';
 import { formatFeatureUnavailableError } from '../featureErrors';
+
+const LEGACY_ORACLE_FEATURE = 'horoscope';
+
+function withOracleFeatureCompatibility(decoded: CustomIdEnvelope): CustomIdEnvelope {
+  if (decoded.feature !== LEGACY_ORACLE_FEATURE) {
+    return decoded;
+  }
+
+  return {
+    ...decoded,
+    feature: 'oracle',
+  };
+}
 
 export type InteractionContext = {
   client: Client;
@@ -113,7 +127,7 @@ const datePayloadSchema = z.object({
   t: z.string().min(1)
 });
 const anonQuestionPayloadSchema = z.object({ q: z.string().uuid() });
-const horoscopePickerPayloadSchema = z.object({
+const oraclePickerPayloadSchema = z.object({
   g: z.string().min(1),
   w: z.string().min(1),
   m: z.string().optional(),
@@ -164,19 +178,19 @@ function parseSayToneOrDefault(value: string): 'soft' | 'direct' | 'short' {
   return 'soft';
 }
 
-function parseHoroscopeSelection(payload: Record<string, string>): {
+function parseOracleSelection(payload: Record<string, string>): {
   guildId: string;
   weekStartDate: string;
   mode: 'soft' | 'neutral' | 'hard';
   context: 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
 } | null {
-  const parsed = horoscopePickerPayloadSchema.safeParse(payload);
+  const parsed = oraclePickerPayloadSchema.safeParse(payload);
   if (!parsed.success) {
     return null;
   }
 
-  const mode = parseHoroscopeMode(parsed.data.m ?? 'soft');
-  const context = parseHoroscopeContext(parsed.data.c ?? 'ok');
+  const mode = parseOracleMode(parsed.data.m ?? 'soft');
+  const context = parseOracleContext(parsed.data.c ?? 'ok');
   if (!mode || !context) {
     return null;
   }
@@ -190,7 +204,7 @@ function parseHoroscopeSelection(payload: Record<string, string>): {
 }
 
 async function handleButton(ctx: InteractionContext, interaction: ButtonInteraction): Promise<void> {
-  const decoded = decodeCustomId(interaction.customId);
+  const decoded = withOracleFeatureCompatibility(decodeCustomId(interaction.customId));
   const correlationId = createCorrelationId();
   const tr = await createInteractionTranslator(interaction);
 
@@ -746,17 +760,17 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_open') {
-    const selection = parseHoroscopeSelection(decoded.payload);
+  if (decoded.feature === 'oracle' && decoded.action === 'claim_open') {
+    const selection = parseOracleSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_horoscope') });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_oracle') });
       return;
     }
 
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: tr.t('interaction.horoscope.pick_mode_context'),
-      components: buildHoroscopeClaimPicker({
+      content: tr.t('interaction.oracle.pick_mode_context'),
+      components: buildOracleClaimPicker({
         guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: selection.mode,
@@ -766,22 +780,22 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
+  if (decoded.feature === 'oracle' && decoded.action === 'claim_submit') {
     if (!interaction.guildId) {
       await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
-    const selection = parseHoroscopeSelection(decoded.payload);
+    const selection = parseOracleSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_horoscope_selection') });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_oracle_selection') });
       return;
     }
 
     await interaction.deferUpdate();
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
-    const claimed = await claimHoroscope({
+    const claimed = await claimOracle({
       guildId: interaction.guildId,
       userId: interaction.user.id,
       pairId: pair?.id ?? null,
@@ -799,7 +813,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         const channel = await interaction.client.channels.fetch(pair.privateChannelId);
         if (channel?.isTextBased() && 'send' in channel && typeof channel.send === 'function') {
           await channel.send({
-            content: tr.t('interaction.horoscope.weekly_to_pair_content', {
+            content: tr.t('interaction.oracle.weekly_to_pair_content', {
               userId: interaction.user.id,
               text: claimed.text
             })
@@ -809,32 +823,32 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       }
     }
 
-    await markHoroscopeClaimDelivery(claimed.claim.id, delivered);
+    await markOracleClaimDelivery(claimed.claim.id, delivered);
 
     const deliveryText = delivered === 'dm'
-      ? tr.t('interaction.horoscope.delivery_dm')
+      ? tr.t('interaction.oracle.delivery_dm')
       : delivered === 'pair'
-        ? tr.t('interaction.horoscope.delivery_pair')
-        : tr.t('interaction.horoscope.delivery_fallback_here', { text: claimed.text });
+        ? tr.t('interaction.oracle.delivery_pair')
+        : tr.t('interaction.oracle.delivery_fallback_here', { text: claimed.text });
 
     await interaction.editReply({
       content: claimed.created
-        ? tr.t('interaction.horoscope.claimed', { delivery: deliveryText })
-        : tr.t('interaction.horoscope.already_claimed', { delivery: deliveryText }),
+        ? tr.t('interaction.oracle.claimed', { delivery: deliveryText })
+        : tr.t('interaction.oracle.already_claimed', { delivery: deliveryText }),
       components: []
     });
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'about') {
+  if (decoded.feature === 'oracle' && decoded.action === 'about') {
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: tr.t('interaction.horoscope.about'),
+      content: tr.t('interaction.oracle.about'),
     });
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'start_pair_ritual') {
+  if (decoded.feature === 'oracle' && decoded.action === 'start_pair_ritual') {
     if (!interaction.guildId) {
       await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
@@ -845,7 +859,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       await requestPairHomeRefresh(ctx.boss, {
         guildId: interaction.guildId,
         pairId: pair.id,
-        reason: 'horoscope_ritual_open',
+        reason: 'oracle_ritual_open',
         interactionId: interaction.id,
         userId: interaction.user.id,
         correlationId
@@ -855,8 +869,8 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       content: pair
-        ? tr.t('interaction.horoscope.ritual_open_pair_panel', { channelId: pair.privateChannelId })
-        : tr.t('interaction.horoscope.ritual_create_pair_first'),
+        ? tr.t('interaction.oracle.ritual_open_pair_panel', { channelId: pair.privateChannelId })
+        : tr.t('interaction.oracle.ritual_create_pair_first'),
     });
     return;
   }
@@ -1063,7 +1077,7 @@ function parseCheckinScores(locale: AppLocale, interaction: ModalSubmitInteracti
 }
 
 async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInteraction): Promise<void> {
-  const decoded = decodeCustomId(interaction.customId);
+  const decoded = withOracleFeatureCompatibility(decodeCustomId(interaction.customId));
   const correlationId = createCorrelationId();
   const tr = await createInteractionTranslator(interaction);
 
@@ -1261,7 +1275,7 @@ async function handleSelect(
   ctx: InteractionContext,
   interaction: StringSelectMenuInteraction | ChannelSelectMenuInteraction | RoleSelectMenuInteraction,
 ): Promise<void> {
-  const decoded = decodeCustomId(interaction.customId);
+  const decoded = withOracleFeatureCompatibility(decodeCustomId(interaction.customId));
   const tr = await createInteractionTranslator(interaction);
 
   if (decoded.feature === 'setup_wizard') {
@@ -1289,15 +1303,15 @@ async function handleSelect(
     return;
   }
 
-  if (decoded.feature === 'horoscope' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
+  if (decoded.feature === 'oracle' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported.horoscope_selector') });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported.oracle_selector') });
       return;
     }
 
-    const selection = parseHoroscopeSelection(decoded.payload);
+    const selection = parseOracleSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_horoscope_selection_picker') });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_oracle_selection_picker') });
       return;
     }
 
@@ -1308,20 +1322,20 @@ async function handleSelect(
     }
 
     const nextMode = decoded.action === 'pick_mode'
-      ? parseHoroscopeMode(selected)
+      ? parseOracleMode(selected)
       : selection.mode;
     const nextContext = decoded.action === 'pick_context'
-      ? parseHoroscopeContext(selected)
+      ? parseOracleContext(selected)
       : selection.context;
 
     if (!nextMode || !nextContext) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.invalid_option.horoscope_selection') });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.invalid_option.oracle_selection') });
       return;
     }
 
     await interaction.update({
-      content: tr.t('interaction.horoscope.pick_mode_context'),
-      components: buildHoroscopeClaimPicker({
+      content: tr.t('interaction.oracle.pick_mode_context'),
+      components: buildOracleClaimPicker({
         guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: nextMode,
@@ -1452,4 +1466,5 @@ export async function routeInteractionComponent(
     }
   }
 }
+
 

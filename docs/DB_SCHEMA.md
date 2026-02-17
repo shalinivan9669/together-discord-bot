@@ -1,4 +1,4 @@
-# Database Schema
+﻿# Database Schema
 
 Migrations:
 - `src/infra/db/migrations/0000_init.sql`
@@ -29,10 +29,10 @@ Migrations:
 - `mediator_repair_sessions(id PK, guild_id, pair_id, channel_id, message_id, started_by_user_id, status, current_step, started_at, last_tick_at, completed_at)`
 - `date_weekend_plans(id PK, guild_id, user_id, pair_id, weekend_date, energy, budget, time_window, ideas_json, created_at, UNIQUE(guild_id,user_id,weekend_date,energy,budget,time_window))`
 
-## Horoscope (Phase 2)
-- `content_horoscope_archetypes(key PK, title, variants_json, active, created_at)`
-- `horoscope_weeks(id PK, guild_id, week_start_date, archetype_key, seed, UNIQUE(guild_id,week_start_date))`
-- `horoscope_claims(id PK, guild_id, week_start_date, user_id, pair_id, delivered_to, mode, context, claim_text, UNIQUE(guild_id,week_start_date,user_id))`
+## Oracle (Phase 2)
+- `content_oracle_archetypes(key PK, title, variants_json, active, created_at)`
+- `oracle_weeks(id PK, guild_id, week_start_date, archetype_key, seed, UNIQUE(guild_id,week_start_date))`
+- `oracle_claims(id PK, guild_id, week_start_date, user_id, pair_id, delivered_to, mode, context, claim_text, UNIQUE(guild_id,week_start_date,user_id))`
 
 ## Check-in (Phase 2)
 - `agreements_library(key PK, text, tags_json, active, created_at)`
@@ -55,3 +55,4 @@ Migrations:
 - `raid_daily_offers(id PK, raid_id, day_date, quest_keys_json, UNIQUE(raid_id,day_date))`
 - `raid_claims(id PK, raid_id, day_date, pair_id, quest_key, status, base_points, bonus_points, requested_by_user_id, confirmed_by_user_id, UNIQUE(raid_id,day_date,pair_id,quest_key))`
 - `raid_pair_daily_totals(raid_id, day_date, pair_id, points_total, UNIQUE(raid_id,day_date,pair_id))`
+

@@ -1,4 +1,4 @@
-# Step 1 Changed Files (Full Content)
+﻿# Step 1 Changed Files (Full Content)
 
 ## docs/UX_PLAN.md
 ```md
@@ -55,7 +55,7 @@
   - participants count
   - top-5
   - buttons: Take today quests / My contribution / Rules
-- Weekly horoscope public post now renders as V2 container with:
+- Weekly oracle public post now renders as V2 container with:
   - header + teaser
   - buttons: Get privately / About / Start pair ritual
 
@@ -79,7 +79,7 @@
 ### 4. `/setup` Ephemeral Wizard
 - `/setup` now opens an ephemeral setup panel.
 - Wizard controls:
-  - Channel Selects: duel/horoscope/questions/raid
+  - Channel Selects: duel/oracle/questions/raid
   - Role Select: moderator role
   - Buttons: Save / Reset / Test Post
 - Save persists to `guild_settings`.
@@ -142,11 +142,11 @@ This repo uses raw Discord API Components V2 payloads through `src/discord/ui-v2
   - one row per select control in setup wizard
 - Set `MessageFlags.IsComponentsV2` when creating/editing V2 messages.
 
-## Don’t
-- Don’t mix spammy follow-up public posts for normal state updates.
-- Don’t bypass `ThrottledMessageEditor` for projection edits.
-- Don’t encode unvalidated payloads directly from user input.
-- Don’t place long prose into one giant text block.
+## DonвЂ™t
+- DonвЂ™t mix spammy follow-up public posts for normal state updates.
+- DonвЂ™t bypass `ThrottledMessageEditor` for projection edits.
+- DonвЂ™t encode unvalidated payloads directly from user input.
+- DonвЂ™t place long prose into one giant text block.
 
 ## Examples
 
@@ -162,9 +162,9 @@ await messageEditor.queueEdit({
 });
 ```
 
-### Weekly horoscope V2 post
+### Weekly oracle V2 post
 ```ts
-const message = renderWeeklyHoroscopePost({ guildId, weekStartDate });
+const message = renderWeeklyOraclePost({ guildId, weekStartDate });
 await sendComponentsV2Message(client, channelId, message);
 ```
 
@@ -380,7 +380,7 @@ function truncateSafe(value: string, maxLength: number): string {
     return chars.slice(0, maxLength).join('');
   }
 
-  return `${chars.slice(0, maxLength - 1).join('')}вЂ¦`;
+  return `${chars.slice(0, maxLength - 1).join('')}РІР‚В¦`;
 }
 
 export function safeTextDisplayContent(value: string): string {
@@ -674,7 +674,7 @@ function standingsLines(snapshot: DuelScoreboardSnapshot): string {
   }
 
   const rows = top.map(
-    (row, idx) => `${idx + 1}. <@${row.user1Id}> + <@${row.user2Id}> вЂ” **${row.points}** pts`,
+    (row, idx) => `${idx + 1}. <@${row.user1Id}> + <@${row.user2Id}> РІР‚вЂќ **${row.points}** pts`,
   );
   return ['Top 5', ...rows].join('\n');
 }
@@ -685,7 +685,7 @@ function roundStatus(snapshot: DuelScoreboardSnapshot): string {
   }
 
   const endsAt = snapshot.roundEndsAt
-    ? ` вЂў ends <t:${Math.floor(snapshot.roundEndsAt.getTime() / 1000)}:R>`
+    ? ` РІР‚Сћ ends <t:${Math.floor(snapshot.roundEndsAt.getTime() / 1000)}:R>`
     : '';
 
   return `Round #${snapshot.roundNo}: **${snapshot.roundStatus}**${endsAt}`;
@@ -803,7 +803,7 @@ function topPairsText(snapshot: RaidProgressSnapshot): string {
   return [
     'Top 5 (opt-in)',
     ...rows.map(
-      (pair, idx) => `${idx + 1}. <@${pair.user1Id}> + <@${pair.user2Id}> вЂ” **${pair.points}** pts`,
+      (pair, idx) => `${idx + 1}. <@${pair.user1Id}> + <@${pair.user2Id}> РІР‚вЂќ **${pair.points}** pts`,
     )
   ].join('\n');
 }
@@ -841,7 +841,7 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
           ),
           separator(),
           textBlock(
-            `Week: \`${snapshot.weekStartDate}\` вЂў ends <t:${Math.floor(snapshot.weekEndAt.getTime() / 1000)}:R>\nParticipants: **${snapshot.participantsCount}**`,
+            `Week: \`${snapshot.weekStartDate}\` РІР‚Сћ ends <t:${Math.floor(snapshot.weekEndAt.getTime() / 1000)}:R>\nParticipants: **${snapshot.participantsCount}**`,
           ),
           separator(),
           textBlock(topPairsText(snapshot)),
@@ -972,7 +972,7 @@ export async function refreshRaidProgressProjection(
 
 ```
 
-## src/discord/projections/horoscopeWeeklyRenderer.ts
+## src/discord/projections/oracleWeeklyRenderer.ts
 ```ts
 import {
   actionRowButtons,
@@ -985,12 +985,12 @@ import {
 } from '../ui-v2';
 import { encodeCustomId } from '../interactions/customId';
 
-export function renderWeeklyHoroscopePost(params: {
+export function renderWeeklyOraclePost(params: {
   guildId: string;
   weekStartDate: string;
 }): ComponentsV2Message {
   const claimId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'claim_open',
     payload: {
       g: params.guildId,
@@ -999,7 +999,7 @@ export function renderWeeklyHoroscopePost(params: {
   });
 
   const aboutId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'about',
     payload: {
       g: params.guildId,
@@ -1008,7 +1008,7 @@ export function renderWeeklyHoroscopePost(params: {
   });
 
   const ritualId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'start_pair_ritual',
     payload: {
       g: params.guildId,
@@ -1019,7 +1019,7 @@ export function renderWeeklyHoroscopePost(params: {
   return {
     components: [
       uiCard({
-        title: 'Weekly Horoscope',
+        title: 'Weekly Oracle',
         status: `Week ${params.weekStartDate}`,
         accentColor: 0x74512d,
         components: [
@@ -1061,7 +1061,7 @@ import { randomUUID } from 'node:crypto';
 import { and, asc, eq, lte, or } from 'drizzle-orm';
 import type { Client, MessageCreateOptions } from 'discord.js';
 import { z } from 'zod';
-import { renderWeeklyHoroscopePost } from '../../discord/projections/horoscopeWeeklyRenderer';
+import { renderWeeklyOraclePost } from '../../discord/projections/oracleWeeklyRenderer';
 import { sendComponentsV2Message, type ComponentsV2Message } from '../../discord/ui-v2';
 import { db } from '../../infra/db/drizzle';
 import { anonQuestions, scheduledPosts } from '../../infra/db/schema';
@@ -1086,7 +1086,7 @@ const checkinNudgePayloadSchema = z.object({
   weekStartDate: z.string()
 });
 
-const horoscopeWeeklyPayloadSchema = z.object({
+const oracleWeeklyPayloadSchema = z.object({
   guildId: z.string(),
   weekStartDate: z.string()
 });
@@ -1095,7 +1095,7 @@ export type ScheduledPostType =
   | 'anon_question'
   | 'checkin_agreement'
   | 'checkin_nudge'
-  | 'horoscope_weekly'
+  | 'oracle_weekly'
   | 'text';
 
 export async function createScheduledPost(input: {
@@ -1193,11 +1193,11 @@ function buildMessageOptions(row: typeof scheduledPosts.$inferSelect): BuiltMess
     };
   }
 
-  if (row.type === 'horoscope_weekly') {
-    const payload = horoscopeWeeklyPayloadSchema.parse(row.payloadJson);
+  if (row.type === 'oracle_weekly') {
+    const payload = oracleWeeklyPayloadSchema.parse(row.payloadJson);
     return {
       kind: 'v2',
-      message: renderWeeklyHoroscopePost({
+      message: renderWeeklyOraclePost({
         guildId: payload.guildId,
         weekStartDate: payload.weekStartDate
       })
@@ -1378,7 +1378,7 @@ import {
 export const guildSettings = pgTable('guild_settings', {
   guildId: varchar('guild_id', { length: 32 }).primaryKey(),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Asia/Almaty'),
-  horoscopeChannelId: varchar('horoscope_channel_id', { length: 32 }),
+  oracleChannelId: varchar('oracle_channel_id', { length: 32 }),
   questionsChannelId: varchar('questions_channel_id', { length: 32 }),
   raidChannelId: varchar('raid_channel_id', { length: 32 }),
   duelPublicChannelId: varchar('duel_public_channel_id', { length: 32 }),
@@ -1497,7 +1497,7 @@ export const commandRateLimits = pgTable(
   }),
 );
 
-export const contentHoroscopeArchetypes = pgTable('content_horoscope_archetypes', {
+export const contentOracleArchetypes = pgTable('content_oracle_archetypes', {
   key: varchar('key', { length: 64 }).primaryKey(),
   title: varchar('title', { length: 100 }).notNull(),
   variantsJson: jsonb('variants_json').notNull(),
@@ -1505,8 +1505,8 @@ export const contentHoroscopeArchetypes = pgTable('content_horoscope_archetypes'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
-export const horoscopeWeeks = pgTable(
-  'horoscope_weeks',
+export const oracleWeeks = pgTable(
+  'oracle_weeks',
   {
     id: varchar('id', { length: 36 }).primaryKey(),
     guildId: varchar('guild_id', { length: 32 }).notNull(),
@@ -1516,12 +1516,12 @@ export const horoscopeWeeks = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
-    uniqueWeek: unique('horoscope_weeks_guild_week_uq').on(table.guildId, table.weekStartDate)
+    uniqueWeek: unique('oracle_weeks_guild_week_uq').on(table.guildId, table.weekStartDate)
   }),
 );
 
-export const horoscopeClaims = pgTable(
-  'horoscope_claims',
+export const oracleClaims = pgTable(
+  'oracle_claims',
   {
     id: varchar('id', { length: 36 }).primaryKey(),
     guildId: varchar('guild_id', { length: 32 }).notNull(),
@@ -1535,7 +1535,7 @@ export const horoscopeClaims = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
-    uniqueClaim: unique('horoscope_claims_guild_week_user_uq').on(
+    uniqueClaim: unique('oracle_claims_guild_week_user_uq').on(
       table.guildId,
       table.weekStartDate,
       table.userId,
@@ -2009,7 +2009,7 @@ export const JobNames = {
   RaidProgressRefresh: 'raid.progress.refresh',
   PairHomeRefresh: 'pair.home.refresh',
   PublicPostPublish: 'public.post.publish',
-  WeeklyHoroscopePublish: 'weekly.horoscope.publish',
+  WeeklyOraclePublish: 'weekly.oracle.publish',
   WeeklyCheckinNudge: 'weekly.checkin.nudge',
   WeeklyRaidStart: 'weekly.raid.start',
   WeeklyRaidEnd: 'weekly.raid.end',
@@ -2090,7 +2090,7 @@ function duelSummary(snapshot: PairHomeSnapshot): string {
   }
 
   const endsPart = snapshot.duel.roundEndsAt
-    ? ` • ends <t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
+    ? ` вЂў ends <t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
     : '';
 
   const submitState = snapshot.duel.submittedThisRound ? 'submitted' : 'waiting for submission';
@@ -2344,7 +2344,7 @@ import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
 import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
 import { configureRecurringSchedules } from './scheduler';
 import { publishDueScheduledPosts } from '../../app/services/publicPostService';
-import { scheduleWeeklyHoroscopePosts } from '../../app/services/horoscopeService';
+import { scheduleWeeklyOraclePosts } from '../../app/services/oracleService';
 import { scheduleWeeklyCheckinNudges } from '../../app/services/checkinService';
 import {
   endExpiredRaids,
@@ -2552,19 +2552,19 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
       }
     });
 
-    await boss.work(JobNames.WeeklyHoroscopePublish, async (jobs) => {
+    await boss.work(JobNames.WeeklyOraclePublish, async (jobs) => {
       for (const job of jobs) {
         const parsed = genericScheduledPayloadSchema.parse(
           job.data ?? {
             correlationId: randomUUID(),
             guildId: 'scheduler',
-            feature: JobNames.WeeklyHoroscopePublish,
+            feature: JobNames.WeeklyOraclePublish,
             action: 'tick'
           },
         );
 
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
-        const created = await scheduleWeeklyHoroscopePosts();
+        const created = await scheduleWeeklyOraclePosts();
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, created }, 'job completed');
       }
     });
@@ -4149,7 +4149,7 @@ export type SetupWizardDraft = {
   guildId: string;
   userId: string;
   duelPublicChannelId: string | null;
-  horoscopeChannelId: string | null;
+  oracleChannelId: string | null;
   questionsChannelId: string | null;
   raidChannelId: string | null;
   moderatorRoleId: string | null;
@@ -4179,7 +4179,7 @@ function toDraft(guildId: string, userId: string, settings: GuildSettingsRow): S
     guildId,
     userId,
     duelPublicChannelId: settings?.duelPublicChannelId ?? null,
-    horoscopeChannelId: settings?.horoscopeChannelId ?? null,
+    oracleChannelId: settings?.oracleChannelId ?? null,
     questionsChannelId: settings?.questionsChannelId ?? null,
     raidChannelId: settings?.raidChannelId ?? null,
     moderatorRoleId: settings?.moderatorRoleId ?? null,
@@ -4308,7 +4308,7 @@ export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Mes
     'Pick channels and role below, then press Save.',
     '',
     channelLine('Duel scoreboard', draft.duelPublicChannelId),
-    channelLine('Weekly horoscope', draft.horoscopeChannelId),
+    channelLine('Weekly oracle', draft.oracleChannelId),
     channelLine('Questions inbox', draft.questionsChannelId),
     channelLine('Raid progress', draft.raidChannelId),
     roleLine(draft.moderatorRoleId),
@@ -4323,7 +4323,7 @@ export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Mes
         components: [
           textBlock(summary),
           channelSelect('pick_duel_channel', 'Select duel scoreboard channel'),
-          channelSelect('pick_horoscope_channel', 'Select weekly horoscope channel'),
+          channelSelect('pick_oracle_channel', 'Select weekly oracle channel'),
           channelSelect('pick_questions_channel', 'Select questions channel'),
           channelSelect('pick_raid_channel', 'Select raid progress channel'),
           actionRowSelects([
@@ -4441,7 +4441,7 @@ export type SetupWizardInteraction = ButtonInteraction | ChannelSelectMenuIntera
 
 const actionSchema = z.enum([
   'pick_duel_channel',
-  'pick_horoscope_channel',
+  'pick_oracle_channel',
   'pick_questions_channel',
   'pick_raid_channel',
   'pick_mod_role',
@@ -4481,7 +4481,7 @@ async function updatePanel(interaction: SetupWizardInteraction, draft: SetupWiza
 function selectTargetChannel(draft: SetupWizardDraft): string | null {
   return draft.duelPublicChannelId
     ?? draft.raidChannelId
-    ?? draft.horoscopeChannelId
+    ?? draft.oracleChannelId
     ?? draft.questionsChannelId
     ?? null;
 }
@@ -4547,8 +4547,8 @@ export async function handleSetupWizardComponent(
 
     const patch = action === 'pick_duel_channel'
       ? { duelPublicChannelId: channelId }
-      : action === 'pick_horoscope_channel'
-        ? { horoscopeChannelId: channelId }
+      : action === 'pick_oracle_channel'
+        ? { oracleChannelId: channelId }
         : action === 'pick_questions_channel'
           ? { questionsChannelId: channelId }
           : { raidChannelId: channelId };
@@ -4570,7 +4570,7 @@ export async function handleSetupWizardComponent(
   if (action === 'save') {
     await setGuildSettings(interaction.guildId, {
       duelPublicChannelId: draft.duelPublicChannelId,
-      horoscopeChannelId: draft.horoscopeChannelId,
+      oracleChannelId: draft.oracleChannelId,
       questionsChannelId: draft.questionsChannelId,
       raidChannelId: draft.raidChannelId,
       moderatorRoleId: draft.moderatorRoleId
@@ -4687,7 +4687,7 @@ import {
   buildCheckinShareButton,
   buildCheckinSubmitModal,
   buildDuelSubmissionModal,
-  buildHoroscopeClaimModal,
+  buildOracleClaimModal,
   buildRaidClaimButton,
   buildRaidConfirmButton
 } from './components';
@@ -4698,11 +4698,11 @@ import {
   rejectAnonQuestion
 } from '../../app/services/anonService';
 import {
-  claimHoroscope,
-  markHoroscopeClaimDelivery,
-  parseHoroscopeContext,
-  parseHoroscopeMode
-} from '../../app/services/horoscopeService';
+  claimOracle,
+  markOracleClaimDelivery,
+  parseOracleContext,
+  parseOracleMode
+} from '../../app/services/oracleService';
 import { getPairForUser } from '../../infra/db/queries/pairs';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { claimRaidQuest, confirmRaidClaim, getRaidContributionForUser, getTodayRaidOffers } from '../../app/services/raidService';
@@ -4962,30 +4962,30 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_open') {
+  if (decoded.feature === 'oracle' && decoded.action === 'claim_open') {
     const guildId = decoded.payload.g;
     const weekStartDate = decoded.payload.w;
     if (!guildId || !weekStartDate) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope payload.' });
+      await interaction.reply({ ephemeral: true, content: 'Malformed oracle payload.' });
       return;
     }
 
-    const modal = buildHoroscopeClaimModal(guildId, weekStartDate);
+    const modal = buildOracleClaimModal(guildId, weekStartDate);
     await interaction.showModal(modal as never);
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'about') {
+  if (decoded.feature === 'oracle' && decoded.action === 'about') {
     await interaction.reply({
       ephemeral: true,
       content:
-        'Weekly horoscope is deterministic and built from seeded templates. ' +
+        'Weekly oracle is deterministic and built from seeded templates. ' +
         'No runtime LLM generation is used in production loops.',
     });
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'start_pair_ritual') {
+  if (decoded.feature === 'oracle' && decoded.action === 'start_pair_ritual') {
     if (!interaction.guildId) {
       await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
       return;
@@ -5267,7 +5267,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
+  if (decoded.feature === 'oracle' && decoded.action === 'claim_submit') {
     if (!interaction.guildId) {
       await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
       return;
@@ -5277,8 +5277,8 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
     const modeInput = interaction.fields.getTextInputValue('mode');
     const contextInput = interaction.fields.getTextInputValue('context');
-    const mode = parseHoroscopeMode(modeInput);
-    const context = parseHoroscopeContext(contextInput);
+    const mode = parseOracleMode(modeInput);
+    const context = parseOracleContext(contextInput);
     if (!mode || !context) {
       await interaction.editReply(
         'Invalid mode/context. Use mode: soft/neutral/hard and context: conflict/ok/boredom/distance/fatigue/jealousy.',
@@ -5287,7 +5287,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
-    const claimed = await claimHoroscope({
+    const claimed = await claimOracle({
       guildId: interaction.guildId,
       userId: interaction.user.id,
       pairId: pair?.id ?? null,
@@ -5305,14 +5305,14 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
         const channel = await interaction.client.channels.fetch(pair.privateChannelId);
         if (channel?.isTextBased() && 'send' in channel && typeof channel.send === 'function') {
           await channel.send({
-            content: `<@${interaction.user.id}> weekly horoscope:\n\n${claimed.text}`
+            content: `<@${interaction.user.id}> weekly oracle:\n\n${claimed.text}`
           });
           delivered = 'pair';
         }
       }
     }
 
-    await markHoroscopeClaimDelivery(claimed.claim.id, delivered);
+    await markOracleClaimDelivery(claimed.claim.id, delivered);
 
     const deliveryText = delivered === 'dm'
       ? 'Delivered to your DM.'
@@ -5322,7 +5322,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
     await interaction.editReply(
       claimed.created
-        ? `Horoscope claimed. ${deliveryText}`
+        ? `Oracle claimed. ${deliveryText}`
         : `You already claimed this week. ${deliveryText}`,
     );
     return;
@@ -5957,9 +5957,9 @@ export function buildDuelSubmissionModal(params: { duelId: string; roundId: stri
   return modal;
 }
 
-export function buildHoroscopeClaimModal(guildId: string, weekStartDate: string) {
+export function buildOracleClaimModal(guildId: string, weekStartDate: string) {
   const customId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'claim_submit',
     payload: {
       g: guildId,
@@ -5967,7 +5967,7 @@ export function buildHoroscopeClaimModal(guildId: string, weekStartDate: string)
     }
   });
 
-  const modal = new ModalBuilder().setCustomId(customId).setTitle('Your weekly horoscope');
+  const modal = new ModalBuilder().setCustomId(customId).setTitle('Your weekly oracle');
 
   const modeInput = new TextInputBuilder()
     .setCustomId('mode')
@@ -6216,4 +6216,5 @@ describe('scoreboard renderer', () => {
 }
 
 ```
+
 

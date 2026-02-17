@@ -4,7 +4,7 @@ type SetupWizardDraft = {
   guildId: string;
   userId: string;
   pairCategoryId: string | null;
-  horoscopeChannelId: string | null;
+  oracleChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -19,7 +19,7 @@ function draft(overrides?: Partial<SetupWizardDraft>): SetupWizardDraft {
     guildId: 'g1',
     userId: 'u1',
     pairCategoryId: null,
-    horoscopeChannelId: null,
+    oracleChannelId: null,
     raidChannelId: null,
     hallChannelId: null,
     publicPostChannelId: null,
@@ -136,7 +136,7 @@ describe('setup wizard v2 view', () => {
     const completeView = buildSetupWizardV2View(
       draft({
         pairCategoryId: 'cat1',
-        horoscopeChannelId: 'ch1',
+        oracleChannelId: 'ch1',
         raidChannelId: 'ch2',
         hallChannelId: 'ch3',
         publicPostChannelId: 'ch4',
@@ -155,7 +155,7 @@ describe('setup wizard v2 view', () => {
     expect(categorySelect?.channel_types).toEqual([ChannelType.GuildCategory]);
 
     const textChannelActions = [
-      'pick_horoscope_channel',
+      'pick_oracle_channel',
       'pick_raid_channel',
       'pick_hall_channel',
       'pick_public_post_channel',

@@ -1,4 +1,4 @@
-import {
+﻿import {
   actionRowButtons,
   ButtonStyle,
   ComponentType,
@@ -9,70 +9,68 @@ import {
 } from '../ui-v2';
 import { encodeCustomId } from '../interactions/customId';
 
-export function renderWeeklyHoroscopePost(params: {
+export function renderWeeklyOraclePost(params: {
   guildId: string;
   weekStartDate: string;
 }): ComponentsV2Message {
   const claimId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'claim_open',
     payload: {
       g: params.guildId,
-      w: params.weekStartDate
-    }
+      w: params.weekStartDate,
+    },
   });
 
   const aboutId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'about',
     payload: {
       g: params.guildId,
-      w: params.weekStartDate
-    }
+      w: params.weekStartDate,
+    },
   });
 
   const ritualId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'start_pair_ritual',
     payload: {
       g: params.guildId,
-      w: params.weekStartDate
-    }
+      w: params.weekStartDate,
+    },
   });
 
   return {
     components: [
       uiCard({
-        title: 'Недельный гороскоп',
-        status: `Неделя ${params.weekStartDate}`,
+        title: 'Оракул недели',
+        status: `Неделя с ${params.weekStartDate}`,
         accentColor: 0x74512d,
         components: [
-          textBlock(
-            'Ваш общий паттерн на эту неделю готов.\nПолучите персональную подсказку в один тап.\nРитуал для пары рассчитан на спокойный 10-минутный чек-ин.',
-          ),
+          textBlock('Это не астрология. Это практичная подсказка-навык на эту неделю.'),
           separator(),
           actionRowButtons([
             {
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: claimId,
-              label: 'Получить в личку'
+              label: 'Получить подсказку',
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: aboutId,
-              label: 'О фиче'
+              label: 'Что это?',
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
               custom_id: ritualId,
-              label: 'Начать ритуал пары'
-            }
-          ])
-        ]
-      })
-    ]
+              label: 'Ритуал пары',
+            },
+          ]),
+        ],
+      }),
+    ],
   };
 }

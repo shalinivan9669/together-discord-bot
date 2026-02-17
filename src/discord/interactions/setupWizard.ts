@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChannelType,
   MessageFlags,
   PermissionFlagsBits,
@@ -50,7 +50,7 @@ export type SetupWizardInteraction =
 
 const actionSchema = z.enum([
   'pick_pair_category',
-  'pick_horoscope_channel',
+  'pick_oracle_channel',
   'pick_raid_channel',
   'pick_hall_channel',
   'pick_public_post_channel',
@@ -63,7 +63,7 @@ const actionSchema = z.enum([
 ]);
 
 const scheduleFeatureMap: ReadonlyArray<{ name: JobName; feature: (typeof guildFeatureNames)[number] }> = [
-  { name: JobNames.WeeklyHoroscopePublish, feature: 'horoscope' },
+  { name: JobNames.WeeklyOraclePublish, feature: 'oracle' },
   { name: JobNames.WeeklyCheckinNudge, feature: 'checkin' },
   { name: JobNames.WeeklyRaidStart, feature: 'raid' },
   { name: JobNames.WeeklyRaidEnd, feature: 'raid' },
@@ -117,7 +117,7 @@ function selectTargetChannel(draft: SetupWizardDraft): string | null {
   return draft.publicPostChannelId
     ?? draft.raidChannelId
     ?? draft.hallChannelId
-    ?? draft.horoscopeChannelId
+    ?? draft.oracleChannelId
     ?? draft.anonInboxChannelId
     ?? null;
 }
@@ -208,7 +208,7 @@ async function validateDraftBeforeCommit(
   }
 
   const channelChecks: Array<{ id: string | null; labelKey: Parameters<typeof t>[1] }> = [
-    { id: draft.horoscopeChannelId, labelKey: 'setup.wizard.line.horoscope_channel' },
+    { id: draft.oracleChannelId, labelKey: 'setup.wizard.line.oracle_channel' },
     { id: draft.raidChannelId, labelKey: 'setup.wizard.line.raid_channel' },
     { id: draft.hallChannelId, labelKey: 'setup.wizard.line.hall_channel' },
     { id: draft.publicPostChannelId, labelKey: 'setup.wizard.line.public_post_channel' },
@@ -355,8 +355,8 @@ export async function handleSetupWizardComponent(
 
     const patch = action === 'pick_pair_category'
       ? { pairCategoryId: channelId }
-      : action === 'pick_horoscope_channel'
-        ? { horoscopeChannelId: channelId }
+      : action === 'pick_oracle_channel'
+        ? { oracleChannelId: channelId }
       : action === 'pick_raid_channel'
           ? { raidChannelId: channelId }
       : action === 'pick_hall_channel'
@@ -404,7 +404,7 @@ export async function handleSetupWizardComponent(
 
     await updateGuildConfig(interaction.guildId, {
       pairCategoryId: draft.pairCategoryId,
-      horoscopeChannelId: draft.horoscopeChannelId,
+      oracleChannelId: draft.oracleChannelId,
       raidChannelId: draft.raidChannelId,
       hallChannelId: draft.hallChannelId,
       publicPostChannelId: draft.publicPostChannelId,
@@ -500,3 +500,4 @@ export async function handleSetupWizardComponent(
   await updatePanel(interaction, draft, locale);
   return true;
 }
+

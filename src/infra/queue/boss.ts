@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import type { Client } from 'discord.js';
 import PgBoss from 'pg-boss';
 import {
@@ -22,7 +22,7 @@ import { refreshDuelScoreboardProjection } from '../../discord/projections/score
 import type { ThrottledMessageEditor } from '../../discord/projections/messageEditor';
 import { refreshRaidProgressProjection } from '../../discord/projections/raidProgress';
 import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
-import { refreshWeeklyHoroscopeProjection } from '../../discord/projections/horoscopeWeekly';
+import { refreshWeeklyOracleProjection } from '../../discord/projections/oracleWeekly';
 import { refreshMonthlyHallProjection } from '../../discord/projections/monthlyHall';
 import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
 import { configureRecurringSchedules, type RecurringScheduleStatus } from './scheduler';
@@ -323,13 +323,13 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
       }
     });
 
-    await boss.work(JobNames.WeeklyHoroscopePublish, async (jobs) => {
+    await boss.work(JobNames.WeeklyOraclePublish, async (jobs) => {
       for (const job of jobs) {
         const parsed = genericScheduledPayloadSchema.parse(
           job.data ?? {
             correlationId: randomUUID(),
             guildId: 'scheduler',
-            feature: JobNames.WeeklyHoroscopePublish,
+            feature: JobNames.WeeklyOraclePublish,
             action: 'tick'
           },
         );
@@ -337,14 +337,14 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
 
         if (!messageEditor) {
-          throw new Error('Message editor not initialized for weekly horoscope publish');
+          throw new Error('Message editor not initialized for weekly oracle publish');
         }
 
         if (!discordClient) {
-          throw new Error('Discord client not initialized for weekly horoscope publish');
+          throw new Error('Discord client not initialized for weekly oracle publish');
         }
 
-        const refreshed = await refreshWeeklyHoroscopeProjection({
+        const refreshed = await refreshWeeklyOracleProjection({
           client: discordClient,
           messageEditor,
           weekStartDate: parsed.weekStartDate,
@@ -352,7 +352,7 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         });
 
         if (refreshed.failed > 0) {
-          throw new Error(`Weekly horoscope refresh failed for ${refreshed.failed} guild(s)`);
+          throw new Error(`Weekly oracle refresh failed for ${refreshed.failed} guild(s)`);
         }
 
         logger.info(
@@ -505,3 +505,4 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
     }
   };
 }
+

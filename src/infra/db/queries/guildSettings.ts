@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+﻿import { eq } from 'drizzle-orm';
 import { db } from '../drizzle';
 import { guildSettings } from '../schema';
 
@@ -17,7 +17,7 @@ export async function upsertGuildSettings(
     locale: string;
     timezone: string;
     pairCategoryId: string | null;
-    horoscopeChannelId: string | null;
+    oracleChannelId: string | null;
     publicPostChannelId: string | null;
     anonInboxChannelId: string | null;
     anonModRoleId: string | null;
@@ -47,3 +47,4 @@ export async function upsertGuildSettings(
 
   return row;
 }
+

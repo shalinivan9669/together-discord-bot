@@ -1,4 +1,4 @@
-import type { GuildConfig } from '../../app/services/guildConfigService';
+﻿import type { GuildConfig } from '../../app/services/guildConfigService';
 
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 
@@ -6,7 +6,7 @@ export type SetupWizardDraft = {
   guildId: string;
   userId: string;
   pairCategoryId: string | null;
-  horoscopeChannelId: string | null;
+  oracleChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -39,7 +39,7 @@ function toDraft(guildId: string, userId: string, settings: GuildConfig): SetupW
     guildId,
     userId,
     pairCategoryId: settings.pairCategoryId,
-    horoscopeChannelId: settings.horoscopeChannelId,
+    oracleChannelId: settings.oracleChannelId,
     raidChannelId: settings.raidChannelId,
     hallChannelId: settings.hallChannelId,
     publicPostChannelId: settings.publicPostChannelId,
@@ -118,3 +118,4 @@ export function patchSetupWizardDraft(
 export function clearSetupWizardDraft(guildId: string, userId: string): void {
   drafts.delete(keyOf(guildId, userId));
 }
+

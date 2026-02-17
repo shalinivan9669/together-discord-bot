@@ -5,7 +5,7 @@
 ## Базовые принципы
 
 - Один логический surface = один `Container` card.
-- Публичные циклы (duel/raid/hall/horoscope) живут как single-message projection (edit-only).
+- Публичные циклы (duel/raid/hall/oracle) живут как single-message projection (edit-only).
 - Любая интеракция должна подтверждаться <= 3 сек (`deferReply`, `deferUpdate`, `showModal`).
 - Длинные тексты разбиваются на короткие `TextDisplay` блоки.
 
@@ -53,9 +53,9 @@
 - CTA: `checkin`, `raid`, `duel submit/info`
 - В комнате пары должен быть ровно один bot-owned panel message.
 
-### 5. Weekly Horoscope Card
+### 5. Weekly Oracle Card
 
-- Рендер: `src/discord/projections/horoscopeWeeklyRenderer.ts`
+- Рендер: `src/discord/projections/oracleWeeklyRenderer.ts`
 - CTA: `claim_open`, `about`, `start_pair_ritual`
 
 ### 6. Monthly Hall Card
@@ -100,3 +100,4 @@
 - Есть защита от дублей (db unique/op_dedup/tx).
 - Есть smoke-кейс и негативные кейсы (не тот канал/нет прав/expired session).
 - Есть telemetry-поля в structured logs.
+

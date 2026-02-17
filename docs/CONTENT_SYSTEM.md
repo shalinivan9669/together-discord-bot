@@ -1,16 +1,16 @@
-# Content System
+﻿# Content System
 
 Production loops are deterministic and template-driven. Runtime LLM generation is not used.
 
 ## Sources
-- Horoscope templates: `content_horoscope_archetypes`
+- Oracle templates: `content_oracle_archetypes`
 - Weekly agreements: `agreements_library`
 - Raid quests: `raid_quests`
 - Date generator templates: `src/domain/date/index.ts`
 - Mediator `/say` templates: `src/app/services/mediatorService.ts`
 - QoTD mascot answer templates: `src/app/services/anonService.ts`
 
-## Horoscope structure
+## Oracle structure
 Each archetype contains:
 - `key`
 - `title`
@@ -27,11 +27,16 @@ Each archetype contains:
   - `miniChallenge`
 
 Claim flow:
-1. Determine week key by ISO Monday date (`week_start_date`).
+1. Determine week key by deterministic UTC week start (`week_start_date`).
 2. Deterministically choose archetype for `(guild_id, week_start_date)`.
 3. User picks mode/context via interaction modal.
-4. First claim per `(guild_id, week_start_date, user_id)` is persisted in `horoscope_claims`.
-5. Re-claims reuse stored claim text (idempotent output for the week).
+4. First claim per `(guild_id, week_start_date, user_id)` is persisted in `oracle_claims`.
+5. Re-claims reuse stored claim text (idempotent output for the same week).
+
+Public behavior:
+- One public Oracle message per guild (edit-only, no spam reposts).
+- One archetype is shared by the whole guild for a week.
+- Each user can claim exactly one Oracle hint per week.
 
 ## Check-in structure
 - Agreement choices come from `agreements_library`.
@@ -68,8 +73,10 @@ Deterministic daily offers:
 
 ## Seed behavior
 `scripts/seed.ts` is idempotent and safe to rerun:
-- 12 horoscope archetypes
+- 12 Oracle archetypes
 - 10 agreements
 - 20 raid quests
 
 Upserts are used so content edits are applied without duplicate rows.
+
+

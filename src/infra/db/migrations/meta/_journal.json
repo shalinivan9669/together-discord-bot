@@ -57,6 +57,13 @@
       "when": 1771718400000,
       "tag": "0007_guild_locale",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772380800000,
+      "tag": "0008_oracle_rename",
+      "breakpoints": true
     }
   ]
 }

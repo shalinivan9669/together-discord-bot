@@ -1,4 +1,4 @@
-# Final Changed Files (Full Contents)
+ï»¿# Final Changed Files (Full Contents)
 
 ## .env.example
 -----
@@ -12,7 +12,7 @@ ALLOWED_GUILD_IDS=
 SENTRY_DSN=
 TZ=Asia/Almaty
 DEFAULT_TIMEZONE=Asia/Almaty
-PHASE2_HOROSCOPE_ENABLED=false
+PHASE2_ORACLE_ENABLED=false
 PHASE2_CHECKIN_ENABLED=false
 PHASE2_ANON_ENABLED=false
 PHASE2_REWARDS_ENABLED=false
@@ -45,11 +45,11 @@ This repo uses raw Discord API Components V2 payloads through `src/discord/ui-v2
   - one row per select control in setup wizard
 - Set `MessageFlags.IsComponentsV2` when creating/editing V2 messages.
 
-## Don’t
-- Don’t mix spammy follow-up public posts for normal state updates.
-- Don’t bypass `ThrottledMessageEditor` for projection edits.
-- Don’t encode unvalidated payloads directly from user input.
-- Don’t place long prose into one giant text block.
+## Donâ€™t
+- Donâ€™t mix spammy follow-up public posts for normal state updates.
+- Donâ€™t bypass `ThrottledMessageEditor` for projection edits.
+- Donâ€™t encode unvalidated payloads directly from user input.
+- Donâ€™t place long prose into one giant text block.
 
 ## Examples
 
@@ -65,9 +65,9 @@ await messageEditor.queueEdit({
 });
 ```
 
-### Weekly horoscope V2 post
+### Weekly oracle V2 post
 ```ts
-const message = renderWeeklyHoroscopePost({ guildId, weekStartDate });
+const message = renderWeeklyOraclePost({ guildId, weekStartDate });
 await sendComponentsV2Message(client, channelId, message);
 ```
 
@@ -167,14 +167,14 @@ Registered jobs:
 - `monthly.hall.refresh`
 - `mediator.repair.tick`
 - `public.post.publish`
-- `weekly.horoscope.publish`
+- `weekly.oracle.publish`
 - `weekly.checkin.nudge`
 - `weekly.raid.start`
 - `weekly.raid.end`
 - `daily.raid.offers.generate`
 
 Recurring schedules (enabled by feature flags where applicable):
-- Horoscope weekly publish: Monday `10:00` (`weekly.horoscope.publish`)
+- Oracle weekly publish: Monday `10:00` (`weekly.oracle.publish`)
 - Check-in weekly nudge: Wednesday `12:00` (`weekly.checkin.nudge`)
 - Raid weekly start: Monday `09:00` (`weekly.raid.start`)
 - Raid weekly end: Monday `09:05` (`weekly.raid.end`)
@@ -269,7 +269,7 @@ Production-focused Discord bot for relationship server engagement loops.
 
 ## Scope
 - Phase 1 (enabled and working): boot/runtime, `/healthz`, command deploy script, `/setup`, pair private text channels, duel rounds with modal submissions, single editable scoreboard.
-- Phase 2 (implemented, default OFF by flags where applicable): weekly horoscope loop, weekly check-in, anonymous moderation queue + QoTD UX, rewards helper, raid cooperative loop, seasons basic status, mediator `/say` + `/repair`, date generator `/date`.
+- Phase 2 (implemented, default OFF by flags where applicable): weekly oracle loop, weekly check-in, anonymous moderation queue + QoTD UX, rewards helper, raid cooperative loop, seasons basic status, mediator `/say` + `/repair`, date generator `/date`.
 
 ## Stack
 - Node.js 20+, TypeScript
@@ -633,7 +633,7 @@ export async function approveAnonQuestion(input: {
 
 -----
 
-## src/app/services/horoscopeService.ts
+## src/app/services/oracleService.ts
 -----
 import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, isNotNull } from 'drizzle-orm';
@@ -641,12 +641,12 @@ import { z } from 'zod';
 import { isFeatureEnabled } from '../../config/featureFlags';
 import { startOfWeekIso } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
-import { contentHoroscopeArchetypes, guildSettings, horoscopeClaims, horoscopeWeeks } from '../../infra/db/schema';
+import { contentOracleArchetypes, guildSettings, oracleClaims, oracleWeeks } from '../../infra/db/schema';
 
-export const HOROSCOPE_MODES = ['soft', 'neutral', 'hard'] as const;
-export type HoroscopeMode = (typeof HOROSCOPE_MODES)[number];
+export const ORACLE_MODES = ['soft', 'neutral', 'hard'] as const;
+export type OracleMode = (typeof ORACLE_MODES)[number];
 
-export const HOROSCOPE_CONTEXTS = [
+export const ORACLE_CONTEXTS = [
   'conflict',
   'ok',
   'boredom',
@@ -654,7 +654,7 @@ export const HOROSCOPE_CONTEXTS = [
   'fatigue',
   'jealousy'
 ] as const;
-export type HoroscopeContext = (typeof HOROSCOPE_CONTEXTS)[number];
+export type OracleContext = (typeof ORACLE_CONTEXTS)[number];
 
 const variantSchema = z.object({
   risk: z.string(),
@@ -666,14 +666,14 @@ const variantSchema = z.object({
 
 type Variant = z.infer<typeof variantSchema>;
 
-function normalizeMode(value: string): HoroscopeMode | null {
+function normalizeMode(value: string): OracleMode | null {
   const normalized = value.trim().toLowerCase();
-  return HOROSCOPE_MODES.find((mode) => mode === normalized) ?? null;
+  return ORACLE_MODES.find((mode) => mode === normalized) ?? null;
 }
 
-function normalizeContext(value: string): HoroscopeContext | null {
+function normalizeContext(value: string): OracleContext | null {
   const normalized = value.trim().toLowerCase();
-  return HOROSCOPE_CONTEXTS.find((context) => context === normalized) ?? null;
+  return ORACLE_CONTEXTS.find((context) => context === normalized) ?? null;
 }
 
 function hashNumber(input: string): number {
@@ -688,18 +688,18 @@ function pickDeterministic<T>(list: readonly T[], key: string): T {
 
 function readVariant(
   variantsJson: unknown,
-  mode: HoroscopeMode,
-  context: HoroscopeContext,
+  mode: OracleMode,
+  context: OracleContext,
 ): Variant {
   const variants = z.record(z.string(), z.record(z.string(), variantSchema)).parse(variantsJson);
   const modeMap = variants[mode];
   if (!modeMap) {
-    throw new Error(`Horoscope mode "${mode}" not found in archetype variants`);
+    throw new Error(`Oracle mode "${mode}" not found in archetype variants`);
   }
 
   const variant = modeMap[context];
   if (!variant) {
-    throw new Error(`Horoscope context "${context}" not found in archetype variants`);
+    throw new Error(`Oracle context "${context}" not found in archetype variants`);
   }
 
   return variant;
@@ -708,12 +708,12 @@ function readVariant(
 function buildClaimText(params: {
   archetypeTitle: string;
   weekStartDate: string;
-  mode: HoroscopeMode;
-  context: HoroscopeContext;
+  mode: OracleMode;
+  context: OracleContext;
   variant: Variant;
 }): string {
   return [
-    `## Weekly Horoscope: ${params.archetypeTitle}`,
+    `## Weekly Oracle: ${params.archetypeTitle}`,
     `Week: \`${params.weekStartDate}\``,
     `Mode: **${params.mode}**`,
     `Context: **${params.context}**`,
@@ -726,25 +726,25 @@ function buildClaimText(params: {
   ].join('\n');
 }
 
-export function ensureHoroscopeEnabled(): void {
-  if (!isFeatureEnabled('horoscope')) {
-    throw new Error('Horoscope feature is disabled');
+export function ensureOracleEnabled(): void {
+  if (!isFeatureEnabled('oracle')) {
+    throw new Error('Oracle feature is disabled');
   }
 }
 
-export function parseHoroscopeMode(input: string): HoroscopeMode | null {
+export function parseOracleMode(input: string): OracleMode | null {
   return normalizeMode(input);
 }
 
-export function parseHoroscopeContext(input: string): HoroscopeContext | null {
+export function parseOracleContext(input: string): OracleContext | null {
   return normalizeContext(input);
 }
 
-export async function ensureHoroscopeWeek(guildId: string, weekStartDate: string) {
+export async function ensureOracleWeek(guildId: string, weekStartDate: string) {
   const existingWeek = await db
     .select()
-    .from(horoscopeWeeks)
-    .where(and(eq(horoscopeWeeks.guildId, guildId), eq(horoscopeWeeks.weekStartDate, weekStartDate)))
+    .from(oracleWeeks)
+    .where(and(eq(oracleWeeks.guildId, guildId), eq(oracleWeeks.weekStartDate, weekStartDate)))
     .limit(1);
 
   if (existingWeek[0]) {
@@ -753,21 +753,21 @@ export async function ensureHoroscopeWeek(guildId: string, weekStartDate: string
 
   const archetypes = await db
     .select({
-      key: contentHoroscopeArchetypes.key,
-      title: contentHoroscopeArchetypes.title
+      key: contentOracleArchetypes.key,
+      title: contentOracleArchetypes.title
     })
-    .from(contentHoroscopeArchetypes)
-    .where(eq(contentHoroscopeArchetypes.active, true));
+    .from(contentOracleArchetypes)
+    .where(eq(contentOracleArchetypes.active, true));
 
   if (archetypes.length === 0) {
-    throw new Error('No active horoscope archetypes seeded');
+    throw new Error('No active oracle archetypes seeded');
   }
 
   const selected = pickDeterministic(archetypes, `${guildId}:${weekStartDate}`);
   const seed = hashNumber(`${guildId}:${weekStartDate}:${selected.key}`);
 
   await db
-    .insert(horoscopeWeeks)
+    .insert(oracleWeeks)
     .values({
       id: randomUUID(),
       guildId,
@@ -776,24 +776,24 @@ export async function ensureHoroscopeWeek(guildId: string, weekStartDate: string
       seed
     })
     .onConflictDoNothing({
-      target: [horoscopeWeeks.guildId, horoscopeWeeks.weekStartDate]
+      target: [oracleWeeks.guildId, oracleWeeks.weekStartDate]
     });
 
   const afterInsert = await db
     .select()
-    .from(horoscopeWeeks)
-    .where(and(eq(horoscopeWeeks.guildId, guildId), eq(horoscopeWeeks.weekStartDate, weekStartDate)))
+    .from(oracleWeeks)
+    .where(and(eq(oracleWeeks.guildId, guildId), eq(oracleWeeks.weekStartDate, weekStartDate)))
     .limit(1);
 
   if (!afterInsert[0]) {
-    throw new Error('Failed to ensure horoscope week row');
+    throw new Error('Failed to ensure oracle week row');
   }
 
   return afterInsert[0];
 }
 
-export async function scheduleWeeklyHoroscopePosts(now: Date = new Date()): Promise<number> {
-  ensureHoroscopeEnabled();
+export async function scheduleWeeklyOraclePosts(now: Date = new Date()): Promise<number> {
+  ensureOracleEnabled();
   const weekStartDate = startOfWeekIso(now);
 
   const guilds = await db
@@ -801,38 +801,38 @@ export async function scheduleWeeklyHoroscopePosts(now: Date = new Date()): Prom
       guildId: guildSettings.guildId
     })
     .from(guildSettings)
-    .where(isNotNull(guildSettings.horoscopeChannelId));
+    .where(isNotNull(guildSettings.oracleChannelId));
 
   let preparedCount = 0;
 
   for (const guild of guilds) {
-    await ensureHoroscopeWeek(guild.guildId, weekStartDate);
+    await ensureOracleWeek(guild.guildId, weekStartDate);
     preparedCount += 1;
   }
 
   return preparedCount;
 }
 
-export async function claimHoroscope(input: {
+export async function claimOracle(input: {
   guildId: string;
   userId: string;
   pairId: string | null;
-  mode: HoroscopeMode;
-  context: HoroscopeContext;
+  mode: OracleMode;
+  context: OracleContext;
   now?: Date;
 }) {
-  ensureHoroscopeEnabled();
+  ensureOracleEnabled();
   const now = input.now ?? new Date();
   const weekStartDate = startOfWeekIso(now);
 
   const existingClaim = await db
     .select()
-    .from(horoscopeClaims)
+    .from(oracleClaims)
     .where(
       and(
-        eq(horoscopeClaims.guildId, input.guildId),
-        eq(horoscopeClaims.weekStartDate, weekStartDate),
-        eq(horoscopeClaims.userId, input.userId),
+        eq(oracleClaims.guildId, input.guildId),
+        eq(oracleClaims.weekStartDate, weekStartDate),
+        eq(oracleClaims.userId, input.userId),
       ),
     )
     .limit(1);
@@ -846,11 +846,11 @@ export async function claimHoroscope(input: {
     };
   }
 
-  const week = await ensureHoroscopeWeek(input.guildId, weekStartDate);
+  const week = await ensureOracleWeek(input.guildId, weekStartDate);
   const archetypeRows = await db
     .select()
-    .from(contentHoroscopeArchetypes)
-    .where(eq(contentHoroscopeArchetypes.key, week.archetypeKey))
+    .from(contentOracleArchetypes)
+    .where(eq(contentOracleArchetypes.key, week.archetypeKey))
     .limit(1);
 
   const archetype = archetypeRows[0];
@@ -868,7 +868,7 @@ export async function claimHoroscope(input: {
   });
 
   const inserted = await db
-    .insert(horoscopeClaims)
+    .insert(oracleClaims)
     .values({
       id: randomUUID(),
       guildId: input.guildId,
@@ -881,7 +881,7 @@ export async function claimHoroscope(input: {
       claimText
     })
     .onConflictDoNothing({
-      target: [horoscopeClaims.guildId, horoscopeClaims.weekStartDate, horoscopeClaims.userId]
+      target: [oracleClaims.guildId, oracleClaims.weekStartDate, oracleClaims.userId]
     })
     .returning();
 
@@ -896,18 +896,18 @@ export async function claimHoroscope(input: {
 
   const afterConflict = await db
     .select()
-    .from(horoscopeClaims)
+    .from(oracleClaims)
     .where(
       and(
-        eq(horoscopeClaims.guildId, input.guildId),
-        eq(horoscopeClaims.weekStartDate, weekStartDate),
-        eq(horoscopeClaims.userId, input.userId),
+        eq(oracleClaims.guildId, input.guildId),
+        eq(oracleClaims.weekStartDate, weekStartDate),
+        eq(oracleClaims.userId, input.userId),
       ),
     )
     .limit(1);
 
   if (!afterConflict[0]) {
-    throw new Error('Horoscope claim dedupe conflict but row not found');
+    throw new Error('Oracle claim dedupe conflict but row not found');
   }
 
   return {
@@ -918,13 +918,13 @@ export async function claimHoroscope(input: {
   };
 }
 
-export async function markHoroscopeClaimDelivery(claimId: string, deliveredTo: 'dm' | 'pair' | 'ephemeral') {
+export async function markOracleClaimDelivery(claimId: string, deliveredTo: 'dm' | 'pair' | 'ephemeral') {
   await db
-    .update(horoscopeClaims)
+    .update(oracleClaims)
     .set({
       deliveredTo
     })
-    .where(eq(horoscopeClaims.id, claimId));
+    .where(eq(oracleClaims.id, claimId));
 }
 
 
@@ -1810,7 +1810,7 @@ const envSchema = z.object({
   SENTRY_DSN: optionalUrlString,
   TZ: z.string().default('Asia/Almaty'),
   DEFAULT_TIMEZONE: z.string().default('Asia/Almaty'),
-  PHASE2_HOROSCOPE_ENABLED: booleanFromString,
+  PHASE2_ORACLE_ENABLED: booleanFromString,
   PHASE2_CHECKIN_ENABLED: booleanFromString,
   PHASE2_ANON_ENABLED: booleanFromString,
   PHASE2_REWARDS_ENABLED: booleanFromString,
@@ -2057,12 +2057,12 @@ export const anonCommand: CommandModule = {
 
 -----
 
-## src/discord/commands/horoscope.ts
+## src/discord/commands/oracle.ts
 -----
 import { SlashCommandBuilder } from 'discord.js';
 import {
-  ensureHoroscopeEnabled,
-} from '../../app/services/horoscopeService';
+  ensureOracleEnabled,
+} from '../../app/services/oracleService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { JobNames } from '../../infra/queue/jobs';
 import { createCorrelationId } from '../../lib/correlation';
@@ -2071,23 +2071,23 @@ import { logInteraction } from '../interactionLog';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
-export const horoscopeCommand: CommandModule = {
-  name: 'horoscope',
+export const oracleCommand: CommandModule = {
+  name: 'oracle',
   data: new SlashCommandBuilder()
-    .setName('horoscope')
-    .setDescription('Weekly horoscope controls')
-    .addSubcommand((sub) => sub.setName('status').setDescription('Show horoscope status'))
+    .setName('oracle')
+    .setDescription('Weekly oracle controls')
+    .addSubcommand((sub) => sub.setName('status').setDescription('Show oracle status'))
     .addSubcommand((sub) =>
-      sub.setName('publish-now').setDescription('Force schedule + publish due horoscope posts (admin/mod)'),
+      sub.setName('publish-now').setDescription('Force schedule + publish due oracle posts (admin/mod)'),
     ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      ensureHoroscopeEnabled();
+      ensureOracleEnabled();
     } catch (error) {
-      await interaction.editReply(error instanceof Error ? error.message : 'Horoscope is disabled.');
+      await interaction.editReply(error instanceof Error ? error.message : 'Oracle is disabled.');
       return;
     }
 
@@ -2100,15 +2100,15 @@ export const horoscopeCommand: CommandModule = {
 
       logInteraction({
         interaction,
-        feature: 'horoscope',
+        feature: 'oracle',
         action: 'status',
         correlationId
       });
 
       await interaction.editReply(
-        `Horoscope is enabled.\n` +
+        `Oracle is enabled.\n` +
           `Current week: \`${week}\`\n` +
-          `Configured channel: ${settings?.horoscopeChannelId ? `<#${settings.horoscopeChannelId}>` : 'not set'}\n` +
+          `Configured channel: ${settings?.oracleChannelId ? `<#${settings.oracleChannelId}>` : 'not set'}\n` +
           'Weekly publish: Monday 10:00 (scheduler).',
       );
       return;
@@ -2118,28 +2118,28 @@ export const horoscopeCommand: CommandModule = {
       const settings = await getGuildSettings(interaction.guildId);
       assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
 
-      await ctx.boss.send(JobNames.WeeklyHoroscopePublish, {
+      await ctx.boss.send(JobNames.WeeklyOraclePublish, {
         correlationId,
         interactionId: interaction.id,
         guildId: interaction.guildId,
         userId: interaction.user.id,
-        feature: 'horoscope',
+        feature: 'oracle',
         action: 'publish_now',
         weekStartDate: startOfWeekIso(new Date())
       });
 
       logInteraction({
         interaction,
-        feature: 'horoscope',
+        feature: 'oracle',
         action: 'publish_now',
         correlationId
       });
 
-      await interaction.editReply('Weekly horoscope refresh job queued.');
+      await interaction.editReply('Weekly oracle refresh job queued.');
       return;
     }
 
-    await interaction.editReply('Unknown horoscope subcommand.');
+    await interaction.editReply('Unknown oracle subcommand.');
   }
 };
 
@@ -2331,8 +2331,8 @@ import {
 import { encodeCustomId } from './customId';
 
 type SayTone = 'soft' | 'direct' | 'short';
-type HoroscopeMode = 'soft' | 'neutral' | 'hard';
-type HoroscopeContext = 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
+type OracleMode = 'soft' | 'neutral' | 'hard';
+type OracleContext = 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
 
 function datePayload(filters: { energy: DateEnergy; budget: DateBudget; timeWindow: DateTimeWindow }) {
   return {
@@ -2384,17 +2384,17 @@ export function buildDuelSubmissionModal(params: { duelId: string; roundId: stri
   return modal;
 }
 
-const horoscopeModes: readonly HoroscopeMode[] = ['soft', 'neutral', 'hard'];
-const horoscopeContexts: readonly HoroscopeContext[] = ['conflict', 'ok', 'boredom', 'distance', 'fatigue', 'jealousy'];
+const oracleModes: readonly OracleMode[] = ['soft', 'neutral', 'hard'];
+const oracleContexts: readonly OracleContext[] = ['conflict', 'ok', 'boredom', 'distance', 'fatigue', 'jealousy'];
 
-export function buildHoroscopeClaimPicker(params: {
+export function buildOracleClaimPicker(params: {
   guildId: string;
   weekStartDate: string;
-  mode: HoroscopeMode;
-  context: HoroscopeContext;
+  mode: OracleMode;
+  context: OracleContext;
 }) {
   const modeSelectId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'pick_mode',
     payload: {
       g: params.guildId,
@@ -2405,7 +2405,7 @@ export function buildHoroscopeClaimPicker(params: {
   });
 
   const contextSelectId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'pick_context',
     payload: {
       g: params.guildId,
@@ -2416,7 +2416,7 @@ export function buildHoroscopeClaimPicker(params: {
   });
 
   const claimButtonId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'claim_submit',
     payload: {
       g: params.guildId,
@@ -2432,7 +2432,7 @@ export function buildHoroscopeClaimPicker(params: {
         .setCustomId(modeSelectId)
         .setPlaceholder('Select mode')
         .addOptions(
-          horoscopeModes.map((mode) => ({
+          oracleModes.map((mode) => ({
             label: mode,
             value: mode,
             default: mode === params.mode
@@ -2444,7 +2444,7 @@ export function buildHoroscopeClaimPicker(params: {
         .setCustomId(contextSelectId)
         .setPlaceholder('Select context')
         .addOptions(
-          horoscopeContexts.map((context) => ({
+          oracleContexts.map((context) => ({
             label: context,
             value: context,
             default: context === params.context
@@ -2882,7 +2882,7 @@ import {
   buildCheckinSubmitModal,
   buildDateGeneratorPicker,
   buildDuelSubmissionModal,
-  buildHoroscopeClaimPicker,
+  buildOracleClaimPicker,
   buildMediatorSayToneButtons,
   buildRaidClaimButton,
   buildRaidConfirmButton
@@ -2896,11 +2896,11 @@ import {
   rejectAnonQuestion
 } from '../../app/services/anonService';
 import {
-  claimHoroscope,
-  markHoroscopeClaimDelivery,
-  parseHoroscopeContext,
-  parseHoroscopeMode
-} from '../../app/services/horoscopeService';
+  claimOracle,
+  markOracleClaimDelivery,
+  parseOracleContext,
+  parseOracleMode
+} from '../../app/services/oracleService';
 import { getPairForUser } from '../../infra/db/queries/pairs';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { claimRaidQuest, confirmRaidClaim, getRaidContributionForUser, getTodayRaidOffers } from '../../app/services/raidService';
@@ -2949,7 +2949,7 @@ const datePayloadSchema = z.object({
   t: z.string().min(1)
 });
 const anonQuestionPayloadSchema = z.object({ q: z.string().uuid() });
-const horoscopePickerPayloadSchema = z.object({
+const oraclePickerPayloadSchema = z.object({
   g: z.string().min(1),
   w: z.string().min(1),
   m: z.string().optional(),
@@ -2996,19 +2996,19 @@ function parseSayToneOrDefault(value: string): 'soft' | 'direct' | 'short' {
   return 'soft';
 }
 
-function parseHoroscopeSelection(payload: Record<string, string>): {
+function parseOracleSelection(payload: Record<string, string>): {
   guildId: string;
   weekStartDate: string;
   mode: 'soft' | 'neutral' | 'hard';
   context: 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
 } | null {
-  const parsed = horoscopePickerPayloadSchema.safeParse(payload);
+  const parsed = oraclePickerPayloadSchema.safeParse(payload);
   if (!parsed.success) {
     return null;
   }
 
-  const mode = parseHoroscopeMode(parsed.data.m ?? 'soft');
-  const context = parseHoroscopeContext(parsed.data.c ?? 'ok');
+  const mode = parseOracleMode(parsed.data.m ?? 'soft');
+  const context = parseOracleContext(parsed.data.c ?? 'ok');
   if (!mode || !context) {
     return null;
   }
@@ -3559,17 +3559,17 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_open') {
-    const selection = parseHoroscopeSelection(decoded.payload);
+  if (decoded.feature === 'oracle' && decoded.action === 'claim_open') {
+    const selection = parseOracleSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope payload.' });
+      await interaction.reply({ ephemeral: true, content: 'Malformed oracle payload.' });
       return;
     }
 
     await interaction.reply({
       ephemeral: true,
       content: 'Pick your mode and context, then press **Get privately**.',
-      components: buildHoroscopeClaimPicker({
+      components: buildOracleClaimPicker({
         guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: selection.mode,
@@ -3579,22 +3579,22 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
+  if (decoded.feature === 'oracle' && decoded.action === 'claim_submit') {
     if (!interaction.guildId) {
       await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
       return;
     }
 
-    const selection = parseHoroscopeSelection(decoded.payload);
+    const selection = parseOracleSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope selection.' });
+      await interaction.reply({ ephemeral: true, content: 'Malformed oracle selection.' });
       return;
     }
 
     await interaction.deferUpdate();
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
-    const claimed = await claimHoroscope({
+    const claimed = await claimOracle({
       guildId: interaction.guildId,
       userId: interaction.user.id,
       pairId: pair?.id ?? null,
@@ -3612,14 +3612,14 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         const channel = await interaction.client.channels.fetch(pair.privateChannelId);
         if (channel?.isTextBased() && 'send' in channel && typeof channel.send === 'function') {
           await channel.send({
-            content: `<@${interaction.user.id}> weekly horoscope:\n\n${claimed.text}`
+            content: `<@${interaction.user.id}> weekly oracle:\n\n${claimed.text}`
           });
           delivered = 'pair';
         }
       }
     }
 
-    await markHoroscopeClaimDelivery(claimed.claim.id, delivered);
+    await markOracleClaimDelivery(claimed.claim.id, delivered);
 
     const deliveryText = delivered === 'dm'
       ? 'Delivered to your DM.'
@@ -3629,24 +3629,24 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
     await interaction.editReply({
       content: claimed.created
-        ? `Horoscope claimed. ${deliveryText}`
+        ? `Oracle claimed. ${deliveryText}`
         : `You already claimed this week. ${deliveryText}`,
       components: []
     });
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'about') {
+  if (decoded.feature === 'oracle' && decoded.action === 'about') {
     await interaction.reply({
       ephemeral: true,
       content:
-        'Weekly horoscope is deterministic and built from seeded templates. ' +
+        'Weekly oracle is deterministic and built from seeded templates. ' +
         'No runtime LLM generation is used in production loops.',
     });
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'start_pair_ritual') {
+  if (decoded.feature === 'oracle' && decoded.action === 'start_pair_ritual') {
     if (!interaction.guildId) {
       await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
       return;
@@ -3657,7 +3657,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       await requestPairHomeRefresh(ctx.boss, {
         guildId: interaction.guildId,
         pairId: pair.id,
-        reason: 'horoscope_ritual_open',
+        reason: 'oracle_ritual_open',
         interactionId: interaction.id,
         userId: interaction.user.id,
         correlationId
@@ -4099,15 +4099,15 @@ async function handleSelect(
     return;
   }
 
-  if (decoded.feature === 'horoscope' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
+  if (decoded.feature === 'oracle' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ ephemeral: true, content: 'Unsupported horoscope selector.' });
+      await interaction.reply({ ephemeral: true, content: 'Unsupported oracle selector.' });
       return;
     }
 
-    const selection = parseHoroscopeSelection(decoded.payload);
+    const selection = parseOracleSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope selection payload.' });
+      await interaction.reply({ ephemeral: true, content: 'Malformed oracle selection payload.' });
       return;
     }
 
@@ -4118,20 +4118,20 @@ async function handleSelect(
     }
 
     const nextMode = decoded.action === 'pick_mode'
-      ? parseHoroscopeMode(selected)
+      ? parseOracleMode(selected)
       : selection.mode;
     const nextContext = decoded.action === 'pick_context'
-      ? parseHoroscopeContext(selected)
+      ? parseOracleContext(selected)
       : selection.context;
 
     if (!nextMode || !nextContext) {
-      await interaction.reply({ ephemeral: true, content: 'Invalid horoscope selection option.' });
+      await interaction.reply({ ephemeral: true, content: 'Invalid oracle selection option.' });
       return;
     }
 
     await interaction.update({
       content: 'Pick your mode and context, then press **Get privately**.',
-      components: buildHoroscopeClaimPicker({
+      components: buildOracleClaimPicker({
         guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: nextMode,
@@ -4828,7 +4828,7 @@ import { refreshDuelScoreboardProjection } from '../../discord/projections/score
 import type { ThrottledMessageEditor } from '../../discord/projections/messageEditor';
 import { refreshRaidProgressProjection } from '../../discord/projections/raidProgress';
 import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
-import { refreshWeeklyHoroscopeProjection } from '../../discord/projections/horoscopeWeekly';
+import { refreshWeeklyOracleProjection } from '../../discord/projections/oracleWeekly';
 import { refreshMonthlyHallProjection } from '../../discord/projections/monthlyHall';
 import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
 import { configureRecurringSchedules, type RecurringScheduleStatus } from './scheduler';
@@ -5129,13 +5129,13 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
       }
     });
 
-    await boss.work(JobNames.WeeklyHoroscopePublish, async (jobs) => {
+    await boss.work(JobNames.WeeklyOraclePublish, async (jobs) => {
       for (const job of jobs) {
         const parsed = genericScheduledPayloadSchema.parse(
           job.data ?? {
             correlationId: randomUUID(),
             guildId: 'scheduler',
-            feature: JobNames.WeeklyHoroscopePublish,
+            feature: JobNames.WeeklyOraclePublish,
             action: 'tick'
           },
         );
@@ -5143,14 +5143,14 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
 
         if (!messageEditor) {
-          throw new Error('Message editor not initialized for weekly horoscope publish');
+          throw new Error('Message editor not initialized for weekly oracle publish');
         }
 
         if (!discordClient) {
-          throw new Error('Discord client not initialized for weekly horoscope publish');
+          throw new Error('Discord client not initialized for weekly oracle publish');
         }
 
-        const refreshed = await refreshWeeklyHoroscopeProjection({
+        const refreshed = await refreshWeeklyOracleProjection({
           client: discordClient,
           messageEditor,
           weekStartDate: parsed.weekStartDate,
@@ -5158,7 +5158,7 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         });
 
         if (refreshed.failed > 0) {
-          throw new Error(`Weekly horoscope refresh failed for ${refreshed.failed} guild(s)`);
+          throw new Error(`Weekly oracle refresh failed for ${refreshed.failed} guild(s)`);
         }
 
         logger.info(
@@ -5348,11 +5348,11 @@ export type RecurringScheduleStatus = {
 
 const recurringScheduleDefinitions: readonly RecurringScheduleDefinition[] = [
   {
-    name: JobNames.WeeklyHoroscopePublish,
+    name: JobNames.WeeklyOraclePublish,
     cron: '0 10 * * 1',
-    payloadFeature: 'horoscope',
+    payloadFeature: 'oracle',
     payloadAction: 'weekly_publish',
-    featureFlag: 'horoscope'
+    featureFlag: 'oracle'
   },
   {
     name: JobNames.WeeklyCheckinNudge,
@@ -5476,7 +5476,7 @@ function setBaseEnv() {
   process.env.SENTRY_DSN = '';
   process.env.TZ = 'Asia/Almaty';
   process.env.DEFAULT_TIMEZONE = 'Asia/Almaty';
-  process.env.PHASE2_HOROSCOPE_ENABLED = 'false';
+  process.env.PHASE2_ORACLE_ENABLED = 'false';
   process.env.PHASE2_CHECKIN_ENABLED = 'false';
   process.env.PHASE2_ANON_ENABLED = 'false';
   process.env.PHASE2_REWARDS_ENABLED = 'false';
@@ -5596,9 +5596,9 @@ Pair Home panel:
 pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('pair.home.refresh', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'pair_home', action: 'manual_refresh', pairId: '<pair_id>', reason: 'manual_ops' }); await boss.stop();"
 ```
 
-Weekly horoscope dashboard:
+Weekly oracle dashboard:
 ```powershell
-pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('weekly.horoscope.publish', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'horoscope', action: 'manual_publish' }); await boss.stop();"
+pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('weekly.oracle.publish', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'oracle', action: 'manual_publish' }); await boss.stop();"
 ```
 
 Monthly hall dashboard:
@@ -5625,7 +5625,7 @@ Required variables:
 - `DATABASE_URL=<neon postgres url>`
 - `DISCORD_TOKEN=<bot token>`
 - `DISCORD_APP_ID=<application id>`
-- `PHASE2_HOROSCOPE_ENABLED=true`
+- `PHASE2_ORACLE_ENABLED=true`
 - `PHASE2_CHECKIN_ENABLED=true`
 - `PHASE2_ANON_ENABLED=true`
 - `PHASE2_REWARDS_ENABLED=true`
@@ -5694,7 +5694,7 @@ Invite URL template:
 
 ## 4) Create channels before `/setup`
 - [ ] Duel public channel
-- [ ] Weekly horoscope channel
+- [ ] Weekly oracle channel
 - [ ] Anonymous questions channel
 - [ ] Raid public channel
 - [ ] Monthly hall channel
@@ -5709,7 +5709,7 @@ Invite URL template:
 ## 6) Minimal feature wiring check
 - [ ] `/pair create @user` creates private pair room.
 - [ ] Pair room has exactly one Pair Home panel message.
-- [ ] Public dashboards exist as single editable messages (duel, raid, horoscope, monthly hall).
+- [ ] Public dashboards exist as single editable messages (duel, raid, oracle, monthly hall).
 - [ ] `/anon queue` is accessible only to admin/mod role.
 
 ## 7) First-run safety
@@ -5785,12 +5785,12 @@ Expected:
 - Raid dashboard edits in place.
 - Pair Home panel edits in place with updated raid points.
 
-10. `/horoscope publish-now` (admin/mod)
+10. `/oracle publish-now` (admin/mod)
 Expected:
-- Weekly horoscope dashboard exists as one message in horoscope channel.
+- Weekly oracle dashboard exists as one message in oracle channel.
 - Re-running command edits same message (no extra post).
 
-11. In weekly horoscope dashboard, click `Get privately`.
+11. In weekly oracle dashboard, click `Get privately`.
 Expected:
 - Ephemeral picker with Mode + Context selects.
 - After submit, delivery message indicates DM or pair-room fallback.
@@ -5976,45 +5976,45 @@ export async function buildAnonQueueView(guildId: string, page: number, pageSize
 
 -----
 
-## src/discord/projections/horoscopeWeekly.ts
+## src/discord/projections/oracleWeekly.ts
 -----
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Client } from 'discord.js';
-import { ensureHoroscopeWeek } from '../../app/services/horoscopeService';
+import { ensureOracleWeek } from '../../app/services/oracleService';
 import { startOfWeekIso } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
 import { guildSettings } from '../../infra/db/schema';
 import { logger } from '../../lib/logger';
-import { renderWeeklyHoroscopePost } from './horoscopeWeeklyRenderer';
+import { renderWeeklyOraclePost } from './oracleWeeklyRenderer';
 import type { ThrottledMessageEditor } from './messageEditor';
 import { COMPONENTS_V2_FLAGS, sendComponentsV2Message } from '../ui-v2';
 import { getDiscordErrorStatus, withDiscordApiRetry } from './discordApiRetry';
 import { Routes } from '../ui-v2/api';
 
-export type WeeklyHoroscopeRefreshStats = {
+export type WeeklyOracleRefreshStats = {
   processed: number;
   created: number;
   updated: number;
   failed: number;
 };
 
-async function clearHoroscopeMessageId(guildId: string): Promise<void> {
+async function clearOracleMessageId(guildId: string): Promise<void> {
   await db.execute(sql`
     update guild_settings
-    set horoscope_message_id = null, updated_at = now()
+    set oracle_message_id = null, updated_at = now()
     where guild_id = ${guildId}
   `);
 }
 
-async function setHoroscopeMessageIdIfUnset(input: {
+async function setOracleMessageIdIfUnset(input: {
   guildId: string;
   messageId: string;
 }): Promise<boolean> {
   const updated = await db.execute<{ guild_id: string }>(sql`
     update guild_settings
-    set horoscope_message_id = ${input.messageId}, updated_at = now()
+    set oracle_message_id = ${input.messageId}, updated_at = now()
     where guild_id = ${input.guildId}
-      and horoscope_message_id is null
+      and oracle_message_id is null
     returning guild_id
   `);
 
@@ -6024,7 +6024,7 @@ async function setHoroscopeMessageIdIfUnset(input: {
 async function deleteMessageBestEffort(client: Client, channelId: string, messageId: string): Promise<void> {
   try {
     await withDiscordApiRetry({
-      feature: 'horoscope_weekly',
+      feature: 'oracle_weekly',
       action: 'delete_duplicate',
       maxAttempts: 3,
       baseDelayMs: 300,
@@ -6039,41 +6039,41 @@ async function deleteMessageBestEffort(client: Client, channelId: string, messag
   } catch {
     logger.warn(
       {
-        feature: 'horoscope_weekly',
+        feature: 'oracle_weekly',
         channel_id: channelId,
         message_id: messageId
       },
-      'Failed to delete duplicate weekly horoscope message',
+      'Failed to delete duplicate weekly oracle message',
     );
   }
 }
 
-export async function refreshWeeklyHoroscopeProjection(input: {
+export async function refreshWeeklyOracleProjection(input: {
   client: Client;
   messageEditor: ThrottledMessageEditor;
   weekStartDate?: string;
   guildId?: string;
   now?: Date;
-}): Promise<WeeklyHoroscopeRefreshStats> {
+}): Promise<WeeklyOracleRefreshStats> {
   const weekStartDate = input.weekStartDate ?? startOfWeekIso(input.now ?? new Date());
 
   const rows = input.guildId
     ? await db
         .select({
           guildId: guildSettings.guildId,
-          horoscopeChannelId: guildSettings.horoscopeChannelId,
-          horoscopeMessageId: sql<string | null>`horoscope_message_id`
+          oracleChannelId: guildSettings.oracleChannelId,
+          oracleMessageId: sql<string | null>`oracle_message_id`
         })
         .from(guildSettings)
-        .where(and(eq(guildSettings.guildId, input.guildId), isNotNull(guildSettings.horoscopeChannelId)))
+        .where(and(eq(guildSettings.guildId, input.guildId), isNotNull(guildSettings.oracleChannelId)))
     : await db
         .select({
           guildId: guildSettings.guildId,
-          horoscopeChannelId: guildSettings.horoscopeChannelId,
-          horoscopeMessageId: sql<string | null>`horoscope_message_id`
+          oracleChannelId: guildSettings.oracleChannelId,
+          oracleMessageId: sql<string | null>`oracle_message_id`
         })
         .from(guildSettings)
-        .where(isNotNull(guildSettings.horoscopeChannelId));
+        .where(isNotNull(guildSettings.oracleChannelId));
 
   let processed = 0;
   let created = 0;
@@ -6081,7 +6081,7 @@ export async function refreshWeeklyHoroscopeProjection(input: {
   let failed = 0;
 
   for (const row of rows) {
-    const channelId = row.horoscopeChannelId;
+    const channelId = row.oracleChannelId;
     if (!channelId) {
       continue;
     }
@@ -6089,17 +6089,17 @@ export async function refreshWeeklyHoroscopeProjection(input: {
     processed += 1;
 
     try {
-      await ensureHoroscopeWeek(row.guildId, weekStartDate);
-      const view = renderWeeklyHoroscopePost({
+      await ensureOracleWeek(row.guildId, weekStartDate);
+      const view = renderWeeklyOraclePost({
         guildId: row.guildId,
         weekStartDate
       });
 
-      if (row.horoscopeMessageId) {
+      if (row.oracleMessageId) {
         try {
           await input.messageEditor.queueEdit({
             channelId,
-            messageId: row.horoscopeMessageId,
+            messageId: row.oracleMessageId,
             content: view.content ?? null,
             components: view.components,
             flags: COMPONENTS_V2_FLAGS
@@ -6111,12 +6111,12 @@ export async function refreshWeeklyHoroscopeProjection(input: {
             throw error;
           }
 
-          await clearHoroscopeMessageId(row.guildId);
+          await clearOracleMessageId(row.guildId);
         }
       }
 
       const createdMessage = await sendComponentsV2Message(input.client, channelId, view);
-      const claimed = await setHoroscopeMessageIdIfUnset({
+      const claimed = await setOracleMessageIdIfUnset({
         guildId: row.guildId,
         messageId: createdMessage.id
       });
@@ -6128,18 +6128,18 @@ export async function refreshWeeklyHoroscopeProjection(input: {
 
       const latestRows = await db
         .select({
-          horoscopeMessageId: sql<string | null>`horoscope_message_id`,
-          horoscopeChannelId: guildSettings.horoscopeChannelId
+          oracleMessageId: sql<string | null>`oracle_message_id`,
+          oracleChannelId: guildSettings.oracleChannelId
         })
         .from(guildSettings)
         .where(eq(guildSettings.guildId, row.guildId))
         .limit(1);
 
       const latest = latestRows[0];
-      if (latest?.horoscopeMessageId) {
+      if (latest?.oracleMessageId) {
         await input.messageEditor.queueEdit({
-          channelId: latest.horoscopeChannelId ?? channelId,
-          messageId: latest.horoscopeMessageId,
+          channelId: latest.oracleChannelId ?? channelId,
+          messageId: latest.oracleMessageId,
           content: view.content ?? null,
           components: view.components,
           flags: COMPONENTS_V2_FLAGS
@@ -6149,19 +6149,19 @@ export async function refreshWeeklyHoroscopeProjection(input: {
         created += 1;
       }
 
-      if (latest?.horoscopeMessageId !== createdMessage.id) {
+      if (latest?.oracleMessageId !== createdMessage.id) {
         await deleteMessageBestEffort(input.client, channelId, createdMessage.id);
       }
     } catch (error) {
       failed += 1;
       logger.error(
         {
-          feature: 'horoscope_weekly',
+          feature: 'oracle_weekly',
           guild_id: row.guildId,
           week_start_date: weekStartDate,
           error
         },
-        'Weekly horoscope projection refresh failed',
+        'Weekly oracle projection refresh failed',
       );
     }
   }
@@ -6180,7 +6180,7 @@ export async function refreshWeeklyHoroscopeProjection(input: {
 ## src/infra/db/migrations/0005_final_hardening.sql
 -----
 ALTER TABLE "guild_settings"
-  ADD COLUMN IF NOT EXISTS "horoscope_message_id" varchar(32);
+  ADD COLUMN IF NOT EXISTS "oracle_message_id" varchar(32);
 
 CREATE INDEX IF NOT EXISTS "pairs_guild_created_idx"
   ON "pairs" ("guild_id", "created_at" DESC);
@@ -6197,3 +6197,4 @@ CREATE INDEX IF NOT EXISTS "scheduled_posts_due_status_idx"
 
 
 -----
+

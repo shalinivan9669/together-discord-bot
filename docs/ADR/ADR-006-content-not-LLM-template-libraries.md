@@ -7,7 +7,7 @@ Accepted
 Weekly loops need deterministic, reviewable, and moderation-safe content.
 
 ## Decision
-Use seeded content libraries in Postgres for horoscope archetypes, agreements, and quests.
+Use seeded content libraries in Postgres for Oracle archetypes, agreements, and quests.
 No runtime LLM generation in MVP.
 
 ## Consequences

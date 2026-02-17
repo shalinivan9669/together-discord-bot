@@ -1,4 +1,4 @@
-# Server Setup Checklist
+﻿# Server Setup Checklist
 
 ## 1) Invite and intents
 - [ ] Invite with scopes: `bot` + `applications.commands`.
@@ -23,7 +23,7 @@ Invite URL template:
 
 ## 4) Create channels before `/setup`
 - [ ] Duel public channel
-- [ ] Weekly horoscope channel
+- [ ] Oracle channel
 - [ ] Anonymous questions channel
 - [ ] Raid public channel
 - [ ] Monthly hall channel
@@ -38,10 +38,11 @@ Invite URL template:
 ## 6) Minimal feature wiring check
 - [ ] `/pair create @user` creates private pair room.
 - [ ] Pair room has exactly one Pair Home panel message.
-- [ ] Public dashboards exist as single editable messages (duel, raid, horoscope, monthly hall).
+- [ ] Public dashboards exist as single editable messages (duel, raid, oracle, monthly hall).
 - [ ] `/anon queue` is accessible only to admin/mod role.
 
 ## 7) First-run safety
 - [ ] If `ALLOWED_GUILD_IDS` is set, confirm this guild ID is included.
 - [ ] Verify startup self-check log appears after boot.
 - [ ] Verify `/healthz` is green before onboarding users.
+

@@ -11,7 +11,8 @@ function setBaseEnv() {
   process.env.SENTRY_DSN = '';
   process.env.TZ = 'Asia/Almaty';
   process.env.DEFAULT_TIMEZONE = 'Asia/Almaty';
-  process.env.PHASE2_HOROSCOPE_ENABLED = 'false';
+  process.env.PHASE2_ORACLE_ENABLED = 'false';
+  process.env.PHASE2_HOROSCOPE_ENABLED = '';
   process.env.PHASE2_CHECKIN_ENABLED = 'false';
   process.env.PHASE2_ANON_ENABLED = 'false';
   process.env.PHASE2_REWARDS_ENABLED = 'false';
@@ -40,5 +41,12 @@ describe('env parsing', () => {
     process.env.ALLOWED_GUILD_IDS = '123456789012345678, 987654321098765432';
     const module = await import('../../src/config/env');
     expect(module.env.ALLOWED_GUILD_IDS).toEqual(['123456789012345678', '987654321098765432']);
+  });
+
+  it('uses legacy horoscope env as fallback for oracle flag', async () => {
+    delete process.env.PHASE2_ORACLE_ENABLED;
+    process.env.PHASE2_HOROSCOPE_ENABLED = 'true';
+    const module = await import('../../src/config/env');
+    expect(module.env.PHASE2_ORACLE_ENABLED).toBe(true);
   });
 });

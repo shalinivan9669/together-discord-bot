@@ -1,7 +1,7 @@
-import { env } from './env';
+﻿import { env } from './env';
 
 export const featureFlags = {
-  horoscope: env.PHASE2_HOROSCOPE_ENABLED,
+  oracle: env.PHASE2_ORACLE_ENABLED,
   checkin: env.PHASE2_CHECKIN_ENABLED,
   anon: env.PHASE2_ANON_ENABLED,
   rewards: env.PHASE2_REWARDS_ENABLED,

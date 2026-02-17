@@ -77,14 +77,14 @@
 - подтверждение проходит
 - raid dashboard и pair home обновляются edit-ом
 
-## 3) Horoscope, checkin, anon, hall
+## 3) Oracle, checkin, anon, hall
 
-1. `/horoscope publish-now` (Admin/Mod)
+1. `/oracle publish-now` (Admin/Mod)
 Ожидается:
-- weekly horoscope card существует как одна запись
+- Oracle card существует как одна запись (edit-only)
 - повторный publish обновляет/дедупит, не спамит канал
 
-2. В weekly horoscope нажать `Получить в личку`.
+2. В Oracle card нажать `Получить подсказку`.
 Ожидается:
 - mode/context picker
 - корректная delivery логика
@@ -140,3 +140,4 @@
 - Нет permission bypass в admin/mod потоках.
 - Повторные клики не приводят к двойным начислениям/двойным публикациям.
 - `/healthz` остается здоровым во время всего smoke.
+

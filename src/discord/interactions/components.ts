@@ -1,4 +1,4 @@
-import {
+﻿import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -19,8 +19,8 @@ import { t, type AppLocale } from '../../i18n';
 import { encodeCustomId } from './customId';
 
 type SayTone = 'soft' | 'direct' | 'short';
-type HoroscopeMode = 'soft' | 'neutral' | 'hard';
-type HoroscopeContext = 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
+type OracleMode = 'soft' | 'neutral' | 'hard';
+type OracleContext = 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
 
 function datePayload(filters: { energy: DateEnergy; budget: DateBudget; timeWindow: DateTimeWindow }) {
   return {
@@ -78,17 +78,17 @@ export function buildDuelSubmissionModal(
   return modal;
 }
 
-const horoscopeModes: readonly HoroscopeMode[] = ['soft', 'neutral', 'hard'];
-const horoscopeContexts: readonly HoroscopeContext[] = ['conflict', 'ok', 'boredom', 'distance', 'fatigue', 'jealousy'];
+const oracleModes: readonly OracleMode[] = ['soft', 'neutral', 'hard'];
+const oracleContexts: readonly OracleContext[] = ['conflict', 'ok', 'boredom', 'distance', 'fatigue', 'jealousy'];
 
-export function buildHoroscopeClaimPicker(params: {
+export function buildOracleClaimPicker(params: {
   guildId: string;
   weekStartDate: string;
-  mode: HoroscopeMode;
-  context: HoroscopeContext;
+  mode: OracleMode;
+  context: OracleContext;
 }, locale: AppLocale = 'ru') {
   const modeSelectId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'pick_mode',
     payload: {
       g: params.guildId,
@@ -99,7 +99,7 @@ export function buildHoroscopeClaimPicker(params: {
   });
 
   const contextSelectId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'pick_context',
     payload: {
       g: params.guildId,
@@ -110,7 +110,7 @@ export function buildHoroscopeClaimPicker(params: {
   });
 
   const claimButtonId = encodeCustomId({
-    feature: 'horoscope',
+    feature: 'oracle',
     action: 'claim_submit',
     payload: {
       g: params.guildId,
@@ -124,10 +124,10 @@ export function buildHoroscopeClaimPicker(params: {
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(modeSelectId)
-        .setPlaceholder(t(locale, 'component.horoscope.select_mode'))
+        .setPlaceholder(t(locale, 'component.oracle.select_mode'))
         .addOptions(
-          horoscopeModes.map((mode) => ({
-            label: t(locale, `component.horoscope.mode.${mode}` as const),
+          oracleModes.map((mode) => ({
+            label: t(locale, `component.oracle.mode.${mode}` as const),
             value: mode,
             default: mode === params.mode
           })),
@@ -136,17 +136,17 @@ export function buildHoroscopeClaimPicker(params: {
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(contextSelectId)
-        .setPlaceholder(t(locale, 'component.horoscope.select_context'))
+        .setPlaceholder(t(locale, 'component.oracle.select_context'))
         .addOptions(
-          horoscopeContexts.map((context) => ({
-            label: t(locale, `component.horoscope.context.${context}` as const),
+          oracleContexts.map((context) => ({
+            label: t(locale, `component.oracle.context.${context}` as const),
             value: context,
             default: context === params.context
           })),
         ),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(claimButtonId).setLabel(t(locale, 'component.horoscope.get_privately')).setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(claimButtonId).setLabel(t(locale, 'component.oracle.get_privately')).setStyle(ButtonStyle.Primary),
     )
   ];
 }
@@ -533,3 +533,4 @@ export function buildRaidConfirmButton(claimId: string, locale: AppLocale = 'ru'
     new ButtonBuilder().setCustomId(customId).setLabel(t(locale, 'component.raid.partner_confirm')).setStyle(ButtonStyle.Success),
   );
 }
+

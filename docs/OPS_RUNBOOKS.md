@@ -1,4 +1,4 @@
-# Ops Runbooks
+﻿# Ops Runbooks
 
 ## 1) Discord outage / gateway disconnect
 Symptoms:
@@ -81,12 +81,14 @@ Pair Home panel:
 pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('pair.home.refresh', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'pair_home', action: 'manual_refresh', pairId: '<pair_id>', reason: 'manual_ops' }); await boss.stop();"
 ```
 
-Weekly horoscope dashboard:
+Oracle dashboard (weekly cycle):
 ```powershell
-pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('weekly.horoscope.publish', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'horoscope', action: 'manual_publish' }); await boss.stop();"
+pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('weekly.oracle.publish', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'oracle', action: 'manual_publish' }); await boss.stop();"
 ```
 
 Monthly hall dashboard:
 ```powershell
 pnpm tsx -e "import { randomUUID } from 'node:crypto'; import PgBoss from 'pg-boss'; import { env } from './src/config/env'; const boss = new PgBoss({ connectionString: env.DATABASE_URL, schema: 'public', migrate: false }); await boss.start(); await boss.send('monthly.hall.refresh', { correlationId: randomUUID(), guildId: '<guild_id>', feature: 'monthly_hall', action: 'manual_refresh' }); await boss.stop();"
 ```
+
+

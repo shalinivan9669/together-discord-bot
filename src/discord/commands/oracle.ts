@@ -1,7 +1,5 @@
-import { MessageFlags, SlashCommandBuilder } from 'discord.js';
-import {
-  ensureHoroscopeEnabled,
-} from '../../app/services/horoscopeService';
+﻿import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { ensureOracleEnabled } from '../../app/services/oracleService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { JobNames } from '../../infra/queue/jobs';
 import { createCorrelationId } from '../../lib/correlation';
@@ -12,26 +10,26 @@ import { createInteractionTranslator } from '../locale';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
-export const horoscopeCommand: CommandModule = {
-  name: 'horoscope',
+export const oracleCommand: CommandModule = {
+  name: 'oracle',
   data: new SlashCommandBuilder()
-    .setName('horoscope')
-    .setNameLocalizations({ ru: 'horoscope', 'en-US': 'horoscope' })
-    .setDescription('Управление недельным гороскопом')
-    .setDescriptionLocalizations({ 'en-US': 'Weekly horoscope controls' })
+    .setName('oracle')
+    .setNameLocalizations({ ru: 'oracle', 'en-US': 'oracle' })
+    .setDescription('Управление Оракулом')
+    .setDescriptionLocalizations({ 'en-US': 'Oracle controls' })
     .addSubcommand((sub) =>
       sub
         .setName('status')
         .setNameLocalizations({ ru: 'status', 'en-US': 'status' })
-        .setDescription('Показать статус гороскопа')
-        .setDescriptionLocalizations({ 'en-US': 'Show horoscope status' }),
+        .setDescription('Показать статус Оракула')
+        .setDescriptionLocalizations({ 'en-US': 'Show Oracle status' }),
     )
     .addSubcommand((sub) =>
       sub
         .setName('publish-now')
         .setNameLocalizations({ ru: 'publish-now', 'en-US': 'publish-now' })
-        .setDescription('Форсировать расписание и публикацию гороскопа (админ/модератор)')
-        .setDescriptionLocalizations({ 'en-US': 'Force schedule + publish due horoscope posts (admin/mod)' }),
+        .setDescription('Форсировать публикацию Оракула недели (админ/модератор)')
+        .setDescriptionLocalizations({ 'en-US': 'Force weekly Oracle publish (admin/mod)' }),
     ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
@@ -39,10 +37,10 @@ export const horoscopeCommand: CommandModule = {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      await ensureHoroscopeEnabled(interaction.guildId);
+      await ensureOracleEnabled(interaction.guildId);
     } catch (error) {
       const featureError = formatFeatureUnavailableError('ru', error);
-      await interaction.editReply(featureError ?? tr.t('horoscope.reply.disabled_fallback'));
+      await interaction.editReply(featureError ?? tr.t('oracle.reply.disabled_fallback'));
       return;
     }
 
@@ -55,16 +53,16 @@ export const horoscopeCommand: CommandModule = {
 
       logInteraction({
         interaction,
-        feature: 'horoscope',
+        feature: 'oracle',
         action: 'status',
-        correlationId
+        correlationId,
       });
 
       await interaction.editReply(
-        `${tr.t('horoscope.reply.enabled')}\n` +
-          `${tr.t('horoscope.reply.current_week', { week })}\n` +
-          `${tr.t('horoscope.reply.configured_channel', { channel: settings?.horoscopeChannelId ? `<#${settings.horoscopeChannelId}>` : tr.t('common.not_set') })}\n` +
-          tr.t('horoscope.reply.weekly_publish'),
+        `${tr.t('oracle.reply.enabled')}\n`
+          + `${tr.t('oracle.reply.current_week', { week })}\n`
+          + `${tr.t('oracle.reply.configured_channel', { channel: settings?.oracleChannelId ? `<#${settings.oracleChannelId}>` : tr.t('common.not_set') })}\n`
+          + tr.t('oracle.reply.weekly_publish'),
       );
       return;
     }
@@ -73,27 +71,27 @@ export const horoscopeCommand: CommandModule = {
       const settings = await getGuildSettings(interaction.guildId);
       assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
 
-      await ctx.boss.send(JobNames.WeeklyHoroscopePublish, {
+      await ctx.boss.send(JobNames.WeeklyOraclePublish, {
         correlationId,
         interactionId: interaction.id,
         guildId: interaction.guildId,
         userId: interaction.user.id,
-        feature: 'horoscope',
+        feature: 'oracle',
         action: 'publish_now',
-        weekStartDate: startOfWeekIso(new Date())
+        weekStartDate: startOfWeekIso(new Date()),
       });
 
       logInteraction({
         interaction,
-        feature: 'horoscope',
+        feature: 'oracle',
         action: 'publish_now',
-        correlationId
+        correlationId,
       });
 
-      await interaction.editReply(tr.t('horoscope.reply.publish_job_queued'));
+      await interaction.editReply(tr.t('oracle.reply.publish_job_queued'));
       return;
     }
 
     await interaction.editReply(tr.t('error.unknown_subcommand'));
-  }
+  },
 };

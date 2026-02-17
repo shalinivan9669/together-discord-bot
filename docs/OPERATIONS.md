@@ -32,7 +32,7 @@ Endpoint: `GET /healthz`
 - `monthly.hall.refresh`
 - `mediator.repair.tick`
 - `public.post.publish`
-- `weekly.horoscope.publish`
+- `weekly.oracle.publish`
 - `weekly.checkin.nudge`
 - `weekly.raid.start`
 - `weekly.raid.end`
@@ -40,7 +40,7 @@ Endpoint: `GET /healthz`
 
 Recurring schedule:
 
-- Weekly horoscope: Monday `10:00`
+- Oracle: weekly Monday `10:00`
 - Weekly check-in nudge: Wednesday `12:00`
 - Weekly raid start: Monday `09:00`
 - Weekly raid end: Monday `09:05`
@@ -144,3 +144,5 @@ Recurring schedule:
 4. Остановка HTTP сервера
 
 Реализация: `src/index.ts`.
+
+

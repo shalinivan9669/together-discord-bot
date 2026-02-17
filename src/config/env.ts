@@ -1,4 +1,4 @@
-import { config as loadDotenv } from 'dotenv';
+﻿import { config as loadDotenv } from 'dotenv';
 import { z } from 'zod';
 
 loadDotenv();
@@ -50,7 +50,7 @@ const envSchema = z.object({
   SENTRY_DSN: optionalUrlString,
   TZ: z.string().default('Asia/Almaty'),
   DEFAULT_TIMEZONE: z.string().default('Asia/Almaty'),
-  PHASE2_HOROSCOPE_ENABLED: booleanFromString,
+  PHASE2_ORACLE_ENABLED: booleanFromString,
   PHASE2_CHECKIN_ENABLED: booleanFromString,
   PHASE2_ANON_ENABLED: booleanFromString,
   PHASE2_REWARDS_ENABLED: booleanFromString,
@@ -60,7 +60,17 @@ const envSchema = z.object({
   RAID_PROGRESS_EDIT_THROTTLE_SECONDS: z.coerce.number().int().min(5).max(60).default(15)
 });
 
-const parsed = envSchema.safeParse(process.env);
+const rawEnv = {
+  ...process.env,
+  // Backward compatibility for one release:
+  // PHASE2_ORACLE_ENABLED <- PHASE2_HOROSCOPE_ENABLED fallback.
+  PHASE2_ORACLE_ENABLED:
+    process.env.PHASE2_ORACLE_ENABLED
+    ?? process.env.PHASE2_HOROSCOPE_ENABLED
+    ?? 'false',
+};
+
+const parsed = envSchema.safeParse(rawEnv);
 
 if (!parsed.success) {
   const flattened = parsed.error.flatten();
@@ -78,3 +88,4 @@ export function assertRuntimeDiscordEnv(config: Env): asserts config is Env & {
     throw new Error('DISCORD_TOKEN and DISCORD_APP_ID are required for runtime bot process');
   }
 }
+

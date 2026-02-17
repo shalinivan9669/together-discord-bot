@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 export const JobNames = {
   DuelRoundClose: 'duel.round.close',
@@ -8,7 +8,7 @@ export const JobNames = {
   MonthlyHallRefresh: 'monthly.hall.refresh',
   MediatorRepairTick: 'mediator.repair.tick',
   PublicPostPublish: 'public.post.publish',
-  WeeklyHoroscopePublish: 'weekly.horoscope.publish',
+  WeeklyOraclePublish: 'weekly.oracle.publish',
   WeeklyCheckinNudge: 'weekly.checkin.nudge',
   WeeklyRaidStart: 'weekly.raid.start',
   WeeklyRaidEnd: 'weekly.raid.end',
@@ -76,3 +76,4 @@ export type MonthlyHallRefreshPayload = z.infer<typeof monthlyHallRefreshPayload
 export type MediatorRepairTickPayload = z.infer<typeof mediatorRepairTickPayloadSchema>;
 export type PublicPostPublishPayload = z.infer<typeof publicPostPublishPayloadSchema>;
 export type GenericScheduledPayload = z.infer<typeof genericScheduledPayloadSchema>;
+

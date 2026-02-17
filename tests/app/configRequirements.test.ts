@@ -9,7 +9,7 @@ import {
 function baseConfig(overrides?: Partial<GuildConfigRequirementShape>): GuildConfigRequirementShape {
   return {
     pairCategoryId: 'cat-1',
-    horoscopeChannelId: 'ch-h',
+    oracleChannelId: 'ch-h',
     raidChannelId: 'ch-r',
     hallChannelId: 'ch-hall',
     publicPostChannelId: 'ch-pub',

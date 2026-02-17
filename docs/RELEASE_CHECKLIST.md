@@ -1,4 +1,4 @@
-# Release Checklist
+﻿# Release Checklist
 
 ## 0) Encoding guard (pre-commit / pre-push)
 
@@ -20,7 +20,7 @@ Required variables:
 - `DATABASE_URL=<neon postgres url>`
 - `DISCORD_TOKEN=<bot token>`
 - `DISCORD_APP_ID=<application id>`
-- `PHASE2_HOROSCOPE_ENABLED=true`
+- `PHASE2_ORACLE_ENABLED=true`
 - `PHASE2_CHECKIN_ENABLED=true`
 - `PHASE2_ANON_ENABLED=true`
 - `PHASE2_REWARDS_ENABLED=true`
@@ -64,3 +64,4 @@ Optional but recommended:
 - [ ] In a test guild, run `/setup start` -> complete wizard -> verify `/admin status` and `/admin doctor` return `OK`/expected warnings only.
 - [ ] Manual smoke path from `docs/SMOKE_TEST.md` passed.
 - [ ] Server setup checklist from `docs/SERVER_SETUP_CHECKLIST.md` completed.
+

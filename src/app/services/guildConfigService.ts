@@ -1,4 +1,4 @@
-import { env } from '../../config/env';
+﻿import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
 import type { AppLocale } from '../../i18n';
 import { getGuildSettings, upsertGuildSettings } from '../../infra/db/queries/guildSettings';
@@ -10,7 +10,7 @@ import {
 const CONFIG_CACHE_TTL_MS = 45_000;
 
 export const guildFeatureNames = [
-  'horoscope',
+  'oracle',
   'anon',
   'raid',
   'checkin',
@@ -54,7 +54,7 @@ export type GuildConfig = {
   locale: GuildLocale;
   timezone: string;
   pairCategoryId: string | null;
-  horoscopeChannelId: string | null;
+  oracleChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -68,7 +68,7 @@ export type GuildConfigPatch = Partial<{
   locale: GuildLocale;
   timezone: string;
   pairCategoryId: string | null;
-  horoscopeChannelId: string | null;
+  oracleChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -94,7 +94,7 @@ type CacheEntry = {
 const configCache = new Map<string, CacheEntry>();
 
 const featureDefaults: GuildFeatureMap = {
-  horoscope: env.PHASE2_HOROSCOPE_ENABLED,
+  oracle: env.PHASE2_ORACLE_ENABLED,
   anon: env.PHASE2_ANON_ENABLED,
   raid: env.PHASE2_RAID_ENABLED,
   checkin: env.PHASE2_CHECKIN_ENABLED,
@@ -103,7 +103,7 @@ const featureDefaults: GuildFeatureMap = {
 };
 
 const featureLabels: Record<GuildFeatureName, string> = {
-  horoscope: 'Horoscope',
+  oracle: 'Oracle',
   anon: 'Anonymous questions',
   raid: 'Raid',
   checkin: 'Check-in',
@@ -125,8 +125,14 @@ function toFeatures(value: unknown): GuildFeatureMap {
   }
 
   const source = value as Record<string, unknown>;
+  const oracleEnabled = typeof source.oracle === 'boolean'
+    ? source.oracle
+    : typeof source.horoscope === 'boolean'
+      ? source.horoscope
+      : featureDefaults.oracle;
+
   return {
-    horoscope: typeof source.horoscope === 'boolean' ? source.horoscope : featureDefaults.horoscope,
+    oracle: oracleEnabled,
     anon: typeof source.anon === 'boolean' ? source.anon : featureDefaults.anon,
     raid: typeof source.raid === 'boolean' ? source.raid : featureDefaults.raid,
     checkin: typeof source.checkin === 'boolean' ? source.checkin : featureDefaults.checkin,
@@ -153,7 +159,7 @@ function normalizeConfig(
     locale: toLocale(row?.locale),
     timezone: row?.timezone ?? env.DEFAULT_TIMEZONE,
     pairCategoryId: row?.pairCategoryId ?? null,
-    horoscopeChannelId: row?.horoscopeChannelId ?? null,
+    oracleChannelId: row?.oracleChannelId ?? null,
     raidChannelId: row?.raidChannelId ?? null,
     hallChannelId: row?.hallChannelId ?? null,
     publicPostChannelId: row?.publicPostChannelId ?? row?.duelPublicChannelId ?? null,
@@ -270,7 +276,7 @@ export async function updateGuildConfig(
     locale: patch.locale,
     timezone: patch.timezone,
     pairCategoryId: patch.pairCategoryId,
-    horoscopeChannelId: patch.horoscopeChannelId,
+    oracleChannelId: patch.oracleChannelId,
     raidChannelId: patch.raidChannelId,
     hallChannelId: patch.hallChannelId,
     publicPostChannelId: patch.publicPostChannelId,
@@ -365,3 +371,4 @@ export function formatFeatureLabel(feature: GuildFeatureName): string {
 export async function setGuildLocale(guildId: string, locale: GuildLocale): Promise<GuildConfig> {
   return updateGuildConfig(guildId, { locale });
 }
+

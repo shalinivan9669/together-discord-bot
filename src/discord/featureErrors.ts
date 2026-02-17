@@ -1,4 +1,4 @@
-import {
+﻿import {
   type GuildFeatureName,
   GuildFeatureUnavailableError,
 } from '../app/services/guildConfigService';
@@ -6,7 +6,7 @@ import type { GuildConfigRequirementKey } from '../app/services/configRequiremen
 import { t, type AppLocale, type I18nKey } from '../i18n';
 
 const featureLabelKey: Record<GuildFeatureName, I18nKey> = {
-  horoscope: 'admin.status.feature.horoscope',
+  oracle: 'admin.status.feature.oracle',
   anon: 'admin.status.feature.anon',
   raid: 'admin.status.feature.raid',
   checkin: 'admin.status.feature.checkin',
@@ -16,7 +16,7 @@ const featureLabelKey: Record<GuildFeatureName, I18nKey> = {
 
 const requirementLabelKey: Record<GuildConfigRequirementKey, I18nKey> = {
   pair_category_id: 'config.requirement.pair_category_id',
-  horoscope_channel_id: 'config.requirement.horoscope_channel_id',
+  oracle_channel_id: 'config.requirement.oracle_channel_id',
   raid_channel_id: 'config.requirement.raid_channel_id',
   hall_channel_id: 'config.requirement.hall_channel_id',
   public_post_channel_id: 'config.requirement.public_post_channel_id',
@@ -50,3 +50,4 @@ export function formatFeatureUnavailableError(
     missing
   });
 }
+

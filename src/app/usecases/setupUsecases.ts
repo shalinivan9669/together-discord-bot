@@ -1,15 +1,15 @@
-import { setGuildSettings } from '../services/setupService';
+﻿import { setGuildSettings } from '../services/setupService';
 
 export async function setupSetChannelsUsecase(input: {
   guildId: string;
   duelPublicChannelId?: string | null;
-  horoscopeChannelId?: string | null;
+  oracleChannelId?: string | null;
   questionsChannelId?: string | null;
   raidChannelId?: string | null;
 }) {
   return setGuildSettings(input.guildId, {
     duelPublicChannelId: input.duelPublicChannelId,
-    horoscopeChannelId: input.horoscopeChannelId,
+    oracleChannelId: input.oracleChannelId,
     questionsChannelId: input.questionsChannelId,
     raidChannelId: input.raidChannelId
   });

@@ -42,7 +42,9 @@ Production-ready Discord-бот для парных активностей, пу
 - Пары и приватные комнаты: `/pair create`, `/pair room`, Pair Home panel.
 - Дуэли: запуск дуэли, раунды, modal-ответы, scoreboard.
 - Рейд: недельный цикл, daily quests, claim + partner confirm, progress card.
-- Гороскоп: weekly post + приватное получение через mode/context picker.
+- Оракул: один публичный пост (edit-only), период неделя, приватная подсказка через tone/context picker.
+  - Один архетип на период для всего сервера.
+  - Один пользователь может получить 1 подсказку за период (повтор отдает ту же).
 - Чек-ин: weekly agreement + modal на 5 оценок + optional public share.
 - Анонимные вопросы: submit, moderation queue, QoTD publish + кнопки.
 - Mediator: `/say` (тональности) и `/repair` (7-мин flow с edit одной записи).
@@ -62,3 +64,4 @@ Production-ready Discord-бот для парных активностей, пу
 - Базовая локаль продукта - русский.
 - Локаль гильдии переключается через `/admin config set locale <ru|en>`.
 - Все новые фичи должны иметь user-facing тексты как минимум на `ru`.
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   actionRowButtons,
   actionRowSelects,
   ButtonStyle,
@@ -132,7 +132,7 @@ export function buildSetupWizardV2View(
 
   const selectionsSummary = [
     categoryLine(locale, draft.pairCategoryId),
-    channelLine(locale, t(locale, 'setup.wizard.line.horoscope_channel'), draft.horoscopeChannelId),
+    channelLine(locale, t(locale, 'setup.wizard.line.oracle_channel'), draft.oracleChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.raid_channel'), draft.raidChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.hall_channel'), draft.hallChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.public_post_channel'), draft.publicPostChannelId),
@@ -155,11 +155,11 @@ export function buildSetupWizardV2View(
         ]
       }),
       uiCard({
-        title: 'Поля настройки',
+        title: '\u041f\u043e\u043b\u044f \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438',
         accentColor: 0x3d5a80,
         components: [
           categorySelect('pick_pair_category', t(locale, 'setup.wizard.placeholder.pair_category'), draft.userId),
-          channelSelect('pick_horoscope_channel', t(locale, 'setup.wizard.placeholder.horoscope_channel'), draft.userId),
+          channelSelect('pick_oracle_channel', t(locale, 'setup.wizard.placeholder.oracle_channel'), draft.userId),
           channelSelect('pick_raid_channel', t(locale, 'setup.wizard.placeholder.raid_channel'), draft.userId),
           channelSelect('pick_hall_channel', t(locale, 'setup.wizard.placeholder.hall_channel'), draft.userId),
           channelSelect(
@@ -210,3 +210,4 @@ export function buildSetupWizardV2View(
 }
 
 export const renderSetupWizardPanel = buildSetupWizardV2View;
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   bigint,
   boolean,
   integer,
@@ -16,7 +16,7 @@ export const guildSettings = pgTable('guild_settings', {
   locale: varchar('locale', { length: 8 }).notNull().default('ru'),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Asia/Almaty'),
   pairCategoryId: varchar('pair_category_id', { length: 32 }),
-  horoscopeChannelId: varchar('horoscope_channel_id', { length: 32 }),
+  oracleChannelId: varchar('oracle_channel_id', { length: 32 }),
   publicPostChannelId: varchar('public_post_channel_id', { length: 32 }),
   anonInboxChannelId: varchar('anon_inbox_channel_id', { length: 32 }),
   anonModRoleId: varchar('anon_mod_role_id', { length: 32 }),
@@ -233,7 +233,7 @@ export const dateWeekendPlans = pgTable(
   }),
 );
 
-export const contentHoroscopeArchetypes = pgTable('content_horoscope_archetypes', {
+export const contentOracleArchetypes = pgTable('content_oracle_archetypes', {
   key: varchar('key', { length: 64 }).primaryKey(),
   title: varchar('title', { length: 100 }).notNull(),
   variantsJson: jsonb('variants_json').notNull(),
@@ -241,8 +241,8 @@ export const contentHoroscopeArchetypes = pgTable('content_horoscope_archetypes'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
-export const horoscopeWeeks = pgTable(
-  'horoscope_weeks',
+export const oracleWeeks = pgTable(
+  'oracle_weeks',
   {
     id: varchar('id', { length: 36 }).primaryKey(),
     guildId: varchar('guild_id', { length: 32 }).notNull(),
@@ -252,12 +252,12 @@ export const horoscopeWeeks = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
-    uniqueWeek: unique('horoscope_weeks_guild_week_uq').on(table.guildId, table.weekStartDate)
+    uniqueWeek: unique('oracle_weeks_guild_week_uq').on(table.guildId, table.weekStartDate)
   }),
 );
 
-export const horoscopeClaims = pgTable(
-  'horoscope_claims',
+export const oracleClaims = pgTable(
+  'oracle_claims',
   {
     id: varchar('id', { length: 36 }).primaryKey(),
     guildId: varchar('guild_id', { length: 32 }).notNull(),
@@ -271,7 +271,7 @@ export const horoscopeClaims = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
-    uniqueClaim: unique('horoscope_claims_guild_week_user_uq').on(
+    uniqueClaim: unique('oracle_claims_guild_week_user_uq').on(
       table.guildId,
       table.weekStartDate,
       table.userId,
@@ -486,3 +486,4 @@ export const sequenceNumbers = pgTable('sequence_numbers', {
   value: bigint('value', { mode: 'number' }).notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
+

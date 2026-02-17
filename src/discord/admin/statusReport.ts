@@ -1,4 +1,4 @@
-import type { Guild } from 'discord.js';
+﻿import type { Guild } from 'discord.js';
 import { JobNames, type JobName } from '../../infra/queue/jobs';
 import { listRecurringScheduleStatus } from '../../infra/queue/scheduler';
 import {
@@ -16,7 +16,7 @@ import { runPermissionsCheck } from '../permissions/check';
 import { t, type I18nKey } from '../../i18n';
 
 const scheduleOwnerFeature: Partial<Record<JobName, GuildFeatureName>> = {
-  [JobNames.WeeklyHoroscopePublish]: 'horoscope',
+  [JobNames.WeeklyOraclePublish]: 'oracle',
   [JobNames.WeeklyCheckinNudge]: 'checkin',
   [JobNames.WeeklyRaidStart]: 'raid',
   [JobNames.WeeklyRaidEnd]: 'raid',
@@ -27,7 +27,7 @@ const scheduleOwnerFeature: Partial<Record<JobName, GuildFeatureName>> = {
 };
 
 const featureLabelKey: Record<GuildFeatureName, I18nKey> = {
-  horoscope: 'admin.status.feature.horoscope',
+  oracle: 'admin.status.feature.oracle',
   anon: 'admin.status.feature.anon',
   raid: 'admin.status.feature.raid',
   checkin: 'admin.status.feature.checkin',
@@ -136,8 +136,8 @@ function buildNextActions(
     actions.push('admin.status.next.pick_pair_category');
   }
 
-  if (!config.horoscopeChannelId) {
-    actions.push('admin.status.next.pick_horoscope_channel');
+  if (!config.oracleChannelId) {
+    actions.push('admin.status.next.pick_oracle_channel');
   }
 
   if (!config.raidChannelId) {
@@ -172,7 +172,7 @@ export async function buildAdminStatusReport(
     guild,
     pairCategoryId: config.pairCategoryId,
     targetChannelIds: [
-      config.horoscopeChannelId,
+      config.oracleChannelId,
       config.raidChannelId,
       config.hallChannelId,
       config.publicPostChannelId,
@@ -189,8 +189,8 @@ export async function buildAdminStatusReport(
   const featureLines = guildFeatureNames.map((feature) => {
     const state = featureStates.get(feature) ?? evaluateFeatureState(config, feature);
     const permissionIssue =
-      feature === 'horoscope'
-        ? permissionIssueForChannel(locale, checks, config.horoscopeChannelId)
+      feature === 'oracle'
+        ? permissionIssueForChannel(locale, checks, config.oracleChannelId)
         : feature === 'raid'
           ? permissionIssueForChannel(locale, checks, config.raidChannelId)
           : feature === 'hall'
@@ -225,7 +225,7 @@ export async function buildAdminStatusReport(
     `- ${t(locale, 'admin.status.config.locale')}: \`${config.locale}\``,
     `- ${t(locale, 'admin.status.config.timezone')}: \`${config.timezone}\``,
     `- ${t(locale, 'admin.status.config.pair_category_id')}: ${formatValue(config.pairCategoryId, t(locale, 'common.not_set'))}`,
-    `- ${t(locale, 'admin.status.config.horoscope_channel_id')}: ${formatValue(config.horoscopeChannelId, t(locale, 'common.not_set'))}`,
+    `- ${t(locale, 'admin.status.config.oracle_channel_id')}: ${formatValue(config.oracleChannelId, t(locale, 'common.not_set'))}`,
     `- ${t(locale, 'admin.status.config.raid_channel_id')}: ${formatValue(config.raidChannelId, t(locale, 'common.not_set'))}`,
     `- ${t(locale, 'admin.status.config.hall_channel_id')}: ${formatValue(config.hallChannelId, t(locale, 'common.not_set'))}`,
     `- ${t(locale, 'admin.status.config.public_post_channel_id')}: ${formatValue(config.publicPostChannelId, t(locale, 'common.not_set'))}`,
@@ -267,3 +267,4 @@ export async function buildAdminStatusReport(
     ...nextActionLines,
   ].join('\n');
 }
+

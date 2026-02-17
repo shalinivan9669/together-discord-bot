@@ -1,4 +1,4 @@
-import type PgBoss from 'pg-boss';
+﻿import type PgBoss from 'pg-boss';
 import { logger } from '../../lib/logger';
 import { listSchedulerSettings, upsertSchedulerSetting } from '../db/queries/schedulerSettings';
 import { type JobName, JobNames } from './jobs';
@@ -27,9 +27,9 @@ export type RecurringScheduleStatus = {
 
 const recurringScheduleDefinitions: readonly RecurringScheduleDefinition[] = [
   {
-    name: JobNames.WeeklyHoroscopePublish,
+    name: JobNames.WeeklyOraclePublish,
     cron: '0 10 * * 1',
-    payloadFeature: 'horoscope',
+    payloadFeature: 'oracle',
     payloadAction: 'weekly_publish'
   },
   {
@@ -181,3 +181,4 @@ export async function setRecurringScheduleEnabled(
     enabled
   };
 }
+

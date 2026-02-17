@@ -37,7 +37,7 @@
 ### `/admin feature set <name> <on|off>`
 ### `/admin feature enable-all`
 ### `/admin feature disable-all`
-- Управление guild feature-map: `horoscope`, `anon`, `raid`, `checkin`, `hall`, `public_post`.
+- Управление guild feature-map: `oracle`, `anon`, `raid`, `checkin`, `hall`, `public_post`.
 
 ### `/admin config set locale <ru|en>`
 ### `/admin config get locale`
@@ -93,19 +93,25 @@
 - claim квеста -> запрос подтверждения партнеру в pair room
 - partner confirm -> начисление очков и refresh проекций
 
-## `/horoscope`
+## `/oracle`
+Команда остаётся технически `/oracle`, но user-facing название фичи: **Оракул**.
 
-### `/horoscope status`
-- Проверка включенности фичи, текущей недели, configured канала.
+### `/oracle status`
+- Проверка включенности фичи, текущего недельного периода, configured канала.
 
-### `/horoscope publish-now`
+### `/oracle publish-now`
 - Доступ: админ/мод.
-- Эффект: enqueue `weekly.horoscope.publish`.
+- Эффект: enqueue `weekly.oracle.publish`.
 
 Публичная карточка включает:
-- `Get privately` (mode/context picker)
-- `About`
-- `Start pair ritual`
+- `Получить подсказку` (tone/context picker)
+- `Что это?`
+- `Ритуал пары`
+
+Поведение цикла:
+- один публичный пост на сервер (edit-only);
+- одна тема на весь сервер в текущем недельном периоде;
+- один пользователь получает 1 подсказку за неделю (повтор вернет ту же).
 
 ## `/checkin start`
 
@@ -170,3 +176,5 @@
 ## `/say`, `/repair`, `/date`, `/season` в процессе эксплуатации
 
 Это рабочие команды, но в релизной верификации их нужно включать отдельным блоком smoke, чтобы не оставлять «слепых зон» качества.
+
+

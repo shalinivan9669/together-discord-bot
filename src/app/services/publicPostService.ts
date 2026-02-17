@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto';
+﻿import { randomUUID } from 'node:crypto';
 import { and, asc, eq, lte, or } from 'drizzle-orm';
 import type { Client, MessageCreateOptions } from 'discord.js';
 import { z } from 'zod';
-import { renderWeeklyHoroscopePost } from '../../discord/projections/horoscopeWeeklyRenderer';
+import { renderWeeklyOraclePost } from '../../discord/projections/oracleWeeklyRenderer';
 import { sendComponentsV2Message, type ComponentsV2Message } from '../../discord/ui-v2';
 import { buildAnonPublishedButtons } from '../../discord/interactions/components';
 import { db } from '../../infra/db/drizzle';
@@ -29,7 +29,7 @@ const checkinNudgePayloadSchema = z.object({
   weekStartDate: z.string()
 });
 
-const horoscopeWeeklyPayloadSchema = z.object({
+const oracleWeeklyPayloadSchema = z.object({
   guildId: z.string(),
   weekStartDate: z.string()
 });
@@ -39,6 +39,7 @@ export type ScheduledPostType =
   | 'checkin_agreement'
   | 'checkin_nudge'
   | 'horoscope_weekly'
+  | 'oracle_weekly'
   | 'text';
 
 export async function createScheduledPost(input: {
@@ -137,11 +138,11 @@ function buildMessageOptions(row: typeof scheduledPosts.$inferSelect): BuiltMess
     };
   }
 
-  if (row.type === 'horoscope_weekly') {
-    const payload = horoscopeWeeklyPayloadSchema.parse(row.payloadJson);
+  if (row.type === 'oracle_weekly' || row.type === 'horoscope_weekly') {
+    const payload = oracleWeeklyPayloadSchema.parse(row.payloadJson);
     return {
       kind: 'v2',
-      message: renderWeeklyHoroscopePost({
+      message: renderWeeklyOraclePost({
         guildId: payload.guildId,
         weekStartDate: payload.weekStartDate
       })
@@ -327,3 +328,4 @@ export async function publishDueScheduledPosts(input: {
 
   return { processed, sent, failed, skipped };
 }
+

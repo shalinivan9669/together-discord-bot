@@ -1,6 +1,6 @@
-# Together Discord Bot
+﻿# Together Discord Bot
 
-Discord bot for pair rooms, horoscope, anon questions, raids, weekly check-ins, hall refresh and scheduled public posts.
+Discord bot for pair rooms, oracle, anon questions, raids, weekly check-ins, hall refresh and scheduled public posts.
 
 ## Quick Setup (5 minutes)
 
@@ -60,11 +60,11 @@ Configured category/channel level (pair category + target channels):
 
 Feature names:
 
-- `horoscope`, `anon`, `raid`, `checkin`, `hall`, `public_post`
+- `oracle`, `anon`, `raid`, `checkin`, `hall`, `public_post`
 
 Schedule names:
 
-- `weekly.horoscope.publish`
+- `weekly.oracle.publish`
 - `weekly.checkin.nudge`
 - `weekly.raid.start`
 - `weekly.raid.end`
@@ -102,3 +102,4 @@ pnpm db:migrate && pnpm seed && pnpm commands:deploy && pnpm start
 ```
 
 This keeps command registration deterministic on each redeploy. With `DISCORD_GUILD_ID` set, new slash command updates appear in that guild within seconds. Without it, deployment is global and Discord propagation can take up to about an hour.
+

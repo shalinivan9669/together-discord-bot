@@ -1,5 +1,5 @@
-export type GuildFeatureConfigTarget =
-  | 'horoscope'
+﻿export type GuildFeatureConfigTarget =
+  | 'oracle'
   | 'anon'
   | 'raid'
   | 'checkin'
@@ -8,7 +8,7 @@ export type GuildFeatureConfigTarget =
 
 export type GuildConfigRequirementKey =
   | 'pair_category_id'
-  | 'horoscope_channel_id'
+  | 'oracle_channel_id'
   | 'raid_channel_id'
   | 'hall_channel_id'
   | 'public_post_channel_id'
@@ -16,7 +16,7 @@ export type GuildConfigRequirementKey =
 
 export type GuildConfigRequirementShape = {
   pairCategoryId: string | null;
-  horoscopeChannelId: string | null;
+  oracleChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -28,7 +28,7 @@ const requirementReaders: Record<
   (config: GuildConfigRequirementShape) => string | null
 > = {
   pair_category_id: (config) => config.pairCategoryId,
-  horoscope_channel_id: (config) => config.horoscopeChannelId,
+  oracle_channel_id: (config) => config.oracleChannelId,
   raid_channel_id: (config) => config.raidChannelId,
   hall_channel_id: (config) => config.hallChannelId,
   public_post_channel_id: (config) => config.publicPostChannelId,
@@ -37,7 +37,7 @@ const requirementReaders: Record<
 
 export const setupRequiredConfigKeys: readonly GuildConfigRequirementKey[] = [
   'pair_category_id',
-  'horoscope_channel_id',
+  'oracle_channel_id',
   'raid_channel_id',
   'hall_channel_id',
   'public_post_channel_id',
@@ -48,7 +48,7 @@ const featureRequirementMap: Record<
   GuildFeatureConfigTarget,
   readonly GuildConfigRequirementKey[]
 > = {
-  horoscope: ['horoscope_channel_id'],
+  oracle: ['oracle_channel_id'],
   anon: ['anon_inbox_channel_id'],
   raid: ['raid_channel_id'],
   checkin: ['public_post_channel_id'],
@@ -86,3 +86,4 @@ export function getSetupMissingRequirementKeys(
 export function isSetupRequirementsSatisfied(config: GuildConfigRequirementShape): boolean {
   return getSetupMissingRequirementKeys(config).length === 0;
 }
+

@@ -1,4 +1,4 @@
-# UX Plan (Steps 1-3)
+﻿# UX Plan (Steps 1-3)
 
 ## Scope
 - This document tracks phased UX implementation for the Discord bot interface model.
@@ -12,6 +12,7 @@
 - Never post duplicates for normal state changes.
 - All updates must flow through the throttled message editor and queue jobs.
 - Public interactions should answer with ephemeral helper replies where possible.
+- Oracle dashboard uses deterministic weekly UTC periods and updates the same message only.
 
 ### Pair Home Panel
 - Each pair room has exactly one bot-owned panel message.
@@ -36,7 +37,7 @@
 ### Public Dashboards Converted to V2
 - Duel scoreboard: title/status, round state, top-5, submissions, updated timestamp.
 - Raid progress: goal/progress/percent, phase label, participants, top-5.
-- Weekly horoscope post: header/teaser + CTA buttons.
+- Oracle post (weekly cycle): header/teaser + CTA buttons.
 
 ### Pair Home Panel + Setup Wizard
 - Added pair panel lifecycle fields:
@@ -109,3 +110,4 @@
 - No Message Content intent.
 - No arbitrary message reads.
 - Continue idempotency-first writes with DB constraints, transactions, and locks where needed.
+
