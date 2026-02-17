@@ -1,4 +1,5 @@
 import { listPendingAnonQuestionsPage } from '../../app/services/anonService';
+import { t, type AppLocale } from '../../i18n';
 import { buildAnonModerationButtons, buildAnonQueuePaginationButtons } from './components';
 
 const DEFAULT_PAGE_SIZE = 3;
@@ -11,7 +12,12 @@ export type AnonQueueView = {
   total: number;
 };
 
-export async function buildAnonQueueView(guildId: string, page: number, pageSize = DEFAULT_PAGE_SIZE): Promise<AnonQueueView> {
+export async function buildAnonQueueView(
+  guildId: string,
+  page: number,
+  pageSize = DEFAULT_PAGE_SIZE,
+  locale: AppLocale = 'ru',
+): Promise<AnonQueueView> {
   const safePageSize = Math.max(1, Math.min(5, pageSize));
   const requestedPage = Math.max(0, page);
 
@@ -22,7 +28,7 @@ export async function buildAnonQueueView(guildId: string, page: number, pageSize
 
   if (firstPass.total === 0) {
     return {
-      content: 'No pending anonymous questions.',
+      content: t(locale, 'anon.queue.empty'),
       components: [],
       page: 0,
       totalPages: 1,
@@ -46,19 +52,19 @@ export async function buildAnonQueueView(guildId: string, page: number, pageSize
   });
 
   const components: Array<ReturnType<typeof buildAnonModerationButtons> | ReturnType<typeof buildAnonQueuePaginationButtons>> =
-    pageResult.rows.map((row) => buildAnonModerationButtons(row.id));
+    pageResult.rows.map((row) => buildAnonModerationButtons(row.id, locale));
 
   if (totalPages > 1) {
     components.push(
       buildAnonQueuePaginationButtons({
         page: pageIndex,
         totalPages
-      }),
+      }, locale),
     );
   }
 
   return {
-    content: `Pending questions (${pageResult.total})\n\n${lines.join('\n\n')}`,
+    content: `${t(locale, 'anon.queue.title', { total: pageResult.total })}\n\n${lines.join('\n\n')}`,
     components,
     page: pageIndex,
     totalPages,

@@ -7,6 +7,7 @@ import {
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import { buildDuelSubmitButton } from '../interactions/components';
 import { sendComponentsV2Message, textBlock, uiCard } from '../ui-v2';
@@ -22,36 +23,58 @@ export const duelCommand: CommandModule = {
   name: 'duel',
   data: new SlashCommandBuilder()
     .setName('duel')
-    .setDescription('Manage duel rounds and scoreboard')
+    .setNameLocalizations({ ru: 'duel', 'en-US': 'duel' })
+    .setDescription('Управление дуэлями и табло')
+    .setDescriptionLocalizations({ 'en-US': 'Manage duel rounds and scoreboard' })
     .addSubcommand((sub) =>
       sub
         .setName('start')
-        .setDescription('Start a new duel')
+        .setNameLocalizations({ ru: 'start', 'en-US': 'start' })
+        .setDescription('Запустить новую дуэль')
+        .setDescriptionLocalizations({ 'en-US': 'Start a new duel' })
         .addChannelOption((opt) =>
-          opt.setName('public_channel').setDescription('Scoreboard channel').setRequired(true),
+          opt
+            .setName('public_channel')
+            .setNameLocalizations({ ru: 'public_channel', 'en-US': 'public_channel' })
+            .setDescription('Канал табло')
+            .setDescriptionLocalizations({ 'en-US': 'Scoreboard channel' })
+            .setRequired(true),
         ),
     )
     .addSubcommandGroup((group) =>
       group
         .setName('round')
-        .setDescription('Round controls')
+        .setNameLocalizations({ ru: 'round', 'en-US': 'round' })
+        .setDescription('Управление раундами')
+        .setDescriptionLocalizations({ 'en-US': 'Round controls' })
         .addSubcommand((sub) =>
           sub
             .setName('start')
-            .setDescription('Start a round and notify all pairs')
+            .setNameLocalizations({ ru: 'start', 'en-US': 'start' })
+            .setDescription('Запустить раунд и уведомить все пары')
+            .setDescriptionLocalizations({ 'en-US': 'Start a round and notify all pairs' })
             .addIntegerOption((opt) =>
               opt
                 .setName('duration_minutes')
-                .setDescription('Round duration in minutes')
+                .setNameLocalizations({ ru: 'duration_minutes', 'en-US': 'duration_minutes' })
+                .setDescription('Длительность раунда в минутах')
+                .setDescriptionLocalizations({ 'en-US': 'Round duration in minutes' })
                 .setMinValue(5)
                 .setMaxValue(720)
                 .setRequired(true),
             ),
         ),
     )
-    .addSubcommand((sub) => sub.setName('end').setDescription('End active duel')),
+    .addSubcommand((sub) =>
+      sub
+        .setName('end')
+        .setNameLocalizations({ ru: 'end', 'en-US': 'end' })
+        .setDescription('Завершить активную дуэль')
+        .setDescriptionLocalizations({ 'en-US': 'End active duel' }),
+    ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const correlationId = createCorrelationId();
@@ -64,7 +87,7 @@ export const duelCommand: CommandModule = {
     if (!subcommandGroup && subcommand === 'start') {
       const publicChannel = interaction.options.getChannel('public_channel', true);
       if (!publicChannel.isTextBased() || !canSend(publicChannel)) {
-        await interaction.editReply('Public channel must be text based.');
+        await interaction.editReply(tr.t('duel.reply.public_channel_must_be_text'));
         return;
       }
 
@@ -75,8 +98,8 @@ export const duelCommand: CommandModule = {
           const sent = await sendComponentsV2Message(interaction.client, publicChannel.id, {
             components: [
               uiCard({
-                title: 'Butler Duel Scoreboard',
-                status: 'initializing',
+                title: 'Табло дуэли',
+                status: 'инициализация',
                 accentColor: 0xc44536,
                 components: [textBlock(content)]
               })
@@ -99,8 +122,8 @@ export const duelCommand: CommandModule = {
       });
 
       const text = result.created
-        ? `Duel started in <#${result.duel.publicChannelId}>.`
-        : `Duel is already active in <#${result.duel.publicChannelId}>.`;
+        ? tr.t('duel.reply.started', { channelId: result.duel.publicChannelId })
+        : tr.t('duel.reply.already_active', { channelId: result.duel.publicChannelId });
 
       await interaction.editReply(text);
       return;
@@ -120,9 +143,9 @@ export const duelCommand: CommandModule = {
 
           await channel.send({
             content:
-              `Round #${roundNo} is live. Submit before <t:${Math.floor(endsAt.getTime() / 1000)}:t>. ` +
-              'Use the button below once per round.',
-            components: [buildDuelSubmitButton({ duelId, roundId, pairId }) as never]
+              `Раунд #${roundNo} начался. Отправьте ответ до <t:${Math.floor(endsAt.getTime() / 1000)}:t>. ` +
+              'Кнопку ниже можно использовать один раз за раунд.',
+            components: [buildDuelSubmitButton({ duelId, roundId, pairId }, tr.locale) as never]
           });
         },
         boss: ctx.boss,
@@ -140,9 +163,11 @@ export const duelCommand: CommandModule = {
       });
 
       await interaction.editReply(
-        `Round #${result.round.roundNo} started for ${result.pairCount} pair(s). Ends <t:${Math.floor(
-          result.round.endsAt.getTime() / 1000,
-        )}:R>.`,
+        tr.t('duel.reply.round_started', {
+          roundNo: result.round.roundNo,
+          pairCount: result.pairCount,
+          unix: Math.floor(result.round.endsAt.getTime() / 1000)
+        }),
       );
       return;
     }
@@ -164,10 +189,10 @@ export const duelCommand: CommandModule = {
         jobId: null
       });
 
-      await interaction.editReply(`Ended duel in <#${duel.publicChannelId}>.`);
+      await interaction.editReply(tr.t('duel.reply.ended', { channelId: duel.publicChannelId }));
       return;
     }
 
-    await interaction.editReply('Unknown duel subcommand.');
+    await interaction.editReply(tr.t('error.unknown_subcommand'));
   }
 };

@@ -8,6 +8,7 @@ import {
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { buildRaidClaimButton } from '../interactions/components';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import { renderRaidProgressText } from '../projections/raidProgressRenderer';
@@ -29,24 +30,55 @@ export const raidCommand: CommandModule = {
   name: 'raid',
   data: new SlashCommandBuilder()
     .setName('raid')
-    .setDescription('Server cooperative raid')
+    .setNameLocalizations({ ru: 'raid', 'en-US': 'raid' })
+    .setDescription('Кооперативный рейд сервера')
+    .setDescriptionLocalizations({ 'en-US': 'Server cooperative raid' })
     .addSubcommand((sub) =>
       sub
         .setName('start')
-        .setDescription('Start raid')
-        .addChannelOption((opt) => opt.setName('channel').setDescription('Public progress channel').setRequired(false))
-        .addIntegerOption((opt) => opt.setName('goal').setDescription('Goal points').setRequired(false)),
+        .setNameLocalizations({ ru: 'start', 'en-US': 'start' })
+        .setDescription('Запустить рейд')
+        .setDescriptionLocalizations({ 'en-US': 'Start raid' })
+        .addChannelOption((opt) =>
+          opt
+            .setName('channel')
+            .setNameLocalizations({ ru: 'channel', 'en-US': 'channel' })
+            .setDescription('Публичный канал прогресса')
+            .setDescriptionLocalizations({ 'en-US': 'Public progress channel' })
+            .setRequired(false),
+        )
+        .addIntegerOption((opt) =>
+          opt
+            .setName('goal')
+            .setNameLocalizations({ ru: 'goal', 'en-US': 'goal' })
+            .setDescription('Целевые очки')
+            .setDescriptionLocalizations({ 'en-US': 'Goal points' })
+            .setRequired(false),
+        ),
     )
-    .addSubcommand((sub) => sub.setName('quests').setDescription('Show today quests'))
-    .addSubcommand((sub) => sub.setName('progress').setDescription('Show raid progress')),
+    .addSubcommand((sub) =>
+      sub
+        .setName('quests')
+        .setNameLocalizations({ ru: 'quests', 'en-US': 'quests' })
+        .setDescription('Показать квесты на сегодня')
+        .setDescriptionLocalizations({ 'en-US': 'Show today quests' }),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('progress')
+        .setNameLocalizations({ ru: 'progress', 'en-US': 'progress' })
+        .setDescription('Показать прогресс рейда')
+        .setDescriptionLocalizations({ 'en-US': 'Show raid progress' }),
+    ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       await ensureRaidEnabled(interaction.guildId);
-    } catch (error) {
-      await interaction.editReply(error instanceof Error ? error.message : 'Raid is disabled.');
+    } catch {
+      await interaction.editReply(tr.t('raid.reply.disabled_fallback'));
       return;
     }
 
@@ -60,13 +92,13 @@ export const raidCommand: CommandModule = {
       const selectedChannel = interaction.options.getChannel('channel', false);
       const channelId = selectedChannel?.id ?? settings?.raidChannelId ?? null;
       if (!channelId) {
-        await interaction.editReply('Raid public channel is not configured. Run `/setup` and select a raid channel.');
+        await interaction.editReply(tr.t('raid.reply.channel_not_configured'));
         return;
       }
 
       const channel = await interaction.client.channels.fetch(channelId);
       if (!channel?.isTextBased() || !canSend(channel)) {
-        await interaction.editReply('Raid channel must be a text channel.');
+        await interaction.editReply(tr.t('raid.reply.channel_must_be_text'));
         return;
       }
 
@@ -79,8 +111,8 @@ export const raidCommand: CommandModule = {
           const sent = await sendComponentsV2Message(interaction.client, channel.id, {
             components: [
               uiCard({
-                title: 'Cooperative Raid Progress',
-                status: 'initializing',
+                title: 'Прогресс рейда сервера',
+                status: 'инициализация',
                 accentColor: 0x1e6f9f,
                 components: [textBlock(content)]
               })
@@ -103,8 +135,8 @@ export const raidCommand: CommandModule = {
 
       await interaction.editReply(
         result.created
-          ? `Raid started in <#${result.raid.publicChannelId}>.`
-          : `Active raid already exists in <#${result.raid.publicChannelId}>.`,
+          ? tr.t('raid.reply.started', { channelId: result.raid.publicChannelId })
+          : tr.t('raid.reply.already_active', { channelId: result.raid.publicChannelId }),
       );
       return;
     }
@@ -112,12 +144,12 @@ export const raidCommand: CommandModule = {
     if (sub === 'quests') {
       const data = await getTodayRaidOffers(interaction.guildId);
       if (data.offers.length === 0) {
-        await interaction.editReply('No raid offers found for today.');
+        await interaction.editReply(tr.t('raid.reply.no_offers_today'));
         return;
       }
 
       const lines = data.offers.map(
-        (offer, idx) => `${idx + 1}. **${offer.key}** - ${offer.points} pts\n${offer.text}`,
+        (offer, idx) => `${idx + 1}. **${offer.key}** - ${offer.points} ${tr.t('interaction.common.points_short')}\n${offer.text}`,
       );
 
       logInteraction({
@@ -128,8 +160,8 @@ export const raidCommand: CommandModule = {
       });
 
       await interaction.editReply({
-        content: `Today offers (\`${data.dayDate}\`):\n\n${lines.join('\n\n')}`,
-        components: data.offers.map((offer) => buildRaidClaimButton(offer.key)) as never
+        content: `${tr.t('raid.reply.today_offers', { dayDate: data.dayDate })}\n\n${lines.join('\n\n')}`,
+        components: data.offers.map((offer) => buildRaidClaimButton(offer.key, tr.locale)) as never
       });
       return;
     }
@@ -137,7 +169,7 @@ export const raidCommand: CommandModule = {
     if (sub === 'progress') {
       const snapshot = await getRaidProgressSnapshot({ guildId: interaction.guildId });
       if (!snapshot) {
-        await interaction.editReply('No active raid found.');
+        await interaction.editReply(tr.t('raid.reply.no_active_raid'));
         return;
       }
 
@@ -152,6 +184,6 @@ export const raidCommand: CommandModule = {
       return;
     }
 
-    await interaction.editReply('Unknown raid subcommand.');
+    await interaction.editReply(tr.t('error.unknown_subcommand'));
   }
 };

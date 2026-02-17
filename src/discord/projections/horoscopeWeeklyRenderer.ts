@@ -43,12 +43,12 @@ export function renderWeeklyHoroscopePost(params: {
   return {
     components: [
       uiCard({
-        title: 'Weekly Horoscope',
-        status: `Week ${params.weekStartDate}`,
+        title: 'Недельный гороскоп',
+        status: `Неделя ${params.weekStartDate}`,
         accentColor: 0x74512d,
         components: [
           textBlock(
-            'Your shared pattern for this week is ready.\nGet your private guidance in one tap.\nPair ritual prompts are designed for a calm 10-minute check-in.',
+            'Ваш общий паттерн на эту неделю готов.\nПолучите персональную подсказку в один тап.\nРитуал для пары рассчитан на спокойный 10-минутный чек-ин.',
           ),
           separator(),
           actionRowButtons([
@@ -56,19 +56,19 @@ export function renderWeeklyHoroscopePost(params: {
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: claimId,
-              label: 'Get privately'
+              label: 'Получить в личку'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: aboutId,
-              label: 'About'
+              label: 'О фиче'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
               custom_id: ritualId,
-              label: 'Start pair ritual'
+              label: 'Начать ритуал пары'
             }
           ])
         ]

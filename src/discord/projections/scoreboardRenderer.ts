@@ -13,25 +13,53 @@ import { encodeCustomId } from '../interactions/customId';
 function standingsLines(snapshot: DuelScoreboardSnapshot): string {
   const top = snapshot.topPairs.slice(0, 5);
   if (top.length === 0) {
-    return 'Top 5: no submissions yet.';
+    return 'Топ-5: пока нет ответов.';
   }
 
   const rows = top.map(
-    (row, idx) => `${idx + 1}. <@${row.user1Id}> + <@${row.user2Id}> - **${row.points}** pts`,
+    (row, idx) => `${idx + 1}. <@${row.user1Id}> + <@${row.user2Id}> - **${row.points}** очк.`,
   );
-  return ['Top 5', ...rows].join('\n');
+  return ['Топ-5', ...rows].join('\n');
+}
+
+function duelStatusLabel(status: string): string {
+  if (status === 'active') {
+    return 'активна';
+  }
+
+  if (status === 'completed') {
+    return 'завершена';
+  }
+
+  if (status === 'cancelled') {
+    return 'отменена';
+  }
+
+  return status;
+}
+
+function roundStateLabel(status: string): string {
+  if (status === 'active') {
+    return 'активен';
+  }
+
+  if (status === 'closed') {
+    return 'закрыт';
+  }
+
+  return status;
 }
 
 function roundStatus(snapshot: DuelScoreboardSnapshot): string {
   if (!snapshot.roundNo) {
-    return 'Round: _not started_';
+    return 'Раунд: _не начат_';
   }
 
   const endsAt = snapshot.roundEndsAt
-    ? ` - ends <t:${Math.floor(snapshot.roundEndsAt.getTime() / 1000)}:R>`
+    ? ` - до <t:${Math.floor(snapshot.roundEndsAt.getTime() / 1000)}:R>`
     : '';
 
-  return `Round #${snapshot.roundNo}: **${snapshot.roundStatus}**${endsAt}`;
+  return `Раунд #${snapshot.roundNo}: **${roundStateLabel(snapshot.roundStatus)}**${endsAt}`;
 }
 
 export function renderDuelScoreboard(snapshot: DuelScoreboardSnapshot): ComponentsV2Message {
@@ -56,35 +84,35 @@ export function renderDuelScoreboard(snapshot: DuelScoreboardSnapshot): Componen
   return {
     components: [
       uiCard({
-        title: 'Butler Duel Scoreboard',
-        status: snapshot.status,
+        title: 'Табло дуэли',
+        status: duelStatusLabel(snapshot.status),
         accentColor: 0xc44536,
         components: [
-          textBlock(`${roundStatus(snapshot)}\nPairs tracked: **${snapshot.totalPairs}**`),
+          textBlock(`${roundStatus(snapshot)}\nПары в учёте: **${snapshot.totalPairs}**`),
           separator(),
           textBlock(standingsLines(snapshot)),
           separator(),
           textBlock(
-            `Submissions: **${snapshot.totalSubmissions}**\nUpdated: <t:${Math.floor(snapshot.updatedAt.getTime() / 1000)}:R>`,
+            `Ответов: **${snapshot.totalSubmissions}**\nОбновлено: <t:${Math.floor(snapshot.updatedAt.getTime() / 1000)}:R>`,
           ),
           actionRowButtons([
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: rulesId,
-              label: 'Rules'
+              label: 'Правила'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: participateId,
-              label: 'How to participate'
+              label: 'Как участвовать'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
               custom_id: myRoomId,
-              label: 'Open my room'
+              label: 'Открыть мою комнату'
             }
           ])
         ]

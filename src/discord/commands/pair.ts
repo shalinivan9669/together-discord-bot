@@ -4,6 +4,7 @@ import { pairCreateUsecase, pairRoomUsecase } from '../../app/usecases/pairUseca
 import { getGuildConfig } from '../../app/services/guildConfigService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import { describePairCreatePermissionIssue } from '../permissions/check';
 import { buildPairRoomOverwrites } from '../permissions/overwrites';
@@ -18,16 +19,34 @@ export const pairCommand: CommandModule = {
   name: 'pair',
   data: new SlashCommandBuilder()
     .setName('pair')
-    .setDescription('Manage pair private rooms')
+    .setNameLocalizations({ ru: 'pair', 'en-US': 'pair' })
+    .setDescription('Управление приватными комнатами пар')
+    .setDescriptionLocalizations({ 'en-US': 'Manage pair private rooms' })
     .addSubcommand((sub) =>
       sub
         .setName('create')
-        .setDescription('Create or return a private pair room')
-        .addUserOption((opt) => opt.setName('user').setDescription('Second user').setRequired(true)),
+        .setNameLocalizations({ ru: 'create', 'en-US': 'create' })
+        .setDescription('Создать или вернуть приватную комнату пары')
+        .setDescriptionLocalizations({ 'en-US': 'Create or return a private pair room' })
+        .addUserOption((opt) =>
+          opt
+            .setName('user')
+            .setNameLocalizations({ ru: 'user', 'en-US': 'user' })
+            .setDescription('Второй участник')
+            .setDescriptionLocalizations({ 'en-US': 'Second user' })
+            .setRequired(true),
+        ),
     )
-    .addSubcommand((sub) => sub.setName('room').setDescription('Get your pair private room link')),
+    .addSubcommand((sub) =>
+      sub
+        .setName('room')
+        .setNameLocalizations({ ru: 'room', 'en-US': 'room' })
+        .setDescription('Показать ссылку на вашу приватную комнату пары')
+        .setDescriptionLocalizations({ 'en-US': 'Get your pair private room link' }),
+    ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     const correlationId = createCorrelationId();
 
     const subcommand = interaction.options.getSubcommand();
@@ -46,10 +65,15 @@ export const pairCommand: CommandModule = {
 
       const permissionIssue = await describePairCreatePermissionIssue({
         guild: interaction.guild,
-        pairCategoryId: config.pairCategoryId
+        pairCategoryId: config.pairCategoryId,
+        locale: tr.locale
       });
       if (permissionIssue) {
-        await interaction.editReply(`${permissionIssue} Ask a server admin to grant the missing permission and retry.`);
+        await interaction.editReply(
+          tr.t('pair.reply.permission_retry', {
+            details: permissionIssue
+          }),
+        );
         return;
       }
 
@@ -81,9 +105,7 @@ export const pairCommand: CommandModule = {
         });
       } catch (error) {
         if (error instanceof DiscordAPIError && error.code === 50013) {
-          await interaction.editReply(
-            'Cannot create pair room: Missing Manage Channels permission in the selected category or server.',
-          );
+          await interaction.editReply(tr.t('pair.reply.cannot_create_room_permission'));
           return;
         }
 
@@ -98,9 +120,18 @@ export const pairCommand: CommandModule = {
         pairId: result.pair.id
       });
 
-      const prefix = result.created ? 'Created' : 'Existing';
       await interaction.editReply(
-        `${prefix} pair room: <#${result.pair.privateChannelId}> for <@${result.pair.user1Id}> + <@${result.pair.user2Id}>`,
+        result.created
+          ? tr.t('pair.reply.created_room', {
+              channelId: result.pair.privateChannelId,
+              user1: result.pair.user1Id,
+              user2: result.pair.user2Id
+            })
+          : tr.t('pair.reply.existing_room', {
+              channelId: result.pair.privateChannelId,
+              user1: result.pair.user1Id,
+              user2: result.pair.user2Id
+            }),
       );
 
       await requestPairHomeRefresh(ctx.boss, {
@@ -127,14 +158,14 @@ export const pairCommand: CommandModule = {
       });
 
       if (!pair) {
-        await interaction.editReply('No active pair room found for you.');
+        await interaction.editReply(tr.t('pair.reply.no_active_room'));
         return;
       }
 
-      await interaction.editReply(`Your pair room: <#${pair.privateChannelId}>`);
+      await interaction.editReply(tr.t('pair.reply.your_room', { channelId: pair.privateChannelId }));
       return;
     }
 
-    await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unknown pair subcommand.' });
+    await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unknown_subcommand') });
   }
 };

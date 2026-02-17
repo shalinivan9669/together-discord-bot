@@ -70,6 +70,8 @@ import { COMPONENTS_V2_FLAGS } from '../ui-v2';
 import { parseDateBudget, parseDateEnergy, parseDateTimeWindow, type DateFilters } from '../../domain/date';
 import { handleSetupWizardComponent } from './setupWizard';
 import { ANON_MASCOT_DAILY_LIMIT, ANON_PROPOSE_DAILY_LIMIT } from '../../config/constants';
+import { t, type AppLocale } from '../../i18n';
+import { createInteractionTranslator } from '../locale';
 
 export type InteractionContext = {
   client: Client;
@@ -141,8 +143,12 @@ function parseDateFilters(payload: Record<string, string>): DateFilters | null {
   };
 }
 
-function formatDatePickerSummary(filters: DateFilters): string {
-  return `Energy: **${filters.energy}** | Budget: **${filters.budget}** | Time: **${filters.timeWindow}**`;
+function formatDatePickerSummary(locale: AppLocale, filters: DateFilters): string {
+  return t(locale, 'date.summary', {
+    energy: t(locale, `date.energy.${filters.energy}` as const),
+    budget: t(locale, `date.budget.${filters.budget}` as const),
+    time: t(locale, `date.time.${filters.timeWindow}` as const)
+  });
 }
 
 function parseSayToneOrDefault(value: string): 'soft' | 'direct' | 'short' {
@@ -185,6 +191,7 @@ function parseHoroscopeSelection(payload: Record<string, string>): {
 async function handleButton(ctx: InteractionContext, interaction: ButtonInteraction): Promise<void> {
   const decoded = decodeCustomId(interaction.customId);
   const correlationId = createCorrelationId();
+  const tr = await createInteractionTranslator(interaction);
 
   if (decoded.feature === 'setup_wizard') {
     const handled = await handleSetupWizardComponent(ctx, interaction, decoded);
@@ -200,26 +207,26 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'anon_queue' && decoded.action === 'page') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const settings = await getGuildSettings(interaction.guildId);
     if (!isAdminOrConfiguredModeratorForComponent(interaction, settings?.moderatorRoleId ?? null)) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Admin or configured moderator role is required.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.admin_or_moderator_required') });
       return;
     }
 
     const parsedPayload = anonQueuePayloadSchema.safeParse(decoded.payload);
     if (!parsedPayload.success) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed moderation queue payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_moderation_queue') });
       return;
     }
 
     const requestedPageRaw = parsedPayload.data.p ?? '0';
     const requestedPage = Number.parseInt(requestedPageRaw, 10);
     const page = Number.isFinite(requestedPage) && requestedPage >= 0 ? requestedPage : 0;
-    const queue = await buildAnonQueueView(interaction.guildId, page, 3);
+    const queue = await buildAnonQueueView(interaction.guildId, page, 3, tr.locale);
 
     await interaction.update({
       content: queue.content,
@@ -232,9 +239,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     duelBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content:
-        'Rules: one submission per pair per active round. A moderator starts and closes rounds. ' +
-        'Pair totals rank by points first and pair id as deterministic tiebreaker.',
+      content: tr.t('interaction.duel_board.rules'),
     });
     return;
   }
@@ -243,9 +248,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     duelBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content:
-        'How to participate: join your pair room, wait for a round start message, press Submit answer, ' +
-        'then complete the modal once before the timer ends.',
+      content: tr.t('interaction.duel_board.how'),
     });
     return;
   }
@@ -253,7 +256,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'duel_board' && decoded.action === 'my_contribution') {
     duelBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -264,13 +267,15 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     });
 
     if (!contribution) {
-      await interaction.editReply('No active duel contribution found for your pair yet.');
+      await interaction.editReply(tr.t('interaction.duel_board.no_contribution'));
       return;
     }
 
     await interaction.editReply(
-      `My duel contribution: **${contribution.submissions}** submission(s), ` +
-      `**${contribution.points}** point(s) total.`,
+      tr.t('interaction.duel_board.my_contribution', {
+        submissions: contribution.submissions,
+        points: contribution.points
+      }),
     );
     return;
   }
@@ -278,14 +283,16 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'duel_board' && decoded.action === 'open_room') {
     duelBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: pair ? `Your pair room: <#${pair.privateChannelId}>` : 'You do not have an active pair room yet.',
+      content: pair
+        ? tr.t('pair.reply.your_room', { channelId: pair.privateChannelId })
+        : tr.t('pair.reply.no_active_room'),
     });
     return;
   }
@@ -294,9 +301,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     raidBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content:
-        'Raid rules: claim one of today quests, then your partner confirms in the pair room. ' +
-        'Daily pair cap applies automatically.',
+      content: tr.t('interaction.raid_board.rules'),
     });
     return;
   }
@@ -305,9 +310,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     raidBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content:
-        'How it works: open your pair room, pick one today quest, claim it, then ask your partner to confirm. ' +
-        'Progress and contribution update automatically.',
+      content: tr.t('interaction.raid_board.how'),
     });
     return;
   }
@@ -315,14 +318,16 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'open_room') {
     raidBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: pair ? `Your pair room: <#${pair.privateChannelId}>` : 'You do not have an active pair room yet.',
+      content: pair
+        ? tr.t('pair.reply.your_room', { channelId: pair.privateChannelId })
+        : tr.t('pair.reply.no_active_room'),
     });
     return;
   }
@@ -330,24 +335,24 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'take_quests') {
     raidBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const data = await getTodayRaidOffers(interaction.guildId);
     if (data.offers.length === 0) {
-      await interaction.editReply('No raid offers found for today.');
+      await interaction.editReply(tr.t('raid.reply.no_offers_today'));
       return;
     }
 
     const lines = data.offers.map(
-      (offer, idx) => `${idx + 1}. **${offer.key}** - ${offer.points} pts\n${offer.text}`,
+      (offer, idx) => `${idx + 1}. **${offer.key}** - ${offer.points} ${tr.t('interaction.common.points_short')}\n${offer.text}`,
     );
 
     await interaction.editReply({
-      content: `Today offers (\`${data.dayDate}\`):\n\n${lines.join('\n\n')}`,
-      components: data.offers.map((offer) => buildRaidClaimButton(offer.key)) as never
+      content: `${tr.t('raid.reply.today_offers', { dayDate: data.dayDate })}\n\n${lines.join('\n\n')}`,
+      components: data.offers.map((offer) => buildRaidClaimButton(offer.key, tr.locale)) as never
     });
     return;
   }
@@ -355,7 +360,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'my_contribution') {
     raidBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -366,20 +371,23 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     });
 
     if (!contribution) {
-      await interaction.editReply('No active raid contribution found for your pair yet.');
+      await interaction.editReply(tr.t('interaction.raid_board.no_contribution'));
       return;
     }
 
     await interaction.editReply(
-      `My contribution (${contribution.dayDate}): **${contribution.todayPoints}** today, ` +
-      `**${contribution.weekPoints}** this raid week.`,
+      tr.t('interaction.raid_board.my_contribution', {
+        dayDate: contribution.dayDate,
+        todayPoints: contribution.todayPoints,
+        weekPoints: contribution.weekPoints
+      }),
     );
     return;
   }
 
   if (decoded.feature === 'mediator' && decoded.action.startsWith('say_tone_')) {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -394,25 +402,25 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     });
 
     if (!session) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Session expired. Run `/say` again.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.session_expired') });
       return;
     }
 
     await interaction.update({
-      content: renderMediatorSayReply(session),
+      content: renderMediatorSayReply(session, tr.locale),
       components: buildMediatorSayToneButtons({
         sessionId: session.id,
         selectedTone: parseSayToneOrDefault(session.selectedTone),
         canSendToPairRoom: Boolean(session.pairId),
         alreadySent: Boolean(session.sentToPairAt)
-      }) as never
+      }, tr.locale) as never
     });
     return;
   }
 
   if (decoded.feature === 'mediator' && decoded.action === 'say_send_pair') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -425,50 +433,50 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       sessionId: payload.s
     });
     if (!existingSession) {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Session expired. Run `/say` again.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.session_expired') });
       return;
     }
 
     if (!existingSession.pairId) {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'No active pair room found for this account.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.no_active_pair_room') });
       await interaction.editReply({
-        content: renderMediatorSayReply(existingSession),
+        content: renderMediatorSayReply(existingSession, tr.locale),
         components: buildMediatorSayToneButtons({
           sessionId: existingSession.id,
           selectedTone: parseSayToneOrDefault(existingSession.selectedTone),
           canSendToPairRoom: false,
           alreadySent: Boolean(existingSession.sentToPairAt)
-        }) as never
+        }, tr.locale) as never
       });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     if (!pair || pair.id !== existingSession.pairId) {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Pair room is not available anymore.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.pair_room_unavailable') });
       await interaction.editReply({
-        content: renderMediatorSayReply(existingSession),
+        content: renderMediatorSayReply(existingSession, tr.locale),
         components: buildMediatorSayToneButtons({
           sessionId: existingSession.id,
           selectedTone: parseSayToneOrDefault(existingSession.selectedTone),
           canSendToPairRoom: false,
           alreadySent: Boolean(existingSession.sentToPairAt)
-        }) as never
+        }, tr.locale) as never
       });
       return;
     }
 
     const pairChannel = await interaction.client.channels.fetch(pair.privateChannelId);
     if (!pairChannel?.isTextBased() || !('send' in pairChannel) || typeof pairChannel.send !== 'function') {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Pair room channel is not sendable.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.pair_channel_not_sendable') });
       await interaction.editReply({
-        content: renderMediatorSayReply(existingSession),
+        content: renderMediatorSayReply(existingSession, tr.locale),
         components: buildMediatorSayToneButtons({
           sessionId: existingSession.id,
           selectedTone: parseSayToneOrDefault(existingSession.selectedTone),
           canSendToPairRoom: false,
           alreadySent: Boolean(existingSession.sentToPairAt)
-        }) as never
+        }, tr.locale) as never
       });
       return;
     }
@@ -481,27 +489,30 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
     const session = marked.session;
     if (!session) {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Session not found.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.session_not_found') });
       return;
     }
 
     if (marked.changed) {
       await pairChannel.send({
-        content: `<@${interaction.user.id}> drafted this with /say:\n\n${getMediatorSaySelectedText(session)}`
+        content: tr.t('interaction.mediator.sent_to_pair_content', {
+          userId: interaction.user.id,
+          text: getMediatorSaySelectedText(session)
+        })
       });
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Sent to your pair room.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.sent_to_pair_success') });
     } else {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Already sent to pair room earlier.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.mediator.sent_to_pair_already') });
     }
 
     await interaction.editReply({
-      content: renderMediatorSayReply(session),
+      content: renderMediatorSayReply(session, tr.locale),
       components: buildMediatorSayToneButtons({
         sessionId: session.id,
         selectedTone: parseSayToneOrDefault(session.selectedTone),
         canSendToPairRoom: Boolean(session.pairId),
         alreadySent: Boolean(session.sentToPairAt)
-      }) as never
+      }, tr.locale) as never
     });
     return;
   }
@@ -509,7 +520,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'date' && decoded.action === 'generate_ideas') {
     const filters = parseDateFilters(decoded.payload);
     if (!filters) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed date generator payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_date_generator') });
       return;
     }
 
@@ -518,7 +529,8 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     const ideas = buildDateIdeas(filters);
     const view = renderDateIdeasResult({
       filters,
-      ideas
+      ideas,
+      locale: tr.locale
     });
 
     await interaction.editReply({
@@ -531,13 +543,13 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'date' && decoded.action === 'save_weekend') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const filters = parseDateFilters(decoded.payload);
     if (!filters) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed date save payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_date_save') });
       return;
     }
 
@@ -551,30 +563,30 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       filters,
       ideas
     });
-    const weekendDate = saved.row?.weekendDate ?? 'current';
+    const weekendDate = saved.row?.weekendDate ?? tr.t('interaction.date.current_weekend');
 
     await interaction.editReply(
       saved.created
-        ? `Saved for weekend (${weekendDate}).`
-        : `Already saved for weekend (${weekendDate}).`,
+        ? tr.t('interaction.date.saved_weekend', { weekendDate })
+        : tr.t('interaction.date.saved_weekend_already', { weekendDate }),
     );
     return;
   }
 
   if (decoded.feature === 'anon_qotd' && decoded.action === 'propose_question') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
-    const modal = buildAnonAskModal(interaction.guildId);
+    const modal = buildAnonAskModal(interaction.guildId, tr.locale);
     await interaction.showModal(modal as never);
     return;
   }
 
   if (decoded.feature === 'anon_qotd' && decoded.action === 'mascot_answer') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -588,7 +600,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       limit: ANON_MASCOT_DAILY_LIMIT
     });
     if (!quota.allowed) {
-      await interaction.editReply('Mascot answer daily limit reached. Try again tomorrow.');
+      await interaction.editReply(tr.t('interaction.anon.mascot_daily_limit'));
       return;
     }
 
@@ -604,14 +616,18 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       questionId: payload.q
     });
 
-    await interaction.editReply(firstRun ? answer.answer : `${answer.answer}\n(Already generated today.)`);
+    await interaction.editReply(
+      firstRun
+        ? answer.answer
+        : `${answer.answer}\n${tr.t('interaction.anon.answer_already_generated_today')}`,
+    );
     return;
   }
 
   if (decoded.feature === 'pair_home' && decoded.action === 'checkin') {
     const payload = pairHomePayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -623,20 +639,23 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     });
 
     if (!pair || pair.id !== payload.p) {
-      await interaction.editReply('Run check-in from your pair room panel only.');
+      await interaction.editReply(tr.t('interaction.pair_home.checkin_only_from_panel'));
       return;
     }
 
     const agreements = await listActiveAgreements(25);
     if (agreements.length === 0) {
-      await interaction.editReply('No active agreements found. Run seed script first.');
+      await interaction.editReply(tr.t('checkin.reply.no_agreements'));
       return;
     }
 
     await interaction.editReply({
-      content: 'Select one weekly agreement, then fill the 5-score modal.',
+      content: tr.t('checkin.reply.select_agreement'),
       components: [
-        buildCheckinAgreementSelect(agreements.map((agreement) => ({ key: agreement.key, text: agreement.text }))) as never
+        buildCheckinAgreementSelect(
+          agreements.map((agreement) => ({ key: agreement.key, text: agreement.text })),
+          tr.locale
+        ) as never
       ]
     });
     return;
@@ -645,30 +664,30 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'pair_home' && decoded.action === 'raid') {
     const payload = pairHomePayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     if (!pair || pair.id !== payload.p) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'This panel action is only for your active pair.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.pair_home.action_only_active_pair') });
       return;
     }
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const data = await getTodayRaidOffers(interaction.guildId);
     if (data.offers.length === 0) {
-      await interaction.editReply('No raid offers found for today.');
+      await interaction.editReply(tr.t('raid.reply.no_offers_today'));
       return;
     }
 
     const lines = data.offers.map(
-      (offer, idx) => `${idx + 1}. **${offer.key}** - ${offer.points} pts\n${offer.text}`,
+      (offer, idx) => `${idx + 1}. **${offer.key}** - ${offer.points} ${tr.t('interaction.common.points_short')}\n${offer.text}`,
     );
 
     await interaction.editReply({
-      content: `Today offers (\`${data.dayDate}\`):\n\n${lines.join('\n\n')}`,
-      components: data.offers.map((offer) => buildRaidClaimButton(offer.key)) as never
+      content: `${tr.t('raid.reply.today_offers', { dayDate: data.dayDate })}\n\n${lines.join('\n\n')}`,
+      components: data.offers.map((offer) => buildRaidClaimButton(offer.key, tr.locale)) as never
     });
     return;
   }
@@ -677,22 +696,27 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     const payload = pairHomePayloadSchema.parse(decoded.payload);
     const snapshot = await getPairHomeSnapshot(payload.p);
     if (!snapshot) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Pair panel is not available.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.pair_home.panel_not_available') });
       return;
     }
 
     if (snapshot.user1Id !== interaction.user.id && snapshot.user2Id !== interaction.user.id) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'This panel action is only for pair members.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('interaction.pair_home.action_only_members') });
       return;
     }
 
     const text = !snapshot.duel.active
-      ? 'No active duel right now.'
+      ? tr.t('interaction.pair_home.duel_none')
       : !snapshot.duel.roundNo
-        ? 'Duel is active but no round is running right now.'
-        : `Round #${snapshot.duel.roundNo} is active${snapshot.duel.roundEndsAt
-          ? ` and ends <t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
-          : ''}.`;
+        ? tr.t('interaction.pair_home.duel_waiting_round')
+        : tr.t('interaction.pair_home.duel_active_round', {
+            roundNo: snapshot.duel.roundNo,
+            endsPart: snapshot.duel.roundEndsAt
+              ? tr.t('interaction.pair_home.duel_active_round_ends', {
+                  endsAt: `<t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
+                })
+              : ''
+          });
     await interaction.reply({ flags: MessageFlags.Ephemeral, content: text });
     return;
   }
@@ -703,11 +727,11 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     const pairId = decoded.payload.pairId;
 
     if (!duelId || !roundId || !pairId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed duel payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_duel') });
       return;
     }
 
-    const modal = buildDuelSubmissionModal({ duelId, roundId, pairId });
+    const modal = buildDuelSubmissionModal({ duelId, roundId, pairId }, tr.locale);
     await interaction.showModal(modal as never);
 
     logInteraction({
@@ -723,32 +747,32 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'horoscope' && decoded.action === 'claim_open') {
     const selection = parseHoroscopeSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed horoscope payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_horoscope') });
       return;
     }
 
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: 'Pick your mode and context, then press **Get privately**.',
+      content: tr.t('interaction.horoscope.pick_mode_context'),
       components: buildHoroscopeClaimPicker({
         guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: selection.mode,
         context: selection.context
-      }) as never
+      }, tr.locale) as never
     });
     return;
   }
 
   if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const selection = parseHoroscopeSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed horoscope selection.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_horoscope_selection') });
       return;
     }
 
@@ -773,7 +797,10 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         const channel = await interaction.client.channels.fetch(pair.privateChannelId);
         if (channel?.isTextBased() && 'send' in channel && typeof channel.send === 'function') {
           await channel.send({
-            content: `<@${interaction.user.id}> weekly horoscope:\n\n${claimed.text}`
+            content: tr.t('interaction.horoscope.weekly_to_pair_content', {
+              userId: interaction.user.id,
+              text: claimed.text
+            })
           });
           delivered = 'pair';
         }
@@ -783,15 +810,15 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     await markHoroscopeClaimDelivery(claimed.claim.id, delivered);
 
     const deliveryText = delivered === 'dm'
-      ? 'Delivered to your DM.'
+      ? tr.t('interaction.horoscope.delivery_dm')
       : delivered === 'pair'
-        ? 'DM unavailable, delivered to your pair room.'
-        : `DM and pair-room fallback unavailable, showing here:\n\n${claimed.text}`;
+        ? tr.t('interaction.horoscope.delivery_pair')
+        : tr.t('interaction.horoscope.delivery_fallback_here', { text: claimed.text });
 
     await interaction.editReply({
       content: claimed.created
-        ? `Horoscope claimed. ${deliveryText}`
-        : `You already claimed this week. ${deliveryText}`,
+        ? tr.t('interaction.horoscope.claimed', { delivery: deliveryText })
+        : tr.t('interaction.horoscope.already_claimed', { delivery: deliveryText }),
       components: []
     });
     return;
@@ -800,16 +827,14 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'horoscope' && decoded.action === 'about') {
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content:
-        'Weekly horoscope is deterministic and built from seeded templates. ' +
-        'No runtime LLM generation is used in production loops.',
+      content: tr.t('interaction.horoscope.about'),
     });
     return;
   }
 
   if (decoded.feature === 'horoscope' && decoded.action === 'start_pair_ritual') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -828,21 +853,21 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       content: pair
-        ? `Open your pair panel in <#${pair.privateChannelId}> and start the ritual there.`
-        : 'Create a pair room first with `/pair create`, then start the ritual there.',
+        ? tr.t('interaction.horoscope.ritual_open_pair_panel', { channelId: pair.privateChannelId })
+        : tr.t('interaction.horoscope.ritual_create_pair_first'),
     });
     return;
   }
 
   if (decoded.feature === 'checkin' && decoded.action === 'share_agreement') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const checkinId = decoded.payload.c;
     if (!checkinId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed check-in payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_checkin') });
       return;
     }
 
@@ -864,32 +889,32 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
     await interaction.editReply(
       shared.created
-        ? 'Agreement queued for public posting.'
-        : 'Agreement share was already queued earlier.',
+        ? tr.t('interaction.checkin.share_queued')
+        : tr.t('interaction.checkin.share_already_queued'),
     );
     return;
   }
 
   if (decoded.feature === 'anon' && (decoded.action === 'approve' || decoded.action === 'reject')) {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const questionId = decoded.payload.q;
     if (!questionId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed anon moderation payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_anon_moderation') });
       return;
     }
 
     await interaction.deferUpdate();
     const settings = await getGuildSettings(interaction.guildId);
     if (!isAdminOrConfiguredModeratorForComponent(interaction, settings?.moderatorRoleId ?? null)) {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Admin or configured moderator role is required.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: tr.t('error.admin_or_moderator_required') });
       return;
     }
 
-    let feedback = 'Question already moderated.';
+    let feedback = tr.t('interaction.anon.question_already_moderated');
 
     if (decoded.action === 'approve') {
       const approved = await approveAnonQuestion({
@@ -910,8 +935,8 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       }
 
       feedback = approved.changed
-        ? 'Question approved and queued for publishing.'
-        : 'Question already moderated.';
+        ? tr.t('interaction.anon.question_approved')
+        : tr.t('interaction.anon.question_already_moderated');
     } else {
       const rejected = await rejectAnonQuestion({
         guildId: interaction.guildId,
@@ -919,10 +944,12 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         moderatorUserId: interaction.user.id
       });
 
-      feedback = rejected.changed ? 'Question rejected.' : 'Question already moderated.';
+      feedback = rejected.changed
+        ? tr.t('interaction.anon.question_rejected')
+        : tr.t('interaction.anon.question_already_moderated');
     }
 
-    const queue = await buildAnonQueueView(interaction.guildId, 0, 3);
+    const queue = await buildAnonQueueView(interaction.guildId, 0, 3, tr.locale);
     await interaction.editReply({
       content: queue.content,
       components: queue.components as never
@@ -934,13 +961,13 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'raid' && decoded.action === 'claim') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const questKey = decoded.payload.q;
     if (!questKey) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed raid claim payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_raid_claim') });
       return;
     }
 
@@ -953,35 +980,37 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       sendConfirmMessage: async (params) => {
         const channel = await interaction.client.channels.fetch(params.pairPrivateChannelId);
         if (!channel?.isTextBased() || !('send' in channel) || typeof channel.send !== 'function') {
-          throw new Error('Pair room channel is not sendable');
+          throw new Error(tr.t('interaction.mediator.pair_channel_not_sendable'));
         }
 
         await channel.send({
           content:
-            `<@${params.claimerUserId}> claimed **${params.questKey}** for ${params.points} points.\n` +
-            'Partner, press confirm when completed.',
-          components: [buildRaidConfirmButton(params.claimId) as never]
+            `<@${params.claimerUserId}> ${tr.t('interaction.raid.claim_partner_confirm_prompt', {
+              questKey: params.questKey,
+              points: params.points
+            })}`,
+          components: [buildRaidConfirmButton(params.claimId, tr.locale) as never]
         });
       }
     });
 
     await interaction.editReply(
       result.created
-        ? `Claim created for **${questKey}**. Confirmation sent to your pair room.`
-        : `Claim for **${questKey}** already exists today.`,
+        ? tr.t('interaction.raid.claim_created', { questKey })
+        : tr.t('interaction.raid.claim_already_exists', { questKey }),
     );
     return;
   }
 
   if (decoded.feature === 'raid' && decoded.action === 'confirm') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const claimId = decoded.payload.c;
     if (!claimId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed raid confirm payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_raid_confirm') });
       return;
     }
 
@@ -995,37 +1024,37 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     });
 
     if (!result.changed && result.reason === 'same_user') {
-      await interaction.editReply('The same user who claimed cannot confirm. Ask your partner to confirm.');
+      await interaction.editReply(tr.t('interaction.raid.confirm_same_user'));
       return;
     }
 
     if (!result.changed && result.reason === 'already_confirmed') {
-      await interaction.editReply('This claim was already confirmed.');
+      await interaction.editReply(tr.t('interaction.raid.confirm_already_confirmed'));
       return;
     }
 
     if (!result.changed) {
-      await interaction.editReply('Claim confirmation is already in progress. Try again shortly.');
+      await interaction.editReply(tr.t('interaction.raid.confirm_in_progress'));
       return;
     }
 
     await interaction.editReply(
       result.appliedPoints > 0
-        ? `Claim confirmed. +${result.appliedPoints} raid points applied.`
-        : 'Daily cap reached for this pair. Claim marked as capped.',
+        ? tr.t('interaction.raid.confirm_applied', { points: result.appliedPoints })
+        : tr.t('interaction.raid.confirm_capped'),
     );
     return;
   }
 
-  await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported action.' });
+  await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported_action') });
 }
 
-function parseCheckinScores(interaction: ModalSubmitInteraction): [number, number, number, number, number] {
+function parseCheckinScores(locale: AppLocale, interaction: ModalSubmitInteraction): [number, number, number, number, number] {
   const raw = ['s1', 's2', 's3', 's4', 's5'].map((field) => interaction.fields.getTextInputValue(field).trim());
   const values = raw.map((value) => Number.parseInt(value, 10));
 
   if (values.some((value) => Number.isNaN(value))) {
-    throw new Error('Each score must be an integer.');
+    throw new Error(t(locale, 'error.checkin_scores_integer'));
   }
 
   return values as [number, number, number, number, number];
@@ -1034,10 +1063,11 @@ function parseCheckinScores(interaction: ModalSubmitInteraction): [number, numbe
 async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInteraction): Promise<void> {
   const decoded = decodeCustomId(interaction.customId);
   const correlationId = createCorrelationId();
+  const tr = await createInteractionTranslator(interaction);
 
   if (decoded.feature === 'duel' && decoded.action === 'submit_modal') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -1046,7 +1076,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     const pairId = decoded.payload.pairId;
 
     if (!duelId || !roundId || !pairId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed duel submission payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_duel_submission') });
       return;
     }
 
@@ -1076,15 +1106,15 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
     await interaction.editReply(
       result.accepted
-        ? 'Submission accepted. Scoreboard will refresh shortly.'
-        : 'You already submitted for this round. Keeping your first submission.',
+        ? tr.t('interaction.duel.submission_accepted')
+        : tr.t('interaction.duel.submission_already_sent'),
     );
     return;
   }
 
   if (decoded.feature === 'mediator' && decoded.action === 'say_submit') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -1095,24 +1125,25 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
       guildId: interaction.guildId,
       userId: interaction.user.id,
       pairId: pair?.id ?? null,
-      sourceText: source
+      sourceText: source,
+      locale: tr.locale
     });
 
     await interaction.editReply({
-      content: renderMediatorSayReply(session),
+      content: renderMediatorSayReply(session, tr.locale),
       components: buildMediatorSayToneButtons({
         sessionId: session.id,
         selectedTone: parseSayToneOrDefault(session.selectedTone),
         canSendToPairRoom: Boolean(session.pairId),
         alreadySent: Boolean(session.sentToPairAt)
-      }) as never
+      }, tr.locale) as never
     });
     return;
   }
 
   if (decoded.feature === 'anon' && decoded.action === 'ask_modal') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
@@ -1126,7 +1157,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
       limit: ANON_PROPOSE_DAILY_LIMIT
     });
     if (!quota.allowed) {
-      await interaction.editReply('Question submit daily limit reached. Try again tomorrow.');
+      await interaction.editReply(tr.t('interaction.anon.question_submit_daily_limit'));
       return;
     }
 
@@ -1135,7 +1166,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     const dedupeKey = `anon:submit:${interaction.guildId}:${interaction.user.id}:${opDate}:${digest}`;
     const firstRun = await rememberOperation(dedupeKey, { question });
     if (!firstRun) {
-      await interaction.editReply('This exact question was already submitted today.');
+      await interaction.editReply(tr.t('interaction.anon.question_already_submitted_today'));
       return;
     }
 
@@ -1152,25 +1183,25 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
       correlationId
     });
 
-    await interaction.editReply(`Question queued for moderation. Request id: \`${created.id}\``);
+    await interaction.editReply(tr.t('interaction.anon.question_queued', { requestId: created.id }));
     return;
   }
 
   if (decoded.feature === 'checkin' && decoded.action === 'submit_modal') {
     if (!interaction.guildId) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
       return;
     }
 
     const agreementKey = decoded.payload.a;
     if (!agreementKey) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed check-in payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_checkin') });
       return;
     }
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (!interaction.channelId) {
-      await interaction.editReply('Unable to resolve channel for check-in submission.');
+      await interaction.editReply(tr.t('error.channel_not_resolved'));
       return;
     }
 
@@ -1180,11 +1211,11 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
       userId: interaction.user.id
     });
     if (!pair) {
-      await interaction.editReply('Run check-in flow inside your pair room.');
+      await interaction.editReply(tr.t('checkin.reply.run_in_pair_room'));
       return;
     }
 
-    const scores = parseCheckinScores(interaction);
+    const scores = parseCheckinScores(tr.locale, interaction);
     const result = await submitWeeklyCheckin({
       guildId: interaction.guildId,
       pairId: pair.id,
@@ -1214,14 +1245,14 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
     await interaction.editReply({
       content: result.created
-        ? 'Weekly check-in submitted. You can optionally share agreement publicly.'
-        : 'Check-in already exists for this pair/week. Showing the existing record.',
-      components: [buildCheckinShareButton(result.checkin.id) as never]
+        ? tr.t('interaction.checkin.submitted_with_share')
+        : tr.t('interaction.checkin.existing_record_shown'),
+      components: [buildCheckinShareButton(result.checkin.id, tr.locale) as never]
     });
     return;
   }
 
-  await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported modal action.' });
+  await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported_modal_action') });
 }
 
 async function handleSelect(
@@ -1229,6 +1260,7 @@ async function handleSelect(
   interaction: StringSelectMenuInteraction | ChannelSelectMenuInteraction | RoleSelectMenuInteraction,
 ): Promise<void> {
   const decoded = decodeCustomId(interaction.customId);
+  const tr = await createInteractionTranslator(interaction);
 
   if (decoded.feature === 'setup_wizard') {
     const handled = await handleSetupWizardComponent(ctx, interaction, decoded);
@@ -1239,37 +1271,37 @@ async function handleSelect(
 
   if (decoded.feature === 'checkin' && decoded.action === 'agreement_select') {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported check-in selector.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported.checkin_selector') });
       return;
     }
 
     const agreementKey = interaction.values[0];
 
     if (!interaction.guildId || !agreementKey) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed check-in selection payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_checkin_selection') });
       return;
     }
 
-    const modal = buildCheckinSubmitModal(agreementKey);
+    const modal = buildCheckinSubmitModal(agreementKey, tr.locale);
     await interaction.showModal(modal as never);
     return;
   }
 
   if (decoded.feature === 'horoscope' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported horoscope selector.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported.horoscope_selector') });
       return;
     }
 
     const selection = parseHoroscopeSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed horoscope selection payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_horoscope_selection_picker') });
       return;
     }
 
     const selected = interaction.values[0];
     if (!selected) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'No selection value.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.no_selection_value') });
       return;
     }
 
@@ -1281,18 +1313,18 @@ async function handleSelect(
       : selection.context;
 
     if (!nextMode || !nextContext) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid horoscope selection option.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.invalid_option.horoscope_selection') });
       return;
     }
 
     await interaction.update({
-      content: 'Pick your mode and context, then press **Get privately**.',
+      content: tr.t('interaction.horoscope.pick_mode_context'),
       components: buildHoroscopeClaimPicker({
         guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: nextMode,
         context: nextContext
-      }) as never
+      }, tr.locale) as never
     });
     return;
   }
@@ -1302,19 +1334,19 @@ async function handleSelect(
     && (decoded.action === 'pick_energy' || decoded.action === 'pick_budget' || decoded.action === 'pick_time')
   ) {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported date selector.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported.date_selector') });
       return;
     }
 
     const current = parseDateFilters(decoded.payload);
     if (!current) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed date selector payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.payload.malformed_date_selector') });
       return;
     }
 
     const selected = interaction.values[0];
     if (!selected) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'No selection value.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.no_selection_value') });
       return;
     }
 
@@ -1327,7 +1359,7 @@ async function handleSelect(
     if (decoded.action === 'pick_energy') {
       const parsed = parseDateEnergy(selected);
       if (!parsed) {
-        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid energy option.' });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.invalid_option.energy') });
         return;
       }
       next.energy = parsed;
@@ -1336,7 +1368,7 @@ async function handleSelect(
     if (decoded.action === 'pick_budget') {
       const parsed = parseDateBudget(selected);
       if (!parsed) {
-        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid budget option.' });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.invalid_option.budget') });
         return;
       }
       next.budget = parsed;
@@ -1345,7 +1377,7 @@ async function handleSelect(
     if (decoded.action === 'pick_time') {
       const parsed = parseDateTimeWindow(selected);
       if (!parsed) {
-        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid time option.' });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.invalid_option.time') });
         return;
       }
       next.timeWindow = parsed;
@@ -1353,15 +1385,15 @@ async function handleSelect(
 
     await interaction.update({
       content: [
-        'Pick your constraints, then press **Generate 3 ideas**.',
-        formatDatePickerSummary(next)
+        tr.t('date.reply.pick_constraints'),
+        formatDatePickerSummary(tr.locale, next)
       ].join('\n'),
-      components: buildDateGeneratorPicker(next) as never
+      components: buildDateGeneratorPicker(next, tr.locale) as never
     });
     return;
   }
 
-  await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported select action.' });
+  await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported_select_action') });
 }
 
 export async function routeInteractionComponent(
@@ -1389,14 +1421,15 @@ export async function routeInteractionComponent(
     }
   } catch (error) {
     logger.error({ error, interaction_id: interaction.id }, 'Interaction component routing failed');
+    const tr = await createInteractionTranslator(interaction);
 
     if (interaction.deferred) {
-      await interaction.editReply('Interaction failed. Please try again.');
+      await interaction.editReply(tr.t('error.interaction_failed'));
       return;
     }
 
     if (!interaction.replied) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Interaction failed. Please try again.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.interaction_failed') });
     }
   }
 }

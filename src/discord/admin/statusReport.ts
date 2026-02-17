@@ -11,7 +11,7 @@ import {
   type GuildFeatureState,
 } from '../../app/services/guildConfigService';
 import { runPermissionsCheck } from '../permissions/check';
-import { createAdminTranslator, type AdminTranslationKey } from './i18n';
+import { t, type I18nKey } from '../../i18n';
 
 const scheduleOwnerFeature: Partial<Record<JobName, GuildFeatureName>> = {
   [JobNames.WeeklyHoroscopePublish]: 'horoscope',
@@ -24,13 +24,24 @@ const scheduleOwnerFeature: Partial<Record<JobName, GuildFeatureName>> = {
   [JobNames.PublicPostPublish]: 'public_post',
 };
 
-const featureLabelKey: Record<GuildFeatureName, AdminTranslationKey> = {
-  horoscope: 'feature.horoscope',
-  anon: 'feature.anon',
-  raid: 'feature.raid',
-  checkin: 'feature.checkin',
-  hall: 'feature.hall',
-  public_post: 'feature.public_post',
+const featureLabelKey: Record<GuildFeatureName, I18nKey> = {
+  horoscope: 'admin.status.feature.horoscope',
+  anon: 'admin.status.feature.anon',
+  raid: 'admin.status.feature.raid',
+  checkin: 'admin.status.feature.checkin',
+  hall: 'admin.status.feature.hall',
+  public_post: 'admin.status.feature.public_post',
+};
+
+const permissionLabelKey: Record<string, I18nKey> = {
+  'Manage Channels': 'permissions.manage_channels',
+  'View Channels': 'permissions.view_channels',
+  'Send Messages': 'permissions.send_messages',
+  'Embed Links': 'permissions.embed_links',
+  'Read Message History': 'permissions.read_history',
+  'Manage Messages': 'permissions.manage_messages',
+  'Category is missing or not a category': 'permissions.category_missing',
+  'Channel not found': 'permissions.channel_not_found'
 };
 
 function checkMark(ok: boolean): string {
@@ -41,7 +52,17 @@ function formatValue(value: string | null, notSetLabel: string): string {
   return value ? `\`${value}\`` : notSetLabel;
 }
 
+function translatePermissionLabels(locale: GuildConfig['locale'], missing: string[]): string {
+  return missing
+    .map((label) => {
+      const key = permissionLabelKey[label];
+      return key ? t(locale, key) : label;
+    })
+    .join(', ');
+}
+
 function permissionIssueForChannel(
+  locale: GuildConfig['locale'],
   checks: Awaited<ReturnType<typeof runPermissionsCheck>>,
   channelId: string | null,
 ): string | null {
@@ -54,50 +75,50 @@ function permissionIssueForChannel(
     return null;
   }
 
-  return row.missing.join(', ');
+  return translatePermissionLabels(locale, row.missing);
 }
 
 function dependencyReasonLabel(
+  locale: GuildConfig['locale'],
   dependency: GuildFeatureDependencyCode,
-  t: (key: AdminTranslationKey) => string,
 ): string {
   if (dependency === 'anon_mod_role_not_selected') {
-    return t('reason.anon_mod_role_not_selected');
+    return t(locale, 'admin.status.reason.anon_mod_role_not_selected');
   }
 
-  return t('reason.channel_not_selected');
+  return t(locale, 'admin.status.reason.channel_not_selected');
 }
 
 function buildFeatureReason(
+  locale: GuildConfig['locale'],
   state: GuildFeatureState,
   permissionIssue: string | null,
-  t: (key: AdminTranslationKey, params?: Record<string, string>) => string,
 ): string {
   if (!state.enabled) {
-    return t('reason.disabled_by_admin');
+    return t(locale, 'admin.status.reason.disabled_by_admin');
   }
 
   if (!state.configured) {
     const details = [
-      ...new Set(state.missingDependencies.map((item) => dependencyReasonLabel(item, t))),
+      ...new Set(state.missingDependencies.map((item) => dependencyReasonLabel(locale, item))),
     ].join(', ');
-    return t('reason.enabled_not_configured', {
+    return t(locale, 'admin.status.reason.enabled_not_configured', {
       details,
     });
   }
 
   if (permissionIssue) {
-    return t('reason.permissions_missing', { missing: permissionIssue });
+    return t(locale, 'admin.status.reason.permissions_missing', { missing: permissionIssue });
   }
 
-  return t('reason.configured');
+  return t(locale, 'admin.status.reason.configured');
 }
 
 function buildNextActions(
   config: GuildConfig,
   featureStates: ReadonlyMap<GuildFeatureName, GuildFeatureState>,
-): AdminTranslationKey[] {
-  const actions: AdminTranslationKey[] = [];
+): I18nKey[] {
+  const actions: I18nKey[] = [];
 
   const hasDisabledFeatures = guildFeatureNames.some((feature) => {
     const state = featureStates.get(feature);
@@ -105,31 +126,31 @@ function buildNextActions(
   });
 
   if (hasDisabledFeatures) {
-    actions.push('action.enable_all_features');
+    actions.push('admin.status.next.enable_all_features');
   }
 
   if (!config.pairCategoryId) {
-    actions.push('action.pick_pair_category');
+    actions.push('admin.status.next.pick_pair_category');
   }
 
   if (!config.horoscopeChannelId) {
-    actions.push('action.pick_horoscope_channel');
+    actions.push('admin.status.next.pick_horoscope_channel');
   }
 
   if (!config.raidChannelId) {
-    actions.push('action.pick_raid_channel');
+    actions.push('admin.status.next.pick_raid_channel');
   }
 
   if (!config.hallChannelId) {
-    actions.push('action.pick_hall_channel');
+    actions.push('admin.status.next.pick_hall_channel');
   }
 
   if (!config.publicPostChannelId) {
-    actions.push('action.pick_public_post_channel');
+    actions.push('admin.status.next.pick_public_post_channel');
   }
 
   if (!config.anonInboxChannelId || !config.anonModRoleId) {
-    actions.push('action.pick_anon_inbox_mod_role');
+    actions.push('admin.status.next.pick_anon_inbox_mod_role');
   }
 
   return [...new Set(actions)];
@@ -137,7 +158,6 @@ function buildNextActions(
 
 export async function buildAdminStatusReport(guild: Guild): Promise<string> {
   const config = await getGuildConfig(guild.id);
-  const { t } = createAdminTranslator(config.locale);
   const scheduleStatus = await listRecurringScheduleStatus();
   const checks = await runPermissionsCheck({
     guild,
@@ -149,6 +169,7 @@ export async function buildAdminStatusReport(guild: Guild): Promise<string> {
       config.publicPostChannelId,
       config.anonInboxChannelId,
     ].filter((value): value is string => Boolean(value)),
+    locale: config.locale
   });
 
   const featureStates = new Map(
@@ -159,69 +180,69 @@ export async function buildAdminStatusReport(guild: Guild): Promise<string> {
     const state = featureStates.get(feature) ?? evaluateFeatureState(config, feature);
     const permissionIssue =
       feature === 'horoscope'
-        ? permissionIssueForChannel(checks, config.horoscopeChannelId)
+        ? permissionIssueForChannel(config.locale, checks, config.horoscopeChannelId)
         : feature === 'raid'
-          ? permissionIssueForChannel(checks, config.raidChannelId)
+          ? permissionIssueForChannel(config.locale, checks, config.raidChannelId)
           : feature === 'hall'
-            ? permissionIssueForChannel(checks, config.hallChannelId)
+            ? permissionIssueForChannel(config.locale, checks, config.hallChannelId)
             : feature === 'public_post' || feature === 'checkin'
-              ? permissionIssueForChannel(checks, config.publicPostChannelId)
-              : permissionIssueForChannel(checks, config.anonInboxChannelId);
+              ? permissionIssueForChannel(config.locale, checks, config.publicPostChannelId)
+              : permissionIssueForChannel(config.locale, checks, config.anonInboxChannelId);
 
-    const reason = buildFeatureReason(state, permissionIssue, t);
+    const reason = buildFeatureReason(config.locale, state, permissionIssue);
     const ok = state.enabled && state.configured && !permissionIssue;
-    return `- ${t(featureLabelKey[feature])}: ${checkMark(ok)} ${reason}`;
+    return `- ${t(config.locale, featureLabelKey[feature])}: ${checkMark(ok)} ${reason}`;
   });
 
   const scheduleLines = scheduleStatus.map((schedule) => {
     const ownerFeature = scheduleOwnerFeature[schedule.name];
     const ownerState = ownerFeature ? featureStates.get(ownerFeature) : null;
     const willSkip = Boolean(schedule.enabled && ownerState && !ownerState.enabled);
-    const skipSuffix = willSkip ? ` (${t('reason.schedule_feature_disabled_skip')})` : '';
+    const skipSuffix = willSkip ? ` (${t(config.locale, 'admin.status.reason.schedule_feature_disabled_skip')})` : '';
 
-    return `- ${schedule.name}: ${schedule.enabled ? t('schedule.enabled') : t('schedule.disabled')} (\`${schedule.cron}\`)${skipSuffix}`;
+    return `- ${schedule.name}: ${schedule.enabled ? t(config.locale, 'common.enabled') : t(config.locale, 'common.disabled')} (\`${schedule.cron}\`)${skipSuffix}`;
   });
 
   const configLines = [
-    `- locale: \`${config.locale}\``,
-    `- timezone: \`${config.timezone}\``,
-    `- pair_category_id: ${formatValue(config.pairCategoryId, t('value.not_set'))}`,
-    `- horoscope_channel_id: ${formatValue(config.horoscopeChannelId, t('value.not_set'))}`,
-    `- raid_channel_id: ${formatValue(config.raidChannelId, t('value.not_set'))}`,
-    `- hall_channel_id: ${formatValue(config.hallChannelId, t('value.not_set'))}`,
-    `- public_post_channel_id: ${formatValue(config.publicPostChannelId, t('value.not_set'))}`,
-    `- anon_inbox_channel_id: ${formatValue(config.anonInboxChannelId, t('value.not_set'))}`,
-    `- anon_mod_role_id: ${formatValue(config.anonModRoleId, t('value.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.locale')}: \`${config.locale}\``,
+    `- ${t(config.locale, 'admin.status.config.timezone')}: \`${config.timezone}\``,
+    `- ${t(config.locale, 'admin.status.config.pair_category_id')}: ${formatValue(config.pairCategoryId, t(config.locale, 'common.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.horoscope_channel_id')}: ${formatValue(config.horoscopeChannelId, t(config.locale, 'common.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.raid_channel_id')}: ${formatValue(config.raidChannelId, t(config.locale, 'common.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.hall_channel_id')}: ${formatValue(config.hallChannelId, t(config.locale, 'common.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.public_post_channel_id')}: ${formatValue(config.publicPostChannelId, t(config.locale, 'common.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.anon_inbox_channel_id')}: ${formatValue(config.anonInboxChannelId, t(config.locale, 'common.not_set'))}`,
+    `- ${t(config.locale, 'admin.status.config.anon_mod_role_id')}: ${formatValue(config.anonModRoleId, t(config.locale, 'common.not_set'))}`,
   ];
 
   const permissionLines = checks.map((check) =>
     check.ok
-      ? `- ${check.where}: ${checkMark(true)} ${t('value.ok')}`
-      : `- ${check.where}: ${checkMark(false)} ${t('reason.permissions_missing', { missing: check.missing.join(', ') })}`,
+      ? `- ${check.where}: ${checkMark(true)} ${t(config.locale, 'common.ok')}`
+      : `- ${check.where}: ${checkMark(false)} ${t(config.locale, 'admin.status.reason.permissions_missing', { missing: translatePermissionLabels(config.locale, check.missing) })}`,
   );
 
   const nextActions = buildNextActions(config, featureStates);
   const nextActionLines =
     nextActions.length > 0
-      ? nextActions.map((action) => `- ${t(action)}`)
-      : [`- ${t('action.none')}`];
+      ? nextActions.map((action) => `- ${t(config.locale, action)}`)
+      : [`- ${t(config.locale, 'admin.status.next.none')}`];
 
   return [
-    `## ${t('status.title')}`,
+    `## ${t(config.locale, 'admin.status.title')}`,
     '',
-    `### ${t('section.features')}`,
+    `### ${t(config.locale, 'admin.status.section.features')}`,
     ...featureLines,
     '',
-    `### ${t('section.schedules')}`,
+    `### ${t(config.locale, 'admin.status.section.schedules')}`,
     ...scheduleLines,
     '',
-    `### ${t('section.config')}`,
+    `### ${t(config.locale, 'admin.status.section.config')}`,
     ...configLines,
     '',
-    `### ${t('section.permissions')}`,
+    `### ${t(config.locale, 'admin.status.section.permissions')}`,
     ...permissionLines,
     '',
-    `### ${t('section.next_actions')}`,
+    `### ${t(config.locale, 'admin.status.section.next_actions')}`,
     ...nextActionLines,
   ].join('\n');
 }

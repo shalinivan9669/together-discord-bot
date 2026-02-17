@@ -11,21 +11,26 @@ import {
 
 import { encodeCustomId } from '../interactions/customId';
 import type { SetupWizardDraft } from './state';
+import { t, type AppLocale } from '../../i18n';
 
-function channelLine(label: string, channelId: string | null): string {
-  return `${label}: ${channelId ? `<#${channelId}>` : '_not set_'}`;
+function channelLine(locale: AppLocale, label: string, channelId: string | null): string {
+  return `${label}: ${channelId ? `<#${channelId}>` : `_${t(locale, 'common.not_set')}_`}`;
 }
 
-function categoryLine(categoryId: string | null): string {
-  return `Pair rooms category: ${categoryId ? `<#${categoryId}>` : '_not set_'}`;
+function categoryLine(locale: AppLocale, categoryId: string | null): string {
+  return `${t(locale, 'setup.wizard.line.pair_category')}: ${categoryId ? `<#${categoryId}>` : `_${t(locale, 'common.not_set')}_`}`;
 }
 
-function roleLine(roleId: string | null): string {
-  return `Anon moderator role: ${roleId ? `<@&${roleId}>` : '_not set_'}`;
+function roleLine(locale: AppLocale, roleId: string | null): string {
+  return `${t(locale, 'setup.wizard.line.anon_mod_role')}: ${roleId ? `<@&${roleId}>` : `_${t(locale, 'common.not_set')}_`}`;
 }
 
-function timezoneLine(timezone: string): string {
-  return `Timezone: \`${timezone}\``;
+function timezoneLine(locale: AppLocale, timezone: string): string {
+  return `${t(locale, 'setup.wizard.line.timezone')}: \`${timezone}\``;
+}
+
+function localeLine(locale: AppLocale): string {
+  return `${t(locale, 'setup.wizard.line.locale')}: \`${locale}\``;
 }
 
 function setupCustomId(action: string): string {
@@ -62,7 +67,7 @@ function categorySelect(action: string, placeholder: string) {
   ]);
 }
 
-function timezoneSelect(current: string) {
+function timezoneSelect(locale: AppLocale, current: string) {
   const options = [
     'Asia/Almaty',
     'UTC',
@@ -79,7 +84,7 @@ function timezoneSelect(current: string) {
     {
       type: ComponentType.StringSelect,
       custom_id: setupCustomId('pick_timezone'),
-      placeholder: 'Select timezone',
+      placeholder: t(locale, 'setup.wizard.placeholder.timezone'),
       min_values: 1,
       max_values: 1,
       options: options.map((timezone) => ({
@@ -91,64 +96,65 @@ function timezoneSelect(current: string) {
   ]);
 }
 
-export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Message {
+export function renderSetupWizardPanel(draft: SetupWizardDraft, locale: AppLocale): ComponentsV2Message {
   const summary = [
-    'Step 1: select pair category and channels.',
-    'Step 2: select optional anon moderator role and timezone.',
-    'Step 3: press Complete setup.',
+    t(locale, 'setup.wizard.step1'),
+    t(locale, 'setup.wizard.step2'),
+    t(locale, 'setup.wizard.step3'),
     '',
-    categoryLine(draft.pairCategoryId),
-    channelLine('Weekly horoscope', draft.horoscopeChannelId),
-    channelLine('Raid progress', draft.raidChannelId),
-    channelLine('Monthly hall', draft.hallChannelId),
-    channelLine('Public posts', draft.publicPostChannelId),
-    channelLine('Anon inbox', draft.anonInboxChannelId),
-    roleLine(draft.anonModRoleId),
-    timezoneLine(draft.timezone),
+    categoryLine(locale, draft.pairCategoryId),
+    channelLine(locale, t(locale, 'setup.wizard.line.horoscope_channel'), draft.horoscopeChannelId),
+    channelLine(locale, t(locale, 'setup.wizard.line.raid_channel'), draft.raidChannelId),
+    channelLine(locale, t(locale, 'setup.wizard.line.hall_channel'), draft.hallChannelId),
+    channelLine(locale, t(locale, 'setup.wizard.line.public_post_channel'), draft.publicPostChannelId),
+    channelLine(locale, t(locale, 'setup.wizard.line.anon_inbox_channel'), draft.anonInboxChannelId),
+    roleLine(locale, draft.anonModRoleId),
+    timezoneLine(locale, draft.timezone),
+    localeLine(locale),
   ].join('\n');
 
   return {
     components: [
       uiCard({
-        title: 'Setup Wizard',
+        title: t(locale, 'setup.wizard.title'),
         status: draft.guildId,
         accentColor: 0x3d5a80,
         components: [
           textBlock(summary),
-          categorySelect('pick_pair_category', 'Select pair rooms category'),
-          channelSelect('pick_horoscope_channel', 'Select weekly horoscope channel'),
-          channelSelect('pick_raid_channel', 'Select raid progress channel'),
-          channelSelect('pick_hall_channel', 'Select monthly hall channel'),
-          channelSelect('pick_public_post_channel', 'Select public post channel'),
-          channelSelect('pick_anon_inbox_channel', 'Select anon inbox channel'),
+          categorySelect('pick_pair_category', t(locale, 'setup.wizard.placeholder.pair_category')),
+          channelSelect('pick_horoscope_channel', t(locale, 'setup.wizard.placeholder.horoscope_channel')),
+          channelSelect('pick_raid_channel', t(locale, 'setup.wizard.placeholder.raid_channel')),
+          channelSelect('pick_hall_channel', t(locale, 'setup.wizard.placeholder.hall_channel')),
+          channelSelect('pick_public_post_channel', t(locale, 'setup.wizard.placeholder.public_post_channel')),
+          channelSelect('pick_anon_inbox_channel', t(locale, 'setup.wizard.placeholder.anon_inbox_channel')),
           actionRowSelects([
             {
               type: ComponentType.RoleSelect,
               custom_id: setupCustomId('pick_mod_role'),
-              placeholder: 'Select optional moderator role',
+              placeholder: t(locale, 'setup.wizard.placeholder.mod_role'),
               min_values: 0,
               max_values: 1,
             }
           ]),
-          timezoneSelect(draft.timezone),
+          timezoneSelect(locale, draft.timezone),
           actionRowButtons([
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
               custom_id: setupCustomId('complete'),
-              label: 'Complete Setup'
+              label: t(locale, 'setup.wizard.button.complete')
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: setupCustomId('reset'),
-              label: 'Reset'
+              label: t(locale, 'setup.wizard.button.reset')
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: setupCustomId('test_post'),
-              label: 'Test Post'
+              label: t(locale, 'setup.wizard.button.test_post')
             }
           ])
         ]

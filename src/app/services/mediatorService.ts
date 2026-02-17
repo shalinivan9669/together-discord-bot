@@ -7,11 +7,13 @@ import {
   MEDIATOR_REPAIR_TOTAL_MINUTES,
   MEDIATOR_SAY_MAX_LENGTH,
 } from '../../config/constants';
+import { t, type AppLocale } from '../../i18n';
 import { db } from '../../infra/db/drizzle';
 import { mediatorRepairSessions, mediatorSaySessions, pairs } from '../../infra/db/schema';
 import { JobNames } from '../../infra/queue/jobs';
 import { addMinutes } from '../../lib/time';
 import { Routes } from '../../discord/ui-v2/api';
+import { getGuildConfig } from './guildConfigService';
 
 export const mediatorTones = ['soft', 'direct', 'short'] as const;
 export type MediatorTone = (typeof mediatorTones)[number];
@@ -22,46 +24,96 @@ type RepairStep = {
   instruction: string;
 };
 
-const REPAIR_STEPS: RepairStep[] = [
+const REPAIR_STEPS: Record<AppLocale, RepairStep[]> = {
+  ru: [
+    {
+      stepNumber: 1,
+      title: 'Пауза',
+      instruction: 'Возьмите 60 секунд тишины. Без споров и оправданий. Просто выдохните и снизьте напряжение.'
+    },
+    {
+      stepNumber: 2,
+      title: 'Чувство и потребность',
+      instruction: 'Каждый говорит: «Я чувствую ___ и мне нужно ___». До 20 слов.'
+    },
+    {
+      stepNumber: 3,
+      title: 'Своя часть',
+      instruction: 'Каждый называет один свой вклад: «Моя часть была ___». Без «но» в этой фразе.'
+    },
+    {
+      stepNumber: 4,
+      title: 'Фиксация шага',
+      instruction: 'Согласуйте один конкретный шаг на ближайшие 24 часа. Поблагодарите друг друга за разговор.'
+    }
+  ],
+  en: [
+    {
+      stepNumber: 1,
+      title: 'Pause',
+      instruction: 'Take 60 seconds in silence. No rebuttals. Just breathe and lower intensity.'
+    },
+    {
+      stepNumber: 2,
+      title: 'Feeling and Need',
+      instruction: 'Each person says: “I feel ___ and I need ___.” Keep it under 20 words.'
+    },
+    {
+      stepNumber: 3,
+      title: 'Own One Part',
+      instruction: 'Each person owns one action: “My part was ___.” No “but” in this sentence.'
+    },
+    {
+      stepNumber: 4,
+      title: 'Close the Repair',
+      instruction: 'Agree on one concrete next action for the next 24 hours. Thank each other for staying in the talk.'
+    }
+  ]
+};
+
+const SAY_TEMPLATES: Record<
+  AppLocale,
   {
-    stepNumber: 1,
-    title: 'Pause',
-    instruction: 'Take 60 seconds in silence. No rebuttals. Just breathe and lower intensity.'
-  },
-  {
-    stepNumber: 2,
-    title: 'Name Feeling + Need',
-    instruction: 'Each person says: “I feel ___ and I need ___.” Keep it under 20 words.'
-  },
-  {
-    stepNumber: 3,
-    title: 'Own One Part',
-    instruction: 'Each person owns one action: “My part was ___.” No “but” in this sentence.'
-  },
-  {
-    stepNumber: 4,
-    title: 'Repair Close',
-    instruction: 'Agree one concrete next action for the next 24 hours. Thank each other for staying in the talk.'
+    soft: string[];
+    direct: string[];
+    short: string[];
   }
-];
-
-const saySoftTemplates = [
-  'I care about us, so I want to say this calmly: {{base}}. Can we talk for a few minutes?',
-  'I want to share this gently: {{base}}. Could we find a calm moment to discuss it?',
-  'I am trying to be careful with my words: {{base}}. Are you open to a short talk now?'
-];
-
-const sayDirectTemplates = [
-  '{{base}}. I need us to address this clearly today.',
-  '{{base}}. Let’s make one clear decision on this now.',
-  '{{base}}. I need a direct answer so we can move forward.'
-];
-
-const sayShortTemplates = [
-  '{{summary}}. Can we fix this today?',
-  '{{summary}}. Need a quick decision together.',
-  '{{summary}}. Can we align on this now?'
-];
+> = {
+  ru: {
+    soft: [
+      'Мне важны наши отношения, поэтому скажу спокойно: {{base}}. Можем обсудить это пару минут?',
+      'Хочу мягко поделиться: {{base}}. Давай найдём спокойный момент и поговорим.',
+      'Стараюсь подобрать слова бережно: {{base}}. Ты готов(а) к короткому разговору?'
+    ],
+    direct: [
+      '{{base}}. Мне нужно, чтобы мы обсудили это сегодня напрямую.',
+      '{{base}}. Давай прямо сейчас примем одно понятное решение.',
+      '{{base}}. Мне нужен чёткий ответ, чтобы мы могли двигаться дальше.'
+    ],
+    short: [
+      '{{summary}}. Можем закрыть это сегодня?',
+      '{{summary}}. Нужно быстро принять решение вместе.',
+      '{{summary}}. Давай синхронизируемся по этому сейчас.'
+    ]
+  },
+  en: {
+    soft: [
+      'I care about us, so I want to say this calmly: {{base}}. Can we talk for a few minutes?',
+      'I want to share this gently: {{base}}. Could we find a calm moment to discuss it?',
+      'I am trying to be careful with my words: {{base}}. Are you open to a short talk now?'
+    ],
+    direct: [
+      '{{base}}. I need us to address this clearly today.',
+      '{{base}}. Let’s make one clear decision on this now.',
+      '{{base}}. I need a direct answer so we can move forward.'
+    ],
+    short: [
+      '{{summary}}. Can we fix this today?',
+      '{{summary}}. Need a quick decision together.',
+      '{{summary}}. Can we align on this now?'
+    ]
+  }
+};
 
 function hashIndex(seed: string, size: number): number {
   const digest = createHash('sha256').update(seed).digest();
@@ -110,16 +162,16 @@ function parseTone(value: string): MediatorTone | null {
   return mediatorTones.includes(value as MediatorTone) ? (value as MediatorTone) : null;
 }
 
-function selectedToneLabel(tone: MediatorTone): string {
+function selectedToneLabel(locale: AppLocale, tone: MediatorTone): string {
   if (tone === 'soft') {
-    return 'soft';
+    return t(locale, 'component.mediator.say.tone.soft');
   }
 
   if (tone === 'direct') {
-    return 'direct';
+    return t(locale, 'component.mediator.say.tone.direct');
   }
 
-  return 'short';
+  return t(locale, 'component.mediator.say.tone.short');
 }
 
 function sayTextByTone(session: typeof mediatorSaySessions.$inferSelect, tone: MediatorTone): string {
@@ -134,7 +186,7 @@ function sayTextByTone(session: typeof mediatorSaySessions.$inferSelect, tone: M
   return session.shortText;
 }
 
-export function buildMediatorSayVariants(inputText: string): {
+export function buildMediatorSayVariants(inputText: string, locale: AppLocale = 'ru'): {
   sourceText: string;
   softText: string;
   directText: string;
@@ -148,9 +200,10 @@ export function buildMediatorSayVariants(inputText: string): {
   const base = ensureSentence(sourceText);
   const summary = compactSummary(sourceText);
 
+  const templates = SAY_TEMPLATES[locale];
   const softText = truncate(
     applySayTemplate(
-      saySoftTemplates[hashIndex(`soft:${sourceText}`, saySoftTemplates.length)] ?? saySoftTemplates[0]!,
+      templates.soft[hashIndex(`soft:${sourceText}`, templates.soft.length)] ?? templates.soft[0]!,
       base,
       summary,
     ),
@@ -158,7 +211,7 @@ export function buildMediatorSayVariants(inputText: string): {
   );
   const directText = truncate(
     applySayTemplate(
-      sayDirectTemplates[hashIndex(`direct:${sourceText}`, sayDirectTemplates.length)] ?? sayDirectTemplates[0]!,
+      templates.direct[hashIndex(`direct:${sourceText}`, templates.direct.length)] ?? templates.direct[0]!,
       base,
       summary,
     ),
@@ -166,7 +219,7 @@ export function buildMediatorSayVariants(inputText: string): {
   );
   const shortText = truncate(
     applySayTemplate(
-      sayShortTemplates[hashIndex(`short:${sourceText}`, sayShortTemplates.length)] ?? sayShortTemplates[0]!,
+      templates.short[hashIndex(`short:${sourceText}`, templates.short.length)] ?? templates.short[0]!,
       base,
       summary,
     ),
@@ -181,8 +234,9 @@ export async function createMediatorSaySession(input: {
   userId: string;
   pairId: string | null;
   sourceText: string;
+  locale?: AppLocale;
 }) {
-  const variants = buildMediatorSayVariants(input.sourceText);
+  const variants = buildMediatorSayVariants(input.sourceText, input.locale ?? 'ru');
   const id = randomUUID();
 
   const inserted = await db
@@ -291,24 +345,30 @@ export async function markMediatorSaySentToPair(input: {
   return { changed: false, session: rows[0] ?? null };
 }
 
-export function renderMediatorSayReply(session: typeof mediatorSaySessions.$inferSelect): string {
+export function renderMediatorSayReply(
+  session: typeof mediatorSaySessions.$inferSelect,
+  locale: AppLocale = 'ru',
+): string {
   const selectedTone = parseTone(session.selectedTone) ?? 'soft';
   const preview = sayTextByTone(session, selectedTone);
 
   const sentPart = session.sentToPairAt
-    ? `\n\nSent to pair room: <t:${Math.floor(session.sentToPairAt.getTime() / 1000)}:R>.`
+    ? `\n\n${t(locale, 'mediator.say.reply.sent_to_pair', { when: `<t:${Math.floor(session.sentToPairAt.getTime() / 1000)}:R>` })}`
     : '';
 
   return [
-    'Choose a tone, then optionally send to your pair room.',
+    t(locale, 'mediator.say.reply.choose_tone'),
     '',
-    `**Soft**: ${session.softText}`,
+    `**${t(locale, 'mediator.say.reply.soft')}**: ${session.softText}`,
     '',
-    `**Direct**: ${session.directText}`,
+    `**${t(locale, 'mediator.say.reply.direct')}**: ${session.directText}`,
     '',
-    `**Short**: ${session.shortText}`,
+    `**${t(locale, 'mediator.say.reply.short')}**: ${session.shortText}`,
     '',
-    `Preview to send (${selectedToneLabel(selectedTone)}): ${preview}`
+    t(locale, 'mediator.say.reply.preview', {
+      tone: selectedToneLabel(locale, selectedTone),
+      preview
+    })
   ].join('\n') + sentPart;
 }
 
@@ -320,30 +380,33 @@ export type MediatorRepairStartResult = {
 export function renderRepairStepText(input: {
   stepNumber: number;
   startedAt: Date;
+  locale?: AppLocale;
 }): string {
-  const step = REPAIR_STEPS.find((item) => item.stepNumber === input.stepNumber);
+  const locale = input.locale ?? 'ru';
+  const steps = REPAIR_STEPS[locale];
+  const step = steps.find((item) => item.stepNumber === input.stepNumber);
   if (!step) {
     throw new Error('Repair step is not configured');
   }
 
   const nextStepNumber = input.stepNumber + 1;
-  const nextUpdateAt = nextStepNumber <= REPAIR_STEPS.length
+  const nextUpdateAt = nextStepNumber <= steps.length
     ? addMinutes(input.startedAt, MEDIATOR_REPAIR_STEP_INTERVAL_MINUTES * (nextStepNumber - 1))
     : null;
   const flowEndsAt = addMinutes(input.startedAt, MEDIATOR_REPAIR_TOTAL_MINUTES);
 
   const lines = [
-    `## Repair Flow (${MEDIATOR_REPAIR_TOTAL_MINUTES} min)`,
-    `Step ${step.stepNumber}/${REPAIR_STEPS.length}: **${step.title}**`,
+    t(locale, 'mediator.repair.flow_title', { minutes: MEDIATOR_REPAIR_TOTAL_MINUTES }),
+    t(locale, 'mediator.repair.step', { current: step.stepNumber, total: steps.length, title: step.title }),
     step.instruction,
     '',
-    `Flow ends <t:${Math.floor(flowEndsAt.getTime() / 1000)}:R>.`
+    t(locale, 'mediator.repair.flow_ends', { when: `<t:${Math.floor(flowEndsAt.getTime() / 1000)}:R>` })
   ];
 
   if (nextUpdateAt) {
-    lines.push(`Next step update <t:${Math.floor(nextUpdateAt.getTime() / 1000)}:R>.`);
+    lines.push(t(locale, 'mediator.repair.next_step', { when: `<t:${Math.floor(nextUpdateAt.getTime() / 1000)}:R>` }));
   } else {
-    lines.push('Flow complete. Keep the agreement simple and kind.');
+    lines.push(t(locale, 'mediator.repair.complete'));
   }
 
   return lines.join('\n');
@@ -369,6 +432,7 @@ export async function startMediatorRepairFlow(input: {
   correlationId: string;
   interactionId?: string;
   createFlowMessage: (content: string) => Promise<string>;
+  locale?: AppLocale;
   now?: Date;
 }): Promise<MediatorRepairStartResult> {
   const existing = await getActiveRepairSession(input.pairId);
@@ -381,9 +445,12 @@ export async function startMediatorRepairFlow(input: {
 
   const now = input.now ?? new Date();
   const sessionId = randomUUID();
+  const locale = input.locale ?? 'ru';
+  const steps = REPAIR_STEPS[locale];
   const firstMessage = renderRepairStepText({
     stepNumber: 1,
-    startedAt: now
+    startedAt: now,
+    locale
   });
   const messageId = await input.createFlowMessage(firstMessage);
 
@@ -407,7 +474,7 @@ export async function startMediatorRepairFlow(input: {
     throw new Error('Failed to persist repair session');
   }
 
-  for (let stepNumber = 2; stepNumber <= REPAIR_STEPS.length; stepNumber += 1) {
+  for (let stepNumber = 2; stepNumber <= steps.length; stepNumber += 1) {
     const startAfter = addMinutes(now, MEDIATOR_REPAIR_STEP_INTERVAL_MINUTES * (stepNumber - 1));
     await input.boss.send(
       JobNames.MediatorRepairTick,
@@ -442,7 +509,9 @@ export async function runMediatorRepairTick(input: {
   stepNumber: number;
   client: Client;
 }) {
-  const targetStep = REPAIR_STEPS.find((step) => step.stepNumber === input.stepNumber);
+  const config = await getGuildConfig(input.guildId);
+  const steps = REPAIR_STEPS[config.locale];
+  const targetStep = steps.find((step) => step.stepNumber === input.stepNumber);
   if (!targetStep) {
     return { changed: false as const, reason: 'step_not_found' as const };
   }
@@ -468,12 +537,13 @@ export async function runMediatorRepairTick(input: {
     body: {
       content: renderRepairStepText({
         stepNumber: input.stepNumber,
-        startedAt: session.startedAt
+        startedAt: session.startedAt,
+        locale: config.locale
       })
     }
   });
 
-  const completed = input.stepNumber === REPAIR_STEPS.length;
+  const completed = input.stepNumber === steps.length;
   const updated = await db
     .update(mediatorRepairSessions)
     .set({

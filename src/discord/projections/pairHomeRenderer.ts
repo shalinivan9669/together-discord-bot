@@ -19,19 +19,19 @@ type PairHomeButton = {
 
 function duelSummary(snapshot: PairHomeSnapshot): string {
   if (!snapshot.duel.active) {
-    return 'Duel: no active duel.';
+    return 'Дуэль: активной дуэли нет.';
   }
 
   if (!snapshot.duel.roundNo) {
-    return 'Duel: active, waiting for the next round.';
+    return 'Дуэль: активна, ждём следующий раунд.';
   }
 
   const endsPart = snapshot.duel.roundEndsAt
-    ? ` - ends <t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
+    ? ` - до <t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
     : '';
 
-  const state = snapshot.duel.submittedThisRound ? 'submitted' : 'ready to submit';
-  return `Duel round #${snapshot.duel.roundNo}: **${state}**${endsPart}`;
+  const state = snapshot.duel.submittedThisRound ? 'ответ отправлен' : 'можно отправлять ответ';
+  return `Раунд дуэли #${snapshot.duel.roundNo}: **${state}**${endsPart}`;
 }
 
 function duelButton(snapshot: PairHomeSnapshot): PairHomeButton | null {
@@ -52,7 +52,7 @@ function duelButton(snapshot: PairHomeSnapshot): PairHomeButton | null {
           pairId: snapshot.pairId
         }
       }),
-      label: 'Duel submit'
+      label: 'Ответ в дуэли'
     };
   }
 
@@ -64,7 +64,7 @@ function duelButton(snapshot: PairHomeSnapshot): PairHomeButton | null {
       action: 'duel_info',
       payload: { p: snapshot.pairId }
     }),
-    label: 'Duel submit'
+    label: 'Ответ в дуэли'
   };
 }
 
@@ -86,21 +86,21 @@ export function renderPairHomePanel(snapshot: PairHomeSnapshot): ComponentsV2Mes
   });
 
   const raidLine = snapshot.raid.active
-    ? `Raid points today: **${snapshot.raid.pointsToday}/${snapshot.raid.dailyCap}**`
-    : 'Raid points today: no active raid.';
+    ? `Очки рейда сегодня: **${snapshot.raid.pointsToday}/${snapshot.raid.dailyCap}**`
+    : 'Очки рейда сегодня: активного рейда нет.';
 
   const primaryButtons: PairHomeButton[] = [
     {
       type: ComponentType.Button,
       style: ButtonStyle.Secondary,
       custom_id: checkinId,
-      label: 'Check-in'
+      label: 'Чек-ин'
     },
     {
       type: ComponentType.Button,
       style: ButtonStyle.Secondary,
       custom_id: raidId,
-      label: 'Raid quests'
+      label: 'Квесты рейда'
     }
   ];
 
@@ -112,15 +112,15 @@ export function renderPairHomePanel(snapshot: PairHomeSnapshot): ComponentsV2Mes
   return {
     components: [
       uiCard({
-        title: 'Pair Home Panel',
+        title: 'Панель пары',
         status: `${snapshot.user1Id} + ${snapshot.user2Id}`,
         accentColor: 0x4f8a3f,
         components: [
           textBlock(
-            `Check-in this week (${snapshot.weekStartDate}): **${snapshot.checkinSubmitted ? 'submitted' : 'pending'}**\n${raidLine}\n${duelSummary(snapshot)}`,
+            `Чек-ин за неделю (${snapshot.weekStartDate}): **${snapshot.checkinSubmitted ? 'отправлен' : 'ожидается'}**\n${raidLine}\n${duelSummary(snapshot)}`,
           ),
           separator(),
-          textBlock(`Updated: <t:${Math.floor(snapshot.updatedAt.getTime() / 1000)}:R>`),
+          textBlock(`Обновлено: <t:${Math.floor(snapshot.updatedAt.getTime() / 1000)}:R>`),
           actionRowButtons(primaryButtons)
         ]
       })

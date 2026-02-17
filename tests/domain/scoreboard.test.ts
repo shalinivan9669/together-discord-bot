@@ -27,9 +27,9 @@ describe('scoreboard renderer', () => {
     });
 
     const serialized = JSON.stringify(result);
-    expect(serialized).toContain('Butler Duel Scoreboard');
-    expect(serialized).toContain('Round #2');
+    expect(serialized).toContain('Табло дуэли');
+    expect(serialized).toContain('Раунд #2');
     expect(serialized).toContain('<@u1> + <@u2>');
-    expect(serialized).toContain('Submissions: **3**');
+    expect(serialized).toContain('Ответов: **3**');
   });
 });

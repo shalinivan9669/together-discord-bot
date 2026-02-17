@@ -1,5 +1,6 @@
 import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
+import type { AppLocale } from '../../i18n';
 import { getGuildSettings, upsertGuildSettings } from '../../infra/db/queries/guildSettings';
 
 const CONFIG_CACHE_TTL_MS = 45_000;
@@ -14,8 +15,7 @@ export const guildFeatureNames = [
 ] as const;
 
 export type GuildFeatureName = (typeof guildFeatureNames)[number];
-export const guildLocales = ['ru', 'en'] as const;
-export type GuildLocale = (typeof guildLocales)[number];
+export type GuildLocale = AppLocale;
 
 export type GuildFeatureMap = Record<GuildFeatureName, boolean>;
 export type GuildFeatureDependencyCode = 'channel_not_selected' | 'anon_mod_role_not_selected';
@@ -359,4 +359,8 @@ export async function setAllGuildFeatures(guildId: string, enabled: boolean): Pr
 
 export function formatFeatureLabel(feature: GuildFeatureName): string {
   return featureLabels[feature];
+}
+
+export async function setGuildLocale(guildId: string, locale: GuildLocale): Promise<GuildConfig> {
+  return updateGuildConfig(guildId, { locale });
 }

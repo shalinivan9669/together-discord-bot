@@ -19,6 +19,7 @@ import {
 import { createScheduledPost } from '../../app/services/publicPostService';
 import { type JobName, JobNames } from '../../infra/queue/jobs';
 import { setRecurringScheduleEnabled } from '../../infra/queue/scheduler';
+import { t, type AppLocale } from '../../i18n';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
 import { buildAdminStatusReport } from '../admin/statusReport';
@@ -84,8 +85,12 @@ async function ensureDraft(interaction: SetupWizardInteraction): Promise<SetupWi
   return ensureSetupWizardDraft(interaction.guildId, interaction.user.id, config);
 }
 
-async function updatePanel(interaction: SetupWizardInteraction, draft: SetupWizardDraft): Promise<void> {
-  const panel = renderSetupWizardPanel(draft);
+async function updatePanel(
+  interaction: SetupWizardInteraction,
+  draft: SetupWizardDraft,
+  locale: AppLocale,
+): Promise<void> {
+  const panel = renderSetupWizardPanel(draft, locale);
   await interaction.editReply({
     content: panel.content ?? null,
     components: panel.components as never,
@@ -102,11 +107,11 @@ function selectTargetChannel(draft: SetupWizardDraft): string | null {
     ?? null;
 }
 
-function testPostContent(guildId: string): string {
+function testPostContent(locale: AppLocale, guildId: string): string {
   return [
-    '## Setup Wizard Test Post',
-    `Guild: \`${guildId}\``,
-    'This message confirms that scheduled posting and publish queue are wired correctly.'
+    t(locale, 'setup.wizard.test_post.title'),
+    t(locale, 'setup.wizard.test_post.guild', { guildId }),
+    t(locale, 'setup.wizard.test_post.body')
   ].join('\n');
 }
 
@@ -159,14 +164,17 @@ export async function handleSetupWizardComponent(
   const action = actionSchema.parse(decoded.action);
 
   if (!interaction.guildId) {
-    await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
+    await interaction.reply({ flags: MessageFlags.Ephemeral, content: t('ru', 'error.guild_only_action') });
     return true;
   }
+
+  const currentConfig = await getGuildConfig(interaction.guildId);
+  const locale = currentConfig.locale;
 
   if (!isAdmin(interaction)) {
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: 'Administrator permission is required for setup wizard.'
+      content: t(locale, 'error.admin_required')
     });
     return true;
   }
@@ -182,7 +190,7 @@ export async function handleSetupWizardComponent(
       if (!interaction.isRoleSelectMenu()) {
         await interaction.followUp({
           flags: MessageFlags.Ephemeral,
-          content: 'Use the role selector for this action.'
+          content: t(locale, 'setup.wizard.error.role_selector')
         });
         return true;
       }
@@ -192,8 +200,8 @@ export async function handleSetupWizardComponent(
         anonModRoleId: roleId
       });
 
-      await updatePanel(interaction, draft);
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Draft updated.' });
+      await updatePanel(interaction, draft, locale);
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.wizard.followup.draft_updated') });
       return true;
     }
 
@@ -201,7 +209,7 @@ export async function handleSetupWizardComponent(
       if (!interaction.isStringSelectMenu()) {
         await interaction.followUp({
           flags: MessageFlags.Ephemeral,
-          content: 'Use the timezone selector for this action.'
+          content: t(locale, 'setup.wizard.error.timezone_selector')
         });
         return true;
       }
@@ -211,13 +219,13 @@ export async function handleSetupWizardComponent(
         timezone
       });
 
-      await updatePanel(interaction, draft);
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Draft updated.' });
+      await updatePanel(interaction, draft, locale);
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.wizard.followup.draft_updated') });
       return true;
     }
 
     if (!interaction.isChannelSelectMenu()) {
-      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Use a channel selector for this action.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.wizard.error.channel_selector') });
       return true;
     }
 
@@ -237,13 +245,13 @@ export async function handleSetupWizardComponent(
 
     const next = patchSetupWizardDraft(interaction.guildId, interaction.user.id, patch);
 
-    await updatePanel(interaction, next);
-    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Draft updated.' });
+    await updatePanel(interaction, next, locale);
+    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.wizard.followup.draft_updated') });
     return true;
   }
 
   if (!interaction.isButton()) {
-    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Unsupported setup wizard action.' });
+    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.wizard.error.unsupported_action') });
     return true;
   }
 
@@ -278,7 +286,7 @@ export async function handleSetupWizardComponent(
 
     await interaction.followUp({
       flags: MessageFlags.Ephemeral,
-      content: `Setup complete.\n\n${report}`
+      content: `${t(locale, 'setup.wizard.followup.complete')}\n\n${report}`
     });
     return true;
   }
@@ -294,8 +302,8 @@ export async function handleSetupWizardComponent(
       correlationId
     });
 
-    await updatePanel(interaction, resetDraft);
-    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Draft reset to stored settings.' });
+    await updatePanel(interaction, resetDraft, locale);
+    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.wizard.followup.reset') });
     return true;
   }
 
@@ -303,7 +311,7 @@ export async function handleSetupWizardComponent(
   if (!channelId) {
     await interaction.followUp({
       flags: MessageFlags.Ephemeral,
-      content: `Preview:\n\n${testPostContent(interaction.guildId)}`
+      content: `${t(locale, 'setup.wizard.followup.preview')}:\n\n${testPostContent(locale, interaction.guildId)}`
     });
     return true;
   }
@@ -315,7 +323,7 @@ export async function handleSetupWizardComponent(
     type: 'text',
     targetChannelId: channelId,
     payloadJson: {
-      content: testPostContent(interaction.guildId)
+      content: testPostContent(locale, interaction.guildId)
     },
     scheduledFor: now,
     idempotencyKey: `setup:test:${interaction.guildId}:${interaction.user.id}:${dedupeWindow}`
@@ -341,10 +349,10 @@ export async function handleSetupWizardComponent(
   await interaction.followUp({
     flags: MessageFlags.Ephemeral,
     content: scheduled.created
-      ? `Test post queued for <#${channelId}>.`
-      : `Test post already queued for <#${channelId}> in this minute.`,
+      ? t(locale, 'setup.wizard.followup.test_post_queued', { channelId })
+      : t(locale, 'setup.wizard.followup.test_post_already', { channelId }),
   });
 
-  await updatePanel(interaction, draft);
+  await updatePanel(interaction, draft, locale);
   return true;
 }

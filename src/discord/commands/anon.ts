@@ -6,6 +6,7 @@ import { ensureAnonEnabled } from '../../app/services/anonService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { buildAnonAskModal } from '../interactions/components';
 import { buildAnonQueueView } from '../interactions/anonQueueView';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
@@ -15,26 +16,41 @@ export const anonCommand: CommandModule = {
   name: 'anon',
   data: new SlashCommandBuilder()
     .setName('anon')
-    .setDescription('Anonymous questions')
-    .addSubcommand((sub) => sub.setName('ask').setDescription('Submit anonymous question'))
-    .addSubcommand((sub) => sub.setName('queue').setDescription('Moderation queue (admin/mod)')),
+    .setNameLocalizations({ ru: 'anon', 'en-US': 'anon' })
+    .setDescription('Анонимные вопросы')
+    .setDescriptionLocalizations({ 'en-US': 'Anonymous questions' })
+    .addSubcommand((sub) =>
+      sub
+        .setName('ask')
+        .setNameLocalizations({ ru: 'ask', 'en-US': 'ask' })
+        .setDescription('Отправить анонимный вопрос')
+        .setDescriptionLocalizations({ 'en-US': 'Submit anonymous question' }),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('queue')
+        .setNameLocalizations({ ru: 'queue', 'en-US': 'queue' })
+        .setDescription('Очередь модерации (админ/модератор)')
+        .setDescriptionLocalizations({ 'en-US': 'Moderation queue (admin/mod)' }),
+    ),
   async execute(_ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     const sub = interaction.options.getSubcommand();
     const correlationId = createCorrelationId();
 
     try {
       await ensureAnonEnabled(interaction.guildId);
-    } catch (error) {
+    } catch {
       await interaction.reply({
         flags: MessageFlags.Ephemeral,
-        content: error instanceof Error ? error.message : 'Anonymous questions are disabled.'
+        content: tr.t('anon.reply.disabled_fallback')
       });
       return;
     }
 
     if (sub === 'ask') {
-      const modal = buildAnonAskModal(interaction.guildId);
+      const modal = buildAnonAskModal(interaction.guildId, tr.locale);
 
       logInteraction({
         interaction,
@@ -51,7 +67,7 @@ export const anonCommand: CommandModule = {
     assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const queue = await buildAnonQueueView(interaction.guildId, 0, 3);
+    const queue = await buildAnonQueueView(interaction.guildId, 0, 3, tr.locale);
 
     logInteraction({
       interaction,

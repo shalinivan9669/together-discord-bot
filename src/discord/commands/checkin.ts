@@ -6,6 +6,7 @@ import {
 } from '../../app/services/checkinService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { buildCheckinAgreementSelect } from '../interactions/components';
 import { assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
@@ -14,23 +15,32 @@ export const checkinCommand: CommandModule = {
   name: 'checkin',
   data: new SlashCommandBuilder()
     .setName('checkin')
-    .setDescription('Weekly pair check-in')
-    .addSubcommand((sub) => sub.setName('start').setDescription('Start weekly check-in in your pair room')),
+    .setNameLocalizations({ ru: 'checkin', 'en-US': 'checkin' })
+    .setDescription('Еженедельный чек-ин пары')
+    .setDescriptionLocalizations({ 'en-US': 'Weekly pair check-in' })
+    .addSubcommand((sub) =>
+      sub
+        .setName('start')
+        .setNameLocalizations({ ru: 'start', 'en-US': 'start' })
+        .setDescription('Запустить недельный чек-ин в комнате пары')
+        .setDescriptionLocalizations({ 'en-US': 'Start weekly check-in in your pair room' }),
+    ),
   async execute(_ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       await ensureCheckinEnabled(interaction.guildId);
-    } catch (error) {
-      await interaction.editReply(error instanceof Error ? error.message : 'Check-in is disabled.');
+    } catch {
+      await interaction.editReply(tr.t('checkin.reply.disabled_fallback'));
       return;
     }
 
     const correlationId = createCorrelationId();
     const sub = interaction.options.getSubcommand();
     if (sub !== 'start') {
-      await interaction.editReply('Unknown check-in subcommand.');
+      await interaction.editReply(tr.t('error.unknown_subcommand'));
       return;
     }
 
@@ -41,13 +51,13 @@ export const checkinCommand: CommandModule = {
     });
 
     if (!pair) {
-      await interaction.editReply('Run `/checkin start` inside your pair private room.');
+      await interaction.editReply(tr.t('checkin.reply.run_in_pair_room'));
       return;
     }
 
     const agreements = await listActiveAgreements(25);
     if (agreements.length === 0) {
-      await interaction.editReply('No active agreements found. Run seed script first.');
+      await interaction.editReply(tr.t('checkin.reply.no_agreements'));
       return;
     }
 
@@ -60,9 +70,12 @@ export const checkinCommand: CommandModule = {
     });
 
     await interaction.editReply({
-      content: 'Select one weekly agreement, then you will fill the 5-score check-in modal.',
+      content: tr.t('checkin.reply.select_agreement'),
       components: [
-        buildCheckinAgreementSelect(agreements.map((agreement) => ({ key: agreement.key, text: agreement.text }))) as never
+        buildCheckinAgreementSelect(
+          agreements.map((agreement) => ({ key: agreement.key, text: agreement.text })),
+          tr.locale,
+        ) as never
       ]
     });
   }

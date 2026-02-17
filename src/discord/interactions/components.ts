@@ -15,6 +15,7 @@ import {
   type DateEnergy,
   type DateTimeWindow,
 } from '../../domain/date';
+import { t, type AppLocale } from '../../i18n';
 import { encodeCustomId } from './customId';
 
 type SayTone = 'soft' | 'direct' | 'short';
@@ -29,7 +30,10 @@ function datePayload(filters: { energy: DateEnergy; budget: DateBudget; timeWind
   };
 }
 
-export function buildDuelSubmitButton(params: { duelId: string; roundId: string; pairId: string }) {
+export function buildDuelSubmitButton(
+  params: { duelId: string; roundId: string; pairId: string },
+  locale: AppLocale = 'ru',
+) {
   const customId = encodeCustomId({
     feature: 'duel',
     action: 'open_submit_modal',
@@ -41,11 +45,14 @@ export function buildDuelSubmitButton(params: { duelId: string; roundId: string;
   });
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(customId).setLabel('Submit answer').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(customId).setLabel(t(locale, 'component.duel.submit_answer')).setStyle(ButtonStyle.Primary),
   );
 }
 
-export function buildDuelSubmissionModal(params: { duelId: string; roundId: string; pairId: string }) {
+export function buildDuelSubmissionModal(
+  params: { duelId: string; roundId: string; pairId: string },
+  locale: AppLocale = 'ru',
+) {
   const customId = encodeCustomId({
     feature: 'duel',
     action: 'submit_modal',
@@ -56,16 +63,16 @@ export function buildDuelSubmissionModal(params: { duelId: string; roundId: stri
     }
   });
 
-  const modal = new ModalBuilder().setCustomId(customId).setTitle('Round submission');
+  const modal = new ModalBuilder().setCustomId(customId).setTitle(t(locale, 'component.duel.modal.title'));
 
   const answer = new TextInputBuilder()
     .setCustomId('answer')
-    .setLabel('Your round answer')
+    .setLabel(t(locale, 'component.duel.modal.answer_label'))
     .setStyle(TextInputStyle.Paragraph)
     .setMinLength(2)
     .setMaxLength(400)
     .setRequired(true)
-    .setPlaceholder('Write your submission here...');
+    .setPlaceholder(t(locale, 'component.duel.modal.answer_placeholder'));
 
   modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(answer));
   return modal;
@@ -79,7 +86,7 @@ export function buildHoroscopeClaimPicker(params: {
   weekStartDate: string;
   mode: HoroscopeMode;
   context: HoroscopeContext;
-}) {
+}, locale: AppLocale = 'ru') {
   const modeSelectId = encodeCustomId({
     feature: 'horoscope',
     action: 'pick_mode',
@@ -117,10 +124,10 @@ export function buildHoroscopeClaimPicker(params: {
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(modeSelectId)
-        .setPlaceholder('Select mode')
+        .setPlaceholder(t(locale, 'component.horoscope.select_mode'))
         .addOptions(
           horoscopeModes.map((mode) => ({
-            label: mode,
+            label: t(locale, `component.horoscope.mode.${mode}` as const),
             value: mode,
             default: mode === params.mode
           })),
@@ -129,22 +136,25 @@ export function buildHoroscopeClaimPicker(params: {
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(contextSelectId)
-        .setPlaceholder('Select context')
+        .setPlaceholder(t(locale, 'component.horoscope.select_context'))
         .addOptions(
           horoscopeContexts.map((context) => ({
-            label: context,
+            label: t(locale, `component.horoscope.context.${context}` as const),
             value: context,
             default: context === params.context
           })),
         ),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(claimButtonId).setLabel('Get privately').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(claimButtonId).setLabel(t(locale, 'component.horoscope.get_privately')).setStyle(ButtonStyle.Primary),
     )
   ];
 }
 
-export function buildCheckinAgreementSelect(options: Array<{ key: string; text: string }>) {
+export function buildCheckinAgreementSelect(
+  options: Array<{ key: string; text: string }>,
+  locale: AppLocale = 'ru',
+) {
   const customId = encodeCustomId({
     feature: 'checkin',
     action: 'agreement_select',
@@ -153,7 +163,7 @@ export function buildCheckinAgreementSelect(options: Array<{ key: string; text: 
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId(customId)
-    .setPlaceholder('Select this week agreement')
+    .setPlaceholder(t(locale, 'component.checkin.select_agreement'))
     .addOptions(
       options.map((item) => ({
         label: item.text.slice(0, 100),
@@ -165,7 +175,7 @@ export function buildCheckinAgreementSelect(options: Array<{ key: string; text: 
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 }
 
-export function buildCheckinSubmitModal(agreementKey: string) {
+export function buildCheckinSubmitModal(agreementKey: string, locale: AppLocale = 'ru') {
   const customId = encodeCustomId({
     feature: 'checkin',
     action: 'submit_modal',
@@ -174,14 +184,14 @@ export function buildCheckinSubmitModal(agreementKey: string) {
     }
   });
 
-  const modal = new ModalBuilder().setCustomId(customId).setTitle('Weekly check-in');
+  const modal = new ModalBuilder().setCustomId(customId).setTitle(t(locale, 'component.checkin.modal.title'));
 
   const fields = [
-    { id: 's1', label: 'Communication quality (1-10)' },
-    { id: 's2', label: 'Emotional support (1-10)' },
-    { id: 's3', label: 'Shared time quality (1-10)' },
-    { id: 's4', label: 'Conflict repair (1-10)' },
-    { id: 's5', label: 'Overall week (1-10)' }
+    { id: 's1', label: t(locale, 'component.checkin.modal.s1') },
+    { id: 's2', label: t(locale, 'component.checkin.modal.s2') },
+    { id: 's3', label: t(locale, 'component.checkin.modal.s3') },
+    { id: 's4', label: t(locale, 'component.checkin.modal.s4') },
+    { id: 's5', label: t(locale, 'component.checkin.modal.s5') }
   ] as const;
 
   for (const field of fields) {
@@ -202,7 +212,7 @@ export function buildCheckinSubmitModal(agreementKey: string) {
   return modal;
 }
 
-export function buildCheckinShareButton(checkinId: string) {
+export function buildCheckinShareButton(checkinId: string, locale: AppLocale = 'ru') {
   const customId = encodeCustomId({
     feature: 'checkin',
     action: 'share_agreement',
@@ -214,14 +224,14 @@ export function buildCheckinShareButton(checkinId: string) {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(customId)
-      .setLabel('Share agreement publicly')
+      .setLabel(t(locale, 'component.checkin.share_public'))
       .setStyle(ButtonStyle.Secondary),
   );
 }
 
-export function buildAnonAskModal(guildId: string) {
+export function buildAnonAskModal(guildId: string, locale: AppLocale = 'ru') {
   const modal = new ModalBuilder()
-    .setTitle('Anonymous question')
+    .setTitle(t(locale, 'component.anon.ask.modal_title'))
     .setCustomId(
       encodeCustomId({
         feature: 'anon',
@@ -233,7 +243,7 @@ export function buildAnonAskModal(guildId: string) {
       new ActionRowBuilder<TextInputBuilder>().addComponents(
         new TextInputBuilder()
           .setCustomId('question')
-          .setLabel('Your anonymous question')
+          .setLabel(t(locale, 'component.anon.ask.question_label'))
           .setStyle(TextInputStyle.Paragraph)
           .setMaxLength(400)
           .setRequired(true),
@@ -243,7 +253,7 @@ export function buildAnonAskModal(guildId: string) {
   return modal;
 }
 
-export function buildAnonModerationButtons(questionId: string) {
+export function buildAnonModerationButtons(questionId: string, locale: AppLocale = 'ru') {
   const approveId = encodeCustomId({
     feature: 'anon',
     action: 'approve',
@@ -261,15 +271,15 @@ export function buildAnonModerationButtons(questionId: string) {
   });
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(approveId).setLabel('Approve').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(rejectId).setLabel('Reject').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(approveId).setLabel(t(locale, 'component.anon.approve')).setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(rejectId).setLabel(t(locale, 'component.anon.reject')).setStyle(ButtonStyle.Danger),
   );
 }
 
 export function buildAnonQueuePaginationButtons(params: {
   page: number;
   totalPages: number;
-}) {
+}, locale: AppLocale = 'ru') {
   const prevPage = Math.max(0, params.page - 1);
   const nextPage = Math.min(Math.max(0, params.totalPages - 1), params.page + 1);
 
@@ -294,23 +304,28 @@ export function buildAnonQueuePaginationButtons(params: {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(prevId)
-      .setLabel('Prev')
+      .setLabel(t(locale, 'component.anon.prev'))
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(params.page <= 0),
     new ButtonBuilder()
       .setCustomId(markerId)
-      .setLabel(`Page ${params.page + 1}/${Math.max(1, params.totalPages)}`)
+      .setLabel(
+        t(locale, 'component.anon.page', {
+          page: params.page + 1,
+          total: Math.max(1, params.totalPages)
+        }),
+      )
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
       .setCustomId(nextId)
-      .setLabel('Next')
+      .setLabel(t(locale, 'component.anon.next'))
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(params.page >= Math.max(0, params.totalPages - 1)),
   );
 }
 
-export function buildAnonPublishedButtons(questionId: string) {
+export function buildAnonPublishedButtons(questionId: string, locale: AppLocale = 'ru') {
   const mascotAnswerId = encodeCustomId({
     feature: 'anon_qotd',
     action: 'mascot_answer',
@@ -328,12 +343,12 @@ export function buildAnonPublishedButtons(questionId: string) {
   });
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(mascotAnswerId).setLabel('Mascot answer').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId(proposeId).setLabel('Propose question').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(mascotAnswerId).setLabel(t(locale, 'component.anon.mascot_answer')).setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(proposeId).setLabel(t(locale, 'component.anon.propose_question')).setStyle(ButtonStyle.Primary),
   );
 }
 
-export function buildMediatorSayModal(guildId: string) {
+export function buildMediatorSayModal(guildId: string, locale: AppLocale = 'ru') {
   const customId = encodeCustomId({
     feature: 'mediator',
     action: 'say_submit',
@@ -342,16 +357,16 @@ export function buildMediatorSayModal(guildId: string) {
     }
   });
 
-  const modal = new ModalBuilder().setCustomId(customId).setTitle('Mediator /say');
+  const modal = new ModalBuilder().setCustomId(customId).setTitle(t(locale, 'component.mediator.say.modal_title'));
 
   const message = new TextInputBuilder()
     .setCustomId('source')
-    .setLabel('What do you want to say?')
+    .setLabel(t(locale, 'component.mediator.say.source_label'))
     .setStyle(TextInputStyle.Paragraph)
     .setMinLength(2)
     .setMaxLength(320)
     .setRequired(true)
-    .setPlaceholder('Example: I felt ignored when plans changed at the last minute.');
+    .setPlaceholder(t(locale, 'component.mediator.say.source_placeholder'));
 
   modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(message));
   return modal;
@@ -362,7 +377,7 @@ export function buildMediatorSayToneButtons(params: {
   selectedTone: SayTone;
   canSendToPairRoom: boolean;
   alreadySent: boolean;
-}) {
+}, locale: AppLocale = 'ru') {
   const toneButton = (tone: SayTone, label: string) =>
     new ButtonBuilder()
       .setCustomId(
@@ -387,14 +402,14 @@ export function buildMediatorSayToneButtons(params: {
 
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      toneButton('soft', 'Soft'),
-      toneButton('direct', 'Direct'),
-      toneButton('short', 'Short'),
+      toneButton('soft', t(locale, 'component.mediator.say.tone.soft')),
+      toneButton('direct', t(locale, 'component.mediator.say.tone.direct')),
+      toneButton('short', t(locale, 'component.mediator.say.tone.short')),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
         .setCustomId(sendId)
-        .setLabel('Send to pair room')
+        .setLabel(t(locale, 'component.mediator.say.send_pair'))
         .setStyle(ButtonStyle.Success)
         .setDisabled(!params.canSendToPairRoom || params.alreadySent),
     )
@@ -405,7 +420,7 @@ export function buildDateGeneratorPicker(filters: {
   energy: DateEnergy;
   budget: DateBudget;
   timeWindow: DateTimeWindow;
-}) {
+}, locale: AppLocale = 'ru') {
   const energySelectId = encodeCustomId({
     feature: 'date',
     action: 'pick_energy',
@@ -431,28 +446,28 @@ export function buildDateGeneratorPicker(filters: {
   });
 
   const energyOptions: Record<DateEnergy, string> = {
-    low: 'Low energy',
-    medium: 'Medium energy',
-    high: 'High energy'
+    low: t(locale, 'date.energy.low'),
+    medium: t(locale, 'date.energy.medium'),
+    high: t(locale, 'date.energy.high')
   };
 
   const budgetOptions: Record<DateBudget, string> = {
-    free: 'Free',
-    moderate: 'Moderate',
-    splurge: 'Splurge'
+    free: t(locale, 'date.budget.free'),
+    moderate: t(locale, 'date.budget.moderate'),
+    splurge: t(locale, 'date.budget.splurge')
   };
 
   const timeOptions: Record<DateTimeWindow, string> = {
-    quick: 'Quick (30-45m)',
-    evening: 'Evening (1-2h)',
-    halfday: 'Half-day'
+    quick: t(locale, 'date.time.quick'),
+    evening: t(locale, 'date.time.evening'),
+    halfday: t(locale, 'date.time.halfday')
   };
 
   return [
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(energySelectId)
-        .setPlaceholder('Select energy')
+        .setPlaceholder(t(locale, 'component.date.select_energy'))
         .addOptions(
           dateEnergyValues.map((value) => ({
             label: energyOptions[value],
@@ -464,7 +479,7 @@ export function buildDateGeneratorPicker(filters: {
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(budgetSelectId)
-        .setPlaceholder('Select budget')
+        .setPlaceholder(t(locale, 'component.date.select_budget'))
         .addOptions(
           dateBudgetValues.map((value) => ({
             label: budgetOptions[value],
@@ -476,7 +491,7 @@ export function buildDateGeneratorPicker(filters: {
     new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
       new StringSelectMenuBuilder()
         .setCustomId(timeSelectId)
-        .setPlaceholder('Select time')
+        .setPlaceholder(t(locale, 'component.date.select_time'))
         .addOptions(
           dateTimeValues.map((value) => ({
             label: timeOptions[value],
@@ -486,12 +501,12 @@ export function buildDateGeneratorPicker(filters: {
         ),
     ),
     new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(generateId).setLabel('Generate 3 ideas').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(generateId).setLabel(t(locale, 'component.date.generate')).setStyle(ButtonStyle.Primary),
     )
   ];
 }
 
-export function buildRaidClaimButton(questKey: string) {
+export function buildRaidClaimButton(questKey: string, locale: AppLocale = 'ru') {
   const customId = encodeCustomId({
     feature: 'raid',
     action: 'claim',
@@ -501,11 +516,11 @@ export function buildRaidClaimButton(questKey: string) {
   });
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(customId).setLabel('Claim').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(customId).setLabel(t(locale, 'component.raid.claim')).setStyle(ButtonStyle.Primary),
   );
 }
 
-export function buildRaidConfirmButton(claimId: string) {
+export function buildRaidConfirmButton(claimId: string, locale: AppLocale = 'ru') {
   const customId = encodeCustomId({
     feature: 'raid',
     action: 'confirm',
@@ -515,6 +530,6 @@ export function buildRaidConfirmButton(claimId: string) {
   });
 
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(customId).setLabel('Partner confirm').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(customId).setLabel(t(locale, 'component.raid.partner_confirm')).setStyle(ButtonStyle.Success),
   );
 }

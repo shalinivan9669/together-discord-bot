@@ -55,7 +55,14 @@ Recurring schedules (enabled by feature flags where applicable):
 - `/admin feature set <name> <on|off>`
 - `/admin feature enable-all`
 - `/admin feature disable-all`
+- `/admin config set locale <ru|en>`
+- `/admin config get locale`
 - `/admin schedule <name> <on|off>`
+
+Language policy:
+
+- User-facing Discord responses default to Russian (`ru`).
+- Guild locale can be switched per guild via `/admin config set locale`.
 
 One-shot delayed jobs:
 

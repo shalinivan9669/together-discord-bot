@@ -7,6 +7,7 @@ import { JobNames } from '../../infra/queue/jobs';
 import { createCorrelationId } from '../../lib/correlation';
 import { startOfWeekIso } from '../../lib/time';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
@@ -14,19 +15,32 @@ export const horoscopeCommand: CommandModule = {
   name: 'horoscope',
   data: new SlashCommandBuilder()
     .setName('horoscope')
-    .setDescription('Weekly horoscope controls')
-    .addSubcommand((sub) => sub.setName('status').setDescription('Show horoscope status'))
+    .setNameLocalizations({ ru: 'horoscope', 'en-US': 'horoscope' })
+    .setDescription('Управление недельным гороскопом')
+    .setDescriptionLocalizations({ 'en-US': 'Weekly horoscope controls' })
     .addSubcommand((sub) =>
-      sub.setName('publish-now').setDescription('Force schedule + publish due horoscope posts (admin/mod)'),
+      sub
+        .setName('status')
+        .setNameLocalizations({ ru: 'status', 'en-US': 'status' })
+        .setDescription('Показать статус гороскопа')
+        .setDescriptionLocalizations({ 'en-US': 'Show horoscope status' }),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('publish-now')
+        .setNameLocalizations({ ru: 'publish-now', 'en-US': 'publish-now' })
+        .setDescription('Форсировать расписание и публикацию гороскопа (админ/модератор)')
+        .setDescriptionLocalizations({ 'en-US': 'Force schedule + publish due horoscope posts (admin/mod)' }),
     ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       await ensureHoroscopeEnabled(interaction.guildId);
-    } catch (error) {
-      await interaction.editReply(error instanceof Error ? error.message : 'Horoscope is disabled.');
+    } catch {
+      await interaction.editReply(tr.t('horoscope.reply.disabled_fallback'));
       return;
     }
 
@@ -45,10 +59,10 @@ export const horoscopeCommand: CommandModule = {
       });
 
       await interaction.editReply(
-        `Horoscope is enabled.\n` +
-          `Current week: \`${week}\`\n` +
-          `Configured channel: ${settings?.horoscopeChannelId ? `<#${settings.horoscopeChannelId}>` : 'not set'}\n` +
-          'Weekly publish: Monday 10:00 (scheduler).',
+        `${tr.t('horoscope.reply.enabled')}\n` +
+          `${tr.t('horoscope.reply.current_week', { week })}\n` +
+          `${tr.t('horoscope.reply.configured_channel', { channel: settings?.horoscopeChannelId ? `<#${settings.horoscopeChannelId}>` : tr.t('common.not_set') })}\n` +
+          tr.t('horoscope.reply.weekly_publish'),
       );
       return;
     }
@@ -74,10 +88,10 @@ export const horoscopeCommand: CommandModule = {
         correlationId
       });
 
-      await interaction.editReply('Weekly horoscope refresh job queued.');
+      await interaction.editReply(tr.t('horoscope.reply.publish_job_queued'));
       return;
     }
 
-    await interaction.editReply('Unknown horoscope subcommand.');
+    await interaction.editReply(tr.t('error.unknown_subcommand'));
   }
 };

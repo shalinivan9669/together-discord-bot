@@ -20,34 +20,50 @@ function completionPercent(snapshot: RaidProgressSnapshot): number {
 
 function phaseLabel(percent: number): string {
   if (percent >= 100) {
-    return 'Goal reached';
+    return 'Цель достигнута';
   }
 
   if (percent >= 75) {
-    return 'Final push';
+    return 'Финальный рывок';
   }
 
   if (percent >= 40) {
-    return 'Mid raid';
+    return 'Середина рейда';
   }
 
   if (percent > 0) {
-    return 'Momentum building';
+    return 'Набираем темп';
   }
 
-  return 'Kickoff';
+  return 'Старт';
+}
+
+function raidStatusLabel(status: string): string {
+  if (status === 'active') {
+    return 'активен';
+  }
+
+  if (status === 'completed') {
+    return 'завершён';
+  }
+
+  if (status === 'cancelled') {
+    return 'отменён';
+  }
+
+  return status;
 }
 
 function topPairsText(snapshot: RaidProgressSnapshot): string {
   const rows = snapshot.topPairs.slice(0, 5);
   if (rows.length === 0) {
-    return 'Top 5 (opt-in): no confirmed claims yet.';
+    return 'Топ-5 (opt-in): пока нет подтверждённых квестов.';
   }
 
   return [
-    'Top 5 (opt-in)',
+    'Топ-5 (opt-in)',
     ...rows.map(
-      (pair, idx) => `${idx + 1}. <@${pair.user1Id}> + <@${pair.user2Id}> - **${pair.points}** pts`,
+      (pair, idx) => `${idx + 1}. <@${pair.user1Id}> + <@${pair.user2Id}> - **${pair.points}** очк.`,
     )
   ].join('\n');
 }
@@ -76,39 +92,39 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
   return {
     components: [
       uiCard({
-        title: 'Cooperative Raid Progress',
-        status: snapshot.status,
+        title: 'Прогресс рейда сервера',
+        status: raidStatusLabel(snapshot.status),
         accentColor: 0x1e6f9f,
         components: [
           textBlock(
-            `Goal: **${snapshot.goalPoints}** pts\nProgress: **${snapshot.progressPoints}/${snapshot.goalPoints}** (${percent}%)\nPhase: **${phaseLabel(percent)}**`,
+            `Цель: **${snapshot.goalPoints}** очк.\nПрогресс: **${snapshot.progressPoints}/${snapshot.goalPoints}** (${percent}%)\nЭтап: **${phaseLabel(percent)}**`,
           ),
           separator(),
           textBlock(
-            `Week: \`${snapshot.weekStartDate}\` - ends <t:${Math.floor(snapshot.weekEndAt.getTime() / 1000)}:R>\nParticipants: **${snapshot.participantsCount}**`,
+            `Неделя: \`${snapshot.weekStartDate}\` - до <t:${Math.floor(snapshot.weekEndAt.getTime() / 1000)}:R>\nУчастников: **${snapshot.participantsCount}**`,
           ),
           separator(),
           textBlock(topPairsText(snapshot)),
           separator(),
-          textBlock(`Updated: <t:${Math.floor(snapshot.updatedAt.getTime() / 1000)}:R>`),
+          textBlock(`Обновлено: <t:${Math.floor(snapshot.updatedAt.getTime() / 1000)}:R>`),
           actionRowButtons([
             {
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: takeTodayId,
-              label: 'Take quests'
+              label: 'Взять квесты'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: contributionId,
-              label: 'My contribution'
+              label: 'Мой вклад'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: rulesId,
-              label: 'Rules'
+              label: 'Правила'
             }
           ])
         ]
@@ -120,9 +136,9 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
 export function renderRaidProgressText(snapshot: RaidProgressSnapshot): string {
   const percent = completionPercent(snapshot);
   return [
-    `Raid: \`${snapshot.raidId}\``,
-    `Status: **${snapshot.status}**`,
-    `Progress: **${snapshot.progressPoints}/${snapshot.goalPoints}** (${percent}%)`,
-    `Participants: **${snapshot.participantsCount}**`
+    `Рейд: \`${snapshot.raidId}\``,
+    `Статус: **${raidStatusLabel(snapshot.status)}**`,
+    `Прогресс: **${snapshot.progressPoints}/${snapshot.goalPoints}** (${percent}%)`,
+    `Участников: **${snapshot.participantsCount}**`
   ].join('\n');
 }

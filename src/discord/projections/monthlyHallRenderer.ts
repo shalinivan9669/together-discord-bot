@@ -3,7 +3,7 @@ import type { MonthlyHallSnapshot, MonthlyHallTopPairRow } from '../../app/servi
 
 function formatTopPairs(title: string, rows: MonthlyHallTopPairRow[], unit: string): string {
   if (rows.length === 0) {
-    return `${title}: no opt-in entries this month.`;
+    return `${title}: в этом месяце нет opt-in записей.`;
   }
 
   return [
@@ -16,26 +16,26 @@ export function renderMonthlyHallCard(snapshot: MonthlyHallSnapshot): Components
   return {
     components: [
       uiCard({
-        title: 'Monthly Hall of Harmony',
+        title: 'Ежемесячный зал гармонии',
         status: `${snapshot.monthLabel} (${snapshot.monthKey})`,
         accentColor: 0x2f7d6d,
         components: [
           textBlock(
-            `Active pairs: **${snapshot.activePairs}**\n` +
-            `Check-ins done: **${snapshot.checkinsDone}**\n` +
-            `Raid participation: **${snapshot.raidParticipation}** pair(s)\n` +
-            `Duel participation: **${snapshot.duelParticipation}** pair(s)`,
+            `Активных пар: **${snapshot.activePairs}**\n` +
+            `Чек-инов выполнено: **${snapshot.checkinsDone}**\n` +
+            `Участие в рейде: **${snapshot.raidParticipation}** пар(ы)\n` +
+            `Участие в дуэлях: **${snapshot.duelParticipation}** пар(ы)`,
           ),
           separator(),
-          textBlock(formatTopPairs('Top check-in consistency', snapshot.topCheckinPairs, 'check-in(s)')),
+          textBlock(formatTopPairs('Топ стабильности чек-инов', snapshot.topCheckinPairs, 'чек-ин(ов)')),
           separator(),
-          textBlock(formatTopPairs('Top raid points', snapshot.topRaidPairs, 'point(s)')),
+          textBlock(formatTopPairs('Топ очков рейда', snapshot.topRaidPairs, 'очк.')),
           separator(),
-          textBlock(formatTopPairs('Top duel activity', snapshot.topDuelPairs, 'submission(s)')),
+          textBlock(formatTopPairs('Топ активности в дуэлях', snapshot.topDuelPairs, 'ответ(ов)')),
           separator(),
           textBlock(
-            `Updated: <t:${Math.floor(snapshot.generatedAt.getTime() / 1000)}:R>\n` +
-            'Only users who opt in are shown in tops. No negative rankings are posted.',
+            `Обновлено: <t:${Math.floor(snapshot.generatedAt.getTime() / 1000)}:R>\n` +
+            'В топах показываются только пользователи с opt-in. Негативные рейтинги не публикуются.',
           )
         ]
       })

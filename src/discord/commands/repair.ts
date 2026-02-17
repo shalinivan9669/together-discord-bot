@@ -2,6 +2,7 @@ import { MessageFlags, SlashCommandBuilder, type MessageCreateOptions } from 'di
 import { startMediatorRepairFlow, getPairRoomForMediatorUser } from '../../app/services/mediatorService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { createInteractionTranslator } from '../locale';
 import { assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
@@ -19,9 +20,12 @@ export const repairCommand: CommandModule = {
   name: 'repair',
   data: new SlashCommandBuilder()
     .setName('repair')
-    .setDescription('Mediator: start a 7-minute guided repair flow in your pair room'),
+    .setNameLocalizations({ ru: 'repair', 'en-US': 'repair' })
+    .setDescription('Медиатор: запустить 7-минутный сценарий восстановления в комнате пары')
+    .setDescriptionLocalizations({ 'en-US': 'Mediator: start a 7-minute guided repair flow in your pair room' }),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const pair = await getPairRoomForMediatorUser({
@@ -31,13 +35,13 @@ export const repairCommand: CommandModule = {
     });
 
     if (!pair) {
-      await interaction.editReply('Run `/repair` inside your pair private room.');
+      await interaction.editReply(tr.t('repair.reply.run_in_pair_room'));
       return;
     }
 
     const room = interaction.channel;
     if (!room?.isTextBased() || !canSend(room)) {
-      await interaction.editReply('Current pair room channel is not sendable.');
+      await interaction.editReply(tr.t('repair.reply.channel_not_sendable'));
       return;
     }
 
@@ -47,6 +51,7 @@ export const repairCommand: CommandModule = {
       pairId: pair.id,
       pairRoomChannelId: pair.privateChannelId,
       startedByUserId: interaction.user.id,
+      locale: tr.locale,
       interactionId: interaction.id,
       correlationId,
       boss: ctx.boss,
@@ -66,8 +71,8 @@ export const repairCommand: CommandModule = {
 
     await interaction.editReply(
       result.created
-        ? 'Repair flow started. I will edit one message every 2 minutes for the next steps.'
-        : 'A repair flow is already active in this pair room. I will keep editing that same message.',
+        ? tr.t('repair.reply.started')
+        : tr.t('repair.reply.already_active'),
     );
   }
 };
