@@ -5,7 +5,7 @@ import { createQueueRuntime } from './infra/queue/boss';
 import { createDiscordRuntime } from './discord/client';
 import { ThrottledMessageEditor } from './discord/projections/messageEditor';
 import { createHttpRuntime } from './http/server';
-import { pgPool } from './infra/db/client';
+import { checkDbHealth, pgPool } from './infra/db/client';
 
 assertRuntimeDiscordEnv(env);
 
@@ -17,7 +17,8 @@ const queueRuntime = createQueueRuntime({
 
 const discordRuntime = createDiscordRuntime({
   token: env.DISCORD_TOKEN,
-  boss: queueRuntime.boss
+  boss: queueRuntime.boss,
+  allowedGuildIds: env.ALLOWED_GUILD_IDS
 });
 queueRuntime.setDiscordClient(discordRuntime.client);
 
@@ -31,10 +32,38 @@ const httpRuntime = createHttpRuntime({
 
 let shuttingDown = false;
 
+async function runStartupSelfCheck(): Promise<void> {
+  const dbOk = await checkDbHealth();
+  const bossOk = queueRuntime.isReady();
+  const discordConnected = discordRuntime.isReady();
+  const schedules = queueRuntime
+    .getScheduleStatus()
+    .map((schedule) => `${schedule.name}:${schedule.enabled ? 'enabled' : 'disabled'}`);
+
+  logger.info(
+    {
+      feature: 'boot.self_check',
+      discord: {
+        connected: discordConnected,
+        guild_count: discordRuntime.guildCount()
+      },
+      db: dbOk ? 'ok' : 'fail',
+      boss: bossOk ? 'ok' : 'fail',
+      schedules
+    },
+    'Startup self-check',
+  );
+
+  if (!dbOk || !bossOk || !discordConnected) {
+    throw new Error('Startup self-check failed');
+  }
+}
+
 async function start(): Promise<void> {
   await queueRuntime.start();
   await discordRuntime.login();
   await httpRuntime.start();
+  await runStartupSelfCheck();
 
   logger.info({ feature: 'boot', node_env: env.NODE_ENV }, 'Application started');
 }
@@ -47,17 +76,38 @@ async function shutdown(signal: string): Promise<void> {
   shuttingDown = true;
   logger.info({ feature: 'shutdown', signal }, 'Shutdown started');
 
-  try {
-    await queueRuntime.stop();
-    await pgPool.end();
+  const failures: Array<{ step: string; error: unknown }> = [];
+
+  const runStep = async (step: string, work: () => Promise<void>) => {
+    try {
+      await work();
+    } catch (error) {
+      failures.push({ step, error });
+      logger.error({ feature: 'shutdown', signal, step, error }, 'Shutdown step failed');
+    }
+  };
+
+  await runStep('discord.destroy', async () => {
     await discordRuntime.destroy();
+  });
+  await runStep('boss.stop', async () => {
+    await queueRuntime.stop();
+  });
+  await runStep('db.pool.end', async () => {
+    await pgPool.end();
+  });
+  await runStep('http.stop', async () => {
     await httpRuntime.stop();
+  });
+
+  if (failures.length === 0) {
     logger.info({ feature: 'shutdown', signal }, 'Shutdown complete');
     process.exit(0);
-  } catch (error) {
-    logger.error({ error, signal }, 'Shutdown failed');
-    process.exit(1);
+    return;
   }
+
+  logger.error({ feature: 'shutdown', signal, failed_steps: failures.map((failure) => failure.step) }, 'Shutdown failed');
+  process.exit(1);
 }
 
 process.on('SIGINT', () => {

@@ -1,4 +1,4 @@
-ï»¿# Components V2 Patterns
+# Components V2 Patterns
 
 This repo uses raw Discord API Components V2 payloads through `src/discord/ui-v2/`.
 
@@ -17,11 +17,11 @@ This repo uses raw Discord API Components V2 payloads through `src/discord/ui-v2
   - one row per select control in setup wizard
 - Set `MessageFlags.IsComponentsV2` when creating/editing V2 messages.
 
-## Donâ€™t
-- Donâ€™t mix spammy follow-up public posts for normal state updates.
-- Donâ€™t bypass `ThrottledMessageEditor` for projection edits.
-- Donâ€™t encode unvalidated payloads directly from user input.
-- Donâ€™t place long prose into one giant text block.
+## Don’t
+- Don’t mix spammy follow-up public posts for normal state updates.
+- Don’t bypass `ThrottledMessageEditor` for projection edits.
+- Don’t encode unvalidated payloads directly from user input.
+- Don’t place long prose into one giant text block.
 
 ## Examples
 

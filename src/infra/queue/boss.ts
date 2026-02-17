@@ -22,11 +22,11 @@ import { refreshDuelScoreboardProjection } from '../../discord/projections/score
 import type { ThrottledMessageEditor } from '../../discord/projections/messageEditor';
 import { refreshRaidProgressProjection } from '../../discord/projections/raidProgress';
 import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
+import { refreshWeeklyHoroscopeProjection } from '../../discord/projections/horoscopeWeekly';
 import { refreshMonthlyHallProjection } from '../../discord/projections/monthlyHall';
 import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
-import { configureRecurringSchedules } from './scheduler';
+import { configureRecurringSchedules, type RecurringScheduleStatus } from './scheduler';
 import { publishDueScheduledPosts } from '../../app/services/publicPostService';
-import { scheduleWeeklyHoroscopePosts } from '../../app/services/horoscopeService';
 import { scheduleWeeklyCheckinNudges } from '../../app/services/checkinService';
 import {
   endExpiredRaids,
@@ -44,6 +44,7 @@ export type QueueRuntime = {
   start: () => Promise<void>;
   stop: () => Promise<void>;
   isReady: () => boolean;
+  getScheduleStatus: () => RecurringScheduleStatus[];
   setMessageEditor: (editor: ThrottledMessageEditor) => void;
   setDiscordClient: (client: Client) => void;
 };
@@ -101,6 +102,7 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
   });
 
   let ready = false;
+  let scheduleStatus: RecurringScheduleStatus[] = [];
   let messageEditor: ThrottledMessageEditor | null = null;
   let discordClient: Client | null = null;
 
@@ -333,8 +335,38 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         );
 
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
-        const created = await scheduleWeeklyHoroscopePosts();
-        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, created }, 'job completed');
+
+        if (!messageEditor) {
+          throw new Error('Message editor not initialized for weekly horoscope publish');
+        }
+
+        if (!discordClient) {
+          throw new Error('Discord client not initialized for weekly horoscope publish');
+        }
+
+        const refreshed = await refreshWeeklyHoroscopeProjection({
+          client: discordClient,
+          messageEditor,
+          weekStartDate: parsed.weekStartDate,
+          guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId
+        });
+
+        if (refreshed.failed > 0) {
+          throw new Error(`Weekly horoscope refresh failed for ${refreshed.failed} guild(s)`);
+        }
+
+        logger.info(
+          {
+            feature: parsed.feature,
+            action: parsed.action,
+            job_id: job.id,
+            processed: refreshed.processed,
+            created: refreshed.created,
+            updated: refreshed.updated,
+            failed: refreshed.failed
+          },
+          'job completed',
+        );
       }
     });
 
@@ -405,7 +437,10 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         );
 
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
-        const ended = await endExpiredRaids();
+        const ended = await endExpiredRaids(new Date(), {
+          boss,
+          correlationId: parsed.correlationId
+        });
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id, ended }, 'job completed');
       }
     });
@@ -446,22 +481,27 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         await boss.start();
         await ensureQueues(boss, AllJobNames);
         await registerHandlers();
-        await configureRecurringSchedules(boss);
+        scheduleStatus = await configureRecurringSchedules(boss);
         ready = true;
         logger.info({ feature: 'queue' }, 'pg-boss started');
       } catch (error) {
         ready = false;
+        scheduleStatus = [];
         captureException(error, { feature: 'queue.start' });
         throw error;
       }
     },
     async stop() {
       ready = false;
+      scheduleStatus = [];
       await boss.stop();
       logger.info({ feature: 'queue' }, 'pg-boss stopped');
     },
     isReady() {
       return ready;
+    },
+    getScheduleStatus() {
+      return [...scheduleStatus];
     }
   };
 }

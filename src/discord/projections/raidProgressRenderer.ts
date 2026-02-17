@@ -47,7 +47,7 @@ function topPairsText(snapshot: RaidProgressSnapshot): string {
   return [
     'Top 5 (opt-in)',
     ...rows.map(
-      (pair, idx) => `${idx + 1}. <@${pair.user1Id}> + <@${pair.user2Id}> — **${pair.points}** pts`,
+      (pair, idx) => `${idx + 1}. <@${pair.user1Id}> + <@${pair.user2Id}> - **${pair.points}** pts`,
     )
   ].join('\n');
 }
@@ -73,18 +73,6 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
     payload: { r: snapshot.raidId }
   });
 
-  const howId = encodeCustomId({
-    feature: 'raid_board',
-    action: 'how',
-    payload: { r: snapshot.raidId }
-  });
-
-  const openRoomId = encodeCustomId({
-    feature: 'raid_board',
-    action: 'open_room',
-    payload: { r: snapshot.raidId }
-  });
-
   return {
     components: [
       uiCard({
@@ -97,7 +85,7 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
           ),
           separator(),
           textBlock(
-            `Week: \`${snapshot.weekStartDate}\` • ends <t:${Math.floor(snapshot.weekEndAt.getTime() / 1000)}:R>\nParticipants: **${snapshot.participantsCount}**`,
+            `Week: \`${snapshot.weekStartDate}\` - ends <t:${Math.floor(snapshot.weekEndAt.getTime() / 1000)}:R>\nParticipants: **${snapshot.participantsCount}**`,
           ),
           separator(),
           textBlock(topPairsText(snapshot)),
@@ -106,35 +94,21 @@ export function renderRaidProgress(snapshot: RaidProgressSnapshot): ComponentsV2
           actionRowButtons([
             {
               type: ComponentType.Button,
-              style: ButtonStyle.Secondary,
-              custom_id: rulesId,
-              label: 'Rules'
-            },
-            {
-              type: ComponentType.Button,
-              style: ButtonStyle.Secondary,
-              custom_id: howId,
-              label: 'How'
-            },
-            {
-              type: ComponentType.Button,
-              style: ButtonStyle.Success,
-              custom_id: openRoomId,
-              label: 'Open my room'
+              style: ButtonStyle.Primary,
+              custom_id: takeTodayId,
+              label: 'Take quests'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Secondary,
               custom_id: contributionId,
               label: 'My contribution'
-            }
-          ]),
-          actionRowButtons([
+            },
             {
               type: ComponentType.Button,
-              style: ButtonStyle.Primary,
-              custom_id: takeTodayId,
-              label: 'Take today quests'
+              style: ButtonStyle.Secondary,
+              custom_id: rulesId,
+              label: 'Rules'
             }
           ])
         ]

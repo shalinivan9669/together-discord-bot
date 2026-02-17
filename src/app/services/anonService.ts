@@ -13,7 +13,7 @@ const mascotAnswerTemplates = {
     'Choose a calm moment and ask for 10 focused minutes.'
   ],
   repair: [
-    'Use this format: “I felt ___, I need ___, can we ___ tonight?”',
+    'Use this format: "I felt ___, I need ___, can we ___ tonight?"',
     'Name your part first, then ask for one next action.',
     'Aim for repair, not winning. One concrete step beats long debate.'
   ],
@@ -102,12 +102,47 @@ export async function createAnonQuestion(input: {
 }
 
 export async function listPendingAnonQuestions(guildId: string, limit = 5) {
-  return db
+  const page = await listPendingAnonQuestionsPage(guildId, {
+    limit,
+    offset: 0
+  });
+  return page.rows;
+}
+
+export async function listPendingAnonQuestionsPage(
+  guildId: string,
+  input: {
+    limit?: number;
+    offset?: number;
+  },
+): Promise<{
+  rows: Array<typeof anonQuestions.$inferSelect>;
+  total: number;
+  limit: number;
+  offset: number;
+}> {
+  const limit = Math.min(10, Math.max(1, input.limit ?? 5));
+  const offset = Math.max(0, input.offset ?? 0);
+
+  const countRows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(anonQuestions)
+    .where(and(eq(anonQuestions.guildId, guildId), eq(anonQuestions.status, 'pending')));
+
+  const rows = await db
     .select()
     .from(anonQuestions)
     .where(and(eq(anonQuestions.guildId, guildId), eq(anonQuestions.status, 'pending')))
     .orderBy(desc(anonQuestions.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
+
+  return {
+    rows,
+    total: Number(countRows[0]?.count ?? 0),
+    limit,
+    offset
+  };
 }
 
 export async function getAnonQuestionById(guildId: string, questionId: string) {

@@ -1,10 +1,9 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { requestPublicPostPublish } from '../../app/projections/publicPostProjection';
 import {
   ensureHoroscopeEnabled,
-  scheduleWeeklyHoroscopePosts,
 } from '../../app/services/horoscopeService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
+import { JobNames } from '../../infra/queue/jobs';
 import { createCorrelationId } from '../../lib/correlation';
 import { startOfWeekIso } from '../../lib/time';
 import { logInteraction } from '../interactionLog';
@@ -58,13 +57,14 @@ export const horoscopeCommand: CommandModule = {
       const settings = await getGuildSettings(interaction.guildId);
       assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
 
-      const created = await scheduleWeeklyHoroscopePosts();
-      await requestPublicPostPublish(ctx.boss, {
-        guildId: interaction.guildId,
-        reason: 'horoscope_publish_now',
+      await ctx.boss.send(JobNames.WeeklyHoroscopePublish, {
+        correlationId,
         interactionId: interaction.id,
+        guildId: interaction.guildId,
         userId: interaction.user.id,
-        correlationId
+        feature: 'horoscope',
+        action: 'publish_now',
+        weekStartDate: startOfWeekIso(new Date())
       });
 
       logInteraction({
@@ -74,7 +74,7 @@ export const horoscopeCommand: CommandModule = {
         correlationId
       });
 
-      await interaction.editReply(`Scheduled ${created} weekly horoscope post(s). Publish job queued.`);
+      await interaction.editReply('Weekly horoscope refresh job queued.');
       return;
     }
 

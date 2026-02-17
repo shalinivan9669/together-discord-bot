@@ -26,6 +26,19 @@ const optionalUrlString = z.preprocess((value) => {
   return normalized === '' ? undefined : normalized;
 }, z.string().url().optional());
 
+const optionalGuildIdCsv = z.preprocess((value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const ids = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  return ids.length > 0 ? ids : undefined;
+}, z.array(z.string().regex(/^\d{17,20}$/)).optional());
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
@@ -33,6 +46,7 @@ const envSchema = z.object({
   DISCORD_TOKEN: optionalNonEmptyString,
   DISCORD_APP_ID: optionalNonEmptyString,
   DISCORD_GUILD_ID: optionalNonEmptyString,
+  ALLOWED_GUILD_IDS: optionalGuildIdCsv,
   SENTRY_DSN: optionalUrlString,
   TZ: z.string().default('Asia/Almaty'),
   DEFAULT_TIMEZONE: z.string().default('Asia/Almaty'),

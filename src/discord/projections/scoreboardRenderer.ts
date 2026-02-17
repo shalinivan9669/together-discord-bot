@@ -17,7 +17,7 @@ function standingsLines(snapshot: DuelScoreboardSnapshot): string {
   }
 
   const rows = top.map(
-    (row, idx) => `${idx + 1}. <@${row.user1Id}> + <@${row.user2Id}> — **${row.points}** pts`,
+    (row, idx) => `${idx + 1}. <@${row.user1Id}> + <@${row.user2Id}> - **${row.points}** pts`,
   );
   return ['Top 5', ...rows].join('\n');
 }
@@ -28,7 +28,7 @@ function roundStatus(snapshot: DuelScoreboardSnapshot): string {
   }
 
   const endsAt = snapshot.roundEndsAt
-    ? ` • ends <t:${Math.floor(snapshot.roundEndsAt.getTime() / 1000)}:R>`
+    ? ` - ends <t:${Math.floor(snapshot.roundEndsAt.getTime() / 1000)}:R>`
     : '';
 
   return `Round #${snapshot.roundNo}: **${snapshot.roundStatus}**${endsAt}`;
@@ -50,12 +50,6 @@ export function renderDuelScoreboard(snapshot: DuelScoreboardSnapshot): Componen
   const myRoomId = encodeCustomId({
     feature: 'duel_board',
     action: 'open_room',
-    payload: { d: snapshot.duelId }
-  });
-
-  const contributionId = encodeCustomId({
-    feature: 'duel_board',
-    action: 'my_contribution',
     payload: { d: snapshot.duelId }
   });
 
@@ -84,19 +78,13 @@ export function renderDuelScoreboard(snapshot: DuelScoreboardSnapshot): Componen
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
               custom_id: participateId,
-              label: 'How'
+              label: 'How to participate'
             },
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
               custom_id: myRoomId,
               label: 'Open my room'
-            },
-            {
-              type: ComponentType.Button,
-              style: ButtonStyle.Secondary,
-              custom_id: contributionId,
-              label: 'My contribution'
             }
           ])
         ]

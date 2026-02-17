@@ -7,6 +7,7 @@ function setBaseEnv() {
   process.env.DISCORD_TOKEN = '';
   process.env.DISCORD_APP_ID = '';
   process.env.DISCORD_GUILD_ID = '';
+  process.env.ALLOWED_GUILD_IDS = '';
   process.env.SENTRY_DSN = '';
   process.env.TZ = 'Asia/Almaty';
   process.env.DEFAULT_TIMEZONE = 'Asia/Almaty';
@@ -31,6 +32,13 @@ describe('env parsing', () => {
     expect(module.env.NODE_ENV).toBe('test');
     expect(module.env.DEFAULT_TIMEZONE).toBe('Asia/Almaty');
     expect(module.env.DISCORD_GUILD_ID).toBeUndefined();
+    expect(module.env.ALLOWED_GUILD_IDS).toBeUndefined();
     expect(module.env.SENTRY_DSN).toBeUndefined();
+  });
+
+  it('parses allowed guild csv when configured', async () => {
+    process.env.ALLOWED_GUILD_IDS = '123456789012345678, 987654321098765432';
+    const module = await import('../../src/config/env');
+    expect(module.env.ALLOWED_GUILD_IDS).toEqual(['123456789012345678', '987654321098765432']);
   });
 });

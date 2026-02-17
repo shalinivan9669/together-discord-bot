@@ -5,7 +5,6 @@ import { isFeatureEnabled } from '../../config/featureFlags';
 import { startOfWeekIso } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
 import { contentHoroscopeArchetypes, guildSettings, horoscopeClaims, horoscopeWeeks } from '../../infra/db/schema';
-import { createScheduledPost } from './publicPostService';
 
 export const HOROSCOPE_MODES = ['soft', 'neutral', 'hard'] as const;
 export type HoroscopeMode = (typeof HOROSCOPE_MODES)[number];
@@ -162,40 +161,19 @@ export async function scheduleWeeklyHoroscopePosts(now: Date = new Date()): Prom
 
   const guilds = await db
     .select({
-      guildId: guildSettings.guildId,
-      horoscopeChannelId: guildSettings.horoscopeChannelId
+      guildId: guildSettings.guildId
     })
     .from(guildSettings)
     .where(isNotNull(guildSettings.horoscopeChannelId));
 
-  let createdCount = 0;
+  let preparedCount = 0;
 
   for (const guild of guilds) {
-    const channelId = guild.horoscopeChannelId;
-    if (!channelId) {
-      continue;
-    }
-
     await ensureHoroscopeWeek(guild.guildId, weekStartDate);
-
-    const scheduled = await createScheduledPost({
-      guildId: guild.guildId,
-      type: 'horoscope_weekly',
-      targetChannelId: channelId,
-      payloadJson: {
-        guildId: guild.guildId,
-        weekStartDate
-      },
-      scheduledFor: now,
-      idempotencyKey: `horoscope:weekly:${guild.guildId}:${weekStartDate}`
-    });
-
-    if (scheduled.created) {
-      createdCount += 1;
-    }
+    preparedCount += 1;
   }
 
-  return createdCount;
+  return preparedCount;
 }
 
 export async function claimHoroscope(input: {

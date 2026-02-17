@@ -18,6 +18,8 @@ import {
 import { encodeCustomId } from './customId';
 
 type SayTone = 'soft' | 'direct' | 'short';
+type HoroscopeMode = 'soft' | 'neutral' | 'hard';
+type HoroscopeContext = 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
 
 function datePayload(filters: { energy: DateEnergy; budget: DateBudget; timeWindow: DateTimeWindow }) {
   return {
@@ -69,42 +71,77 @@ export function buildDuelSubmissionModal(params: { duelId: string; roundId: stri
   return modal;
 }
 
-export function buildHoroscopeClaimModal(guildId: string, weekStartDate: string) {
-  const customId = encodeCustomId({
+const horoscopeModes: readonly HoroscopeMode[] = ['soft', 'neutral', 'hard'];
+const horoscopeContexts: readonly HoroscopeContext[] = ['conflict', 'ok', 'boredom', 'distance', 'fatigue', 'jealousy'];
+
+export function buildHoroscopeClaimPicker(params: {
+  guildId: string;
+  weekStartDate: string;
+  mode: HoroscopeMode;
+  context: HoroscopeContext;
+}) {
+  const modeSelectId = encodeCustomId({
     feature: 'horoscope',
-    action: 'claim_submit',
+    action: 'pick_mode',
     payload: {
-      g: guildId,
-      w: weekStartDate
+      g: params.guildId,
+      w: params.weekStartDate,
+      m: params.mode,
+      c: params.context
     }
   });
 
-  const modal = new ModalBuilder().setCustomId(customId).setTitle('Your weekly horoscope');
+  const contextSelectId = encodeCustomId({
+    feature: 'horoscope',
+    action: 'pick_context',
+    payload: {
+      g: params.guildId,
+      w: params.weekStartDate,
+      m: params.mode,
+      c: params.context
+    }
+  });
 
-  const modeInput = new TextInputBuilder()
-    .setCustomId('mode')
-    .setLabel('Mode: soft / neutral / hard')
-    .setStyle(TextInputStyle.Short)
-    .setMinLength(4)
-    .setMaxLength(16)
-    .setRequired(true)
-    .setPlaceholder('soft');
+  const claimButtonId = encodeCustomId({
+    feature: 'horoscope',
+    action: 'claim_submit',
+    payload: {
+      g: params.guildId,
+      w: params.weekStartDate,
+      m: params.mode,
+      c: params.context
+    }
+  });
 
-  const contextInput = new TextInputBuilder()
-    .setCustomId('context')
-    .setLabel('Context: conflict/ok/boredom/distance/fatigue/jealousy')
-    .setStyle(TextInputStyle.Short)
-    .setMinLength(2)
-    .setMaxLength(24)
-    .setRequired(true)
-    .setPlaceholder('ok');
-
-  modal.addComponents(
-    new ActionRowBuilder<TextInputBuilder>().addComponents(modeInput),
-    new ActionRowBuilder<TextInputBuilder>().addComponents(contextInput),
-  );
-
-  return modal;
+  return [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(modeSelectId)
+        .setPlaceholder('Select mode')
+        .addOptions(
+          horoscopeModes.map((mode) => ({
+            label: mode,
+            value: mode,
+            default: mode === params.mode
+          })),
+        ),
+    ),
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(contextSelectId)
+        .setPlaceholder('Select context')
+        .addOptions(
+          horoscopeContexts.map((context) => ({
+            label: context,
+            value: context,
+            default: context === params.context
+          })),
+        ),
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(claimButtonId).setLabel('Get privately').setStyle(ButtonStyle.Primary),
+    )
+  ];
 }
 
 export function buildCheckinAgreementSelect(options: Array<{ key: string; text: string }>) {
@@ -226,6 +263,50 @@ export function buildAnonModerationButtons(questionId: string) {
   return new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(approveId).setLabel('Approve').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(rejectId).setLabel('Reject').setStyle(ButtonStyle.Danger),
+  );
+}
+
+export function buildAnonQueuePaginationButtons(params: {
+  page: number;
+  totalPages: number;
+}) {
+  const prevPage = Math.max(0, params.page - 1);
+  const nextPage = Math.min(Math.max(0, params.totalPages - 1), params.page + 1);
+
+  const prevId = encodeCustomId({
+    feature: 'anon_queue',
+    action: 'page',
+    payload: { p: String(prevPage) }
+  });
+
+  const nextId = encodeCustomId({
+    feature: 'anon_queue',
+    action: 'page',
+    payload: { p: String(nextPage) }
+  });
+
+  const markerId = encodeCustomId({
+    feature: 'anon_queue',
+    action: 'noop',
+    payload: { p: String(params.page) }
+  });
+
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(prevId)
+      .setLabel('Prev')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(params.page <= 0),
+    new ButtonBuilder()
+      .setCustomId(markerId)
+      .setLabel(`Page ${params.page + 1}/${Math.max(1, params.totalPages)}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(nextId)
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(params.page >= Math.max(0, params.totalPages - 1)),
   );
 }
 

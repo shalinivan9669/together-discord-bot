@@ -60,7 +60,7 @@ export const raidCommand: CommandModule = {
       const selectedChannel = interaction.options.getChannel('channel', false);
       const channelId = selectedChannel?.id ?? settings?.raidChannelId ?? null;
       if (!channelId) {
-        await interaction.editReply('Raid public channel is not configured. Use `/setup set-channels raid:<channel>`.');
+        await interaction.editReply('Raid public channel is not configured. Run `/setup` and select a raid channel.');
         return;
       }
 

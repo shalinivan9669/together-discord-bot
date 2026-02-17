@@ -43,11 +43,12 @@ import {
   buildCheckinSubmitModal,
   buildDateGeneratorPicker,
   buildDuelSubmissionModal,
-  buildHoroscopeClaimModal,
+  buildHoroscopeClaimPicker,
   buildMediatorSayToneButtons,
   buildRaidClaimButton,
   buildRaidConfirmButton
 } from './components';
+import { buildAnonQueueView } from './anonQueueView';
 import { decodeCustomId } from './customId';
 import {
   approveAnonQuestion,
@@ -109,6 +110,15 @@ const datePayloadSchema = z.object({
   t: z.string().min(1)
 });
 const anonQuestionPayloadSchema = z.object({ q: z.string().uuid() });
+const horoscopePickerPayloadSchema = z.object({
+  g: z.string().min(1),
+  w: z.string().min(1),
+  m: z.string().optional(),
+  c: z.string().optional()
+});
+const anonQueuePayloadSchema = z.object({
+  p: z.string().optional()
+});
 
 function parseDateFilters(payload: Record<string, string>): DateFilters | null {
   const parsed = datePayloadSchema.safeParse(payload);
@@ -147,6 +157,31 @@ function parseSayToneOrDefault(value: string): 'soft' | 'direct' | 'short' {
   return 'soft';
 }
 
+function parseHoroscopeSelection(payload: Record<string, string>): {
+  guildId: string;
+  weekStartDate: string;
+  mode: 'soft' | 'neutral' | 'hard';
+  context: 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
+} | null {
+  const parsed = horoscopePickerPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const mode = parseHoroscopeMode(parsed.data.m ?? 'soft');
+  const context = parseHoroscopeContext(parsed.data.c ?? 'ok');
+  if (!mode || !context) {
+    return null;
+  }
+
+  return {
+    guildId: parsed.data.g,
+    weekStartDate: parsed.data.w,
+    mode,
+    context
+  };
+}
+
 async function handleButton(ctx: InteractionContext, interaction: ButtonInteraction): Promise<void> {
   const decoded = decodeCustomId(interaction.customId);
   const correlationId = createCorrelationId();
@@ -156,6 +191,41 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     if (handled) {
       return;
     }
+  }
+
+  if (decoded.feature === 'anon_queue' && decoded.action === 'noop') {
+    await interaction.deferUpdate();
+    return;
+  }
+
+  if (decoded.feature === 'anon_queue' && decoded.action === 'page') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const settings = await getGuildSettings(interaction.guildId);
+    if (!isAdminOrConfiguredModeratorForComponent(interaction, settings?.moderatorRoleId ?? null)) {
+      await interaction.reply({ ephemeral: true, content: 'Admin or configured moderator role is required.' });
+      return;
+    }
+
+    const parsedPayload = anonQueuePayloadSchema.safeParse(decoded.payload);
+    if (!parsedPayload.success) {
+      await interaction.reply({ ephemeral: true, content: 'Malformed moderation queue payload.' });
+      return;
+    }
+
+    const requestedPageRaw = parsedPayload.data.p ?? '0';
+    const requestedPage = Number.parseInt(requestedPageRaw, 10);
+    const page = Number.isFinite(requestedPage) && requestedPage >= 0 ? requestedPage : 0;
+    const queue = await buildAnonQueueView(interaction.guildId, page, 3);
+
+    await interaction.update({
+      content: queue.content,
+      components: queue.components as never
+    });
+    return;
   }
 
   if (decoded.feature === 'duel_board' && decoded.action === 'rules') {
@@ -651,15 +721,79 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   }
 
   if (decoded.feature === 'horoscope' && decoded.action === 'claim_open') {
-    const guildId = decoded.payload.g;
-    const weekStartDate = decoded.payload.w;
-    if (!guildId || !weekStartDate) {
+    const selection = parseHoroscopeSelection(decoded.payload);
+    if (!selection) {
       await interaction.reply({ ephemeral: true, content: 'Malformed horoscope payload.' });
       return;
     }
 
-    const modal = buildHoroscopeClaimModal(guildId, weekStartDate);
-    await interaction.showModal(modal as never);
+    await interaction.reply({
+      ephemeral: true,
+      content: 'Pick your mode and context, then press **Get privately**.',
+      components: buildHoroscopeClaimPicker({
+        guildId: selection.guildId,
+        weekStartDate: selection.weekStartDate,
+        mode: selection.mode,
+        context: selection.context
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
+    if (!interaction.guildId) {
+      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      return;
+    }
+
+    const selection = parseHoroscopeSelection(decoded.payload);
+    if (!selection) {
+      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope selection.' });
+      return;
+    }
+
+    await interaction.deferUpdate();
+
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    const claimed = await claimHoroscope({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      pairId: pair?.id ?? null,
+      mode: selection.mode,
+      context: selection.context
+    });
+
+    let delivered: 'dm' | 'pair' | 'ephemeral' = 'ephemeral';
+
+    try {
+      await interaction.user.send(claimed.text);
+      delivered = 'dm';
+    } catch {
+      if (pair) {
+        const channel = await interaction.client.channels.fetch(pair.privateChannelId);
+        if (channel?.isTextBased() && 'send' in channel && typeof channel.send === 'function') {
+          await channel.send({
+            content: `<@${interaction.user.id}> weekly horoscope:\n\n${claimed.text}`
+          });
+          delivered = 'pair';
+        }
+      }
+    }
+
+    await markHoroscopeClaimDelivery(claimed.claim.id, delivered);
+
+    const deliveryText = delivered === 'dm'
+      ? 'Delivered to your DM.'
+      : delivered === 'pair'
+        ? 'DM unavailable, delivered to your pair room.'
+        : `DM and pair-room fallback unavailable, showing here:\n\n${claimed.text}`;
+
+    await interaction.editReply({
+      content: claimed.created
+        ? `Horoscope claimed. ${deliveryText}`
+        : `You already claimed this week. ${deliveryText}`,
+      components: []
+    });
     return;
   }
 
@@ -680,10 +814,21 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    if (pair) {
+      await requestPairHomeRefresh(ctx.boss, {
+        guildId: interaction.guildId,
+        pairId: pair.id,
+        reason: 'horoscope_ritual_open',
+        interactionId: interaction.id,
+        userId: interaction.user.id,
+        correlationId
+      });
+    }
+
     await interaction.reply({
       ephemeral: true,
       content: pair
-        ? `Start ritual in your pair room: <#${pair.privateChannelId}>`
+        ? `Open your pair panel in <#${pair.privateChannelId}> and start the ritual there.`
         : 'Create a pair room first with `/pair create`, then start the ritual there.',
     });
     return;
@@ -737,12 +882,14 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferUpdate();
     const settings = await getGuildSettings(interaction.guildId);
     if (!isAdminOrConfiguredModeratorForComponent(interaction, settings?.moderatorRoleId ?? null)) {
-      await interaction.editReply('Admin or configured moderator role is required.');
+      await interaction.followUp({ ephemeral: true, content: 'Admin or configured moderator role is required.' });
       return;
     }
+
+    let feedback = 'Question already moderated.';
 
     if (decoded.action === 'approve') {
       const approved = await approveAnonQuestion({
@@ -762,21 +909,26 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         });
       }
 
-      await interaction.editReply(
-        approved.changed
-          ? 'Question approved and queued for publishing.'
-          : 'Question already moderated.',
-      );
-      return;
+      feedback = approved.changed
+        ? 'Question approved and queued for publishing.'
+        : 'Question already moderated.';
+    } else {
+      const rejected = await rejectAnonQuestion({
+        guildId: interaction.guildId,
+        questionId,
+        moderatorUserId: interaction.user.id
+      });
+
+      feedback = rejected.changed ? 'Question rejected.' : 'Question already moderated.';
     }
 
-    const rejected = await rejectAnonQuestion({
-      guildId: interaction.guildId,
-      questionId,
-      moderatorUserId: interaction.user.id
+    const queue = await buildAnonQueueView(interaction.guildId, 0, 3);
+    await interaction.editReply({
+      content: queue.content,
+      components: queue.components as never
     });
+    await interaction.followUp({ ephemeral: true, content: feedback });
 
-    await interaction.editReply(rejected.changed ? 'Question rejected.' : 'Question already moderated.');
     return;
   }
 
@@ -1004,67 +1156,6 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     return;
   }
 
-  if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
-    if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
-      return;
-    }
-
-    await interaction.deferReply({ ephemeral: true });
-
-    const modeInput = interaction.fields.getTextInputValue('mode');
-    const contextInput = interaction.fields.getTextInputValue('context');
-    const mode = parseHoroscopeMode(modeInput);
-    const context = parseHoroscopeContext(contextInput);
-    if (!mode || !context) {
-      await interaction.editReply(
-        'Invalid mode/context. Use mode: soft/neutral/hard and context: conflict/ok/boredom/distance/fatigue/jealousy.',
-      );
-      return;
-    }
-
-    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
-    const claimed = await claimHoroscope({
-      guildId: interaction.guildId,
-      userId: interaction.user.id,
-      pairId: pair?.id ?? null,
-      mode,
-      context
-    });
-
-    let delivered: 'dm' | 'pair' | 'ephemeral' = 'ephemeral';
-
-    try {
-      await interaction.user.send(claimed.text);
-      delivered = 'dm';
-    } catch {
-      if (pair) {
-        const channel = await interaction.client.channels.fetch(pair.privateChannelId);
-        if (channel?.isTextBased() && 'send' in channel && typeof channel.send === 'function') {
-          await channel.send({
-            content: `<@${interaction.user.id}> weekly horoscope:\n\n${claimed.text}`
-          });
-          delivered = 'pair';
-        }
-      }
-    }
-
-    await markHoroscopeClaimDelivery(claimed.claim.id, delivered);
-
-    const deliveryText = delivered === 'dm'
-      ? 'Delivered to your DM.'
-      : delivered === 'pair'
-        ? 'DM unavailable, delivered to your pair room.'
-        : `DM and pair-room fallback unavailable, showing here:\n\n${claimed.text}`;
-
-    await interaction.editReply(
-      claimed.created
-        ? `Horoscope claimed. ${deliveryText}`
-        : `You already claimed this week. ${deliveryText}`,
-    );
-    return;
-  }
-
   if (decoded.feature === 'checkin' && decoded.action === 'submit_modal') {
     if (!interaction.guildId) {
       await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
@@ -1166,6 +1257,48 @@ async function handleSelect(
 
     const modal = buildCheckinSubmitModal(agreementKey);
     await interaction.showModal(modal as never);
+    return;
+  }
+
+  if (decoded.feature === 'horoscope' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
+    if (!interaction.isStringSelectMenu()) {
+      await interaction.reply({ ephemeral: true, content: 'Unsupported horoscope selector.' });
+      return;
+    }
+
+    const selection = parseHoroscopeSelection(decoded.payload);
+    if (!selection) {
+      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope selection payload.' });
+      return;
+    }
+
+    const selected = interaction.values[0];
+    if (!selected) {
+      await interaction.reply({ ephemeral: true, content: 'No selection value.' });
+      return;
+    }
+
+    const nextMode = decoded.action === 'pick_mode'
+      ? parseHoroscopeMode(selected)
+      : selection.mode;
+    const nextContext = decoded.action === 'pick_context'
+      ? parseHoroscopeContext(selected)
+      : selection.context;
+
+    if (!nextMode || !nextContext) {
+      await interaction.reply({ ephemeral: true, content: 'Invalid horoscope selection option.' });
+      return;
+    }
+
+    await interaction.update({
+      content: 'Pick your mode and context, then press **Get privately**.',
+      components: buildHoroscopeClaimPicker({
+        guildId: selection.guildId,
+        weekStartDate: selection.weekStartDate,
+        mode: nextMode,
+        context: nextContext
+      }) as never
+    });
     return;
   }
 

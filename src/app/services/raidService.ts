@@ -53,6 +53,27 @@ export async function getActiveRaidForGuild(guildId: string) {
   return rows[0] ?? null;
 }
 
+async function requestPairHomeRefreshForGuild(input: {
+  guildId: string;
+  boss: PgBoss;
+  correlationId: string;
+  reason: string;
+}) {
+  const activePairs = await db
+    .select({ id: pairs.id })
+    .from(pairs)
+    .where(and(eq(pairs.guildId, input.guildId), eq(pairs.status, 'active')));
+
+  for (const pair of activePairs) {
+    await requestPairHomeRefresh(input.boss, {
+      guildId: input.guildId,
+      pairId: pair.id,
+      reason: input.reason,
+      correlationId: input.correlationId
+    });
+  }
+}
+
 async function ensureDailyOffersForRaid(raidId: string, dayDate: string): Promise<string[]> {
   const existingRows = await db
     .select()
@@ -245,6 +266,13 @@ export async function startRaid(input: {
     correlationId: input.correlationId
   });
 
+  await requestPairHomeRefreshForGuild({
+    guildId: input.guildId,
+    boss: input.boss,
+    correlationId: input.correlationId,
+    reason: 'raid_started'
+  });
+
   return {
     raid: {
       ...txResult.raid,
@@ -302,14 +330,33 @@ export async function startWeeklyRaidsForConfiguredGuilds(input: {
   return created;
 }
 
-export async function endExpiredRaids(now: Date = new Date()): Promise<number> {
+export async function endExpiredRaids(
+  now: Date = new Date(),
+  input?: {
+    boss: PgBoss;
+    correlationId: string;
+  },
+): Promise<number> {
   ensureRaidEnabled();
 
   const ended = await db
     .update(raids)
     .set({ status: 'ended' })
     .where(and(eq(raids.status, 'active'), lte(raids.weekEndAt, now)))
-    .returning({ id: raids.id });
+    .returning({ id: raids.id, guildId: raids.guildId });
+
+  if (input && ended.length > 0) {
+    const guildIds = [...new Set(ended.map((raid) => raid.guildId))];
+
+    for (const guildId of guildIds) {
+      await requestPairHomeRefreshForGuild({
+        guildId,
+        boss: input.boss,
+        correlationId: input.correlationId,
+        reason: 'raid_ended'
+      });
+    }
+  }
 
   return ended.length;
 }

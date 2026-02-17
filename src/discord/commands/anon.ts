@@ -1,11 +1,12 @@
 import {
   SlashCommandBuilder,
 } from 'discord.js';
-import { ensureAnonEnabled, listPendingAnonQuestions } from '../../app/services/anonService';
+import { ensureAnonEnabled } from '../../app/services/anonService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
-import { buildAnonAskModal, buildAnonModerationButtons } from '../interactions/components';
+import { buildAnonAskModal } from '../interactions/components';
+import { buildAnonQueueView } from '../interactions/anonQueueView';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
@@ -49,14 +50,7 @@ export const anonCommand: CommandModule = {
     assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
     await interaction.deferReply({ ephemeral: true });
 
-    const pending = await listPendingAnonQuestions(interaction.guildId, 5);
-    if (pending.length === 0) {
-      await interaction.editReply('No pending anonymous questions.');
-      return;
-    }
-
-    const lines = pending.map((row, idx) => `${idx + 1}. \`${row.id}\`\n${row.questionText}`);
-    const components = pending.map((row) => buildAnonModerationButtons(row.id));
+    const queue = await buildAnonQueueView(interaction.guildId, 0, 3);
 
     logInteraction({
       interaction,
@@ -66,8 +60,8 @@ export const anonCommand: CommandModule = {
     });
 
     await interaction.editReply({
-      content: `Pending questions (${pending.length}):\n\n${lines.join('\n\n')}`,
-      components: components as never
+      content: queue.content,
+      components: queue.components as never
     });
   }
 };
