@@ -49,6 +49,14 @@ Recurring schedules (enabled by feature flags where applicable):
 - Monthly Hall refresh: day `1` at `10:00` (`monthly.hall.refresh`)
 - Public post publish sweep: every 2 minutes (`public.post.publish`)
 
+## Admin controls
+
+- `/admin status`
+- `/admin feature set <name> <on|off>`
+- `/admin feature enable-all`
+- `/admin feature disable-all`
+- `/admin schedule <name> <on|off>`
+
 One-shot delayed jobs:
 
 - Mediator repair flow ticks (`mediator.repair.tick`) are created on `/repair` start and scheduled at `+2`, `+4`, `+6` minutes.

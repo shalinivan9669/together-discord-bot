@@ -47,8 +47,10 @@ Configured category/channel level (pair category + target channels):
 
 ## Admin Commands
 
-- `/admin status` - full status (features, schedules, config IDs, permission diagnostics)
-- `/admin feature <name> <on|off>`
+- `/admin status` - full status (by default in Russian: features, schedules, config IDs, permission diagnostics, next setup actions)
+- `/admin feature set <name> <on|off>`
+- `/admin feature enable-all`
+- `/admin feature disable-all`
 - `/admin schedule <name> <on|off>`
 - `/setup start` - setup wizard
 
@@ -85,7 +87,7 @@ Common optional:
 - `SENTRY_DSN`
 - `DEFAULT_TIMEZONE` (default: `Asia/Almaty`)
 
-Legacy phase flags still exist in env schema, but runtime feature control is now guild-config based through `/setup` and `/admin feature`.
+Legacy phase flags still exist in env schema, but runtime feature control is now guild-config based through `/setup` and `/admin feature set`.
 
 ## Railway Start Command
 

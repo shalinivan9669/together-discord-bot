@@ -3,13 +3,18 @@ import { db } from '../drizzle';
 import { guildSettings } from '../schema';
 
 export async function getGuildSettings(guildId: string) {
-  const rows = await db.select().from(guildSettings).where(eq(guildSettings.guildId, guildId)).limit(1);
+  const rows = await db
+    .select()
+    .from(guildSettings)
+    .where(eq(guildSettings.guildId, guildId))
+    .limit(1);
   return rows[0] ?? null;
 }
 
 export async function upsertGuildSettings(
   guildId: string,
   patch: Partial<{
+    locale: string;
     timezone: string;
     pairCategoryId: string | null;
     horoscopeChannelId: string | null;
@@ -35,8 +40,8 @@ export async function upsertGuildSettings(
       target: guildSettings.guildId,
       set: {
         ...normalizedPatch,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     })
     .returning();
 

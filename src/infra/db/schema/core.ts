@@ -13,6 +13,7 @@ import {
 
 export const guildSettings = pgTable('guild_settings', {
   guildId: varchar('guild_id', { length: 32 }).primaryKey(),
+  locale: varchar('locale', { length: 8 }).notNull().default('ru'),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Asia/Almaty'),
   pairCategoryId: varchar('pair_category_id', { length: 32 }),
   horoscopeChannelId: varchar('horoscope_channel_id', { length: 32 }),

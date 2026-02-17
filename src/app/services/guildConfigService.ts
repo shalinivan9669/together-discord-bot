@@ -10,15 +10,20 @@ export const guildFeatureNames = [
   'raid',
   'checkin',
   'hall',
-  'public_post'
+  'public_post',
 ] as const;
 
 export type GuildFeatureName = (typeof guildFeatureNames)[number];
+export const guildLocales = ['ru', 'en'] as const;
+export type GuildLocale = (typeof guildLocales)[number];
 
 export type GuildFeatureMap = Record<GuildFeatureName, boolean>;
+export type GuildFeatureDependencyCode = 'channel_not_selected' | 'anon_mod_role_not_selected';
+export type GuildFeatureReasonCode = 'disabled_by_admin' | 'enabled_not_configured' | 'configured';
 
 export type GuildConfig = {
   guildId: string;
+  locale: GuildLocale;
   timezone: string;
   pairCategoryId: string | null;
   horoscopeChannelId: string | null;
@@ -32,6 +37,7 @@ export type GuildConfig = {
 };
 
 export type GuildConfigPatch = Partial<{
+  locale: GuildLocale;
   timezone: string;
   pairCategoryId: string | null;
   horoscopeChannelId: string | null;
@@ -47,7 +53,8 @@ export type GuildFeatureState = {
   feature: GuildFeatureName;
   enabled: boolean;
   configured: boolean;
-  missingDependencies: string[];
+  missingDependencies: GuildFeatureDependencyCode[];
+  reasonCode: GuildFeatureReasonCode;
   reason: string;
 };
 
@@ -64,7 +71,7 @@ const featureDefaults: GuildFeatureMap = {
   raid: env.PHASE2_RAID_ENABLED,
   checkin: env.PHASE2_CHECKIN_ENABLED,
   hall: true,
-  public_post: true
+  public_post: true,
 };
 
 const featureLabels: Record<GuildFeatureName, string> = {
@@ -73,11 +80,15 @@ const featureLabels: Record<GuildFeatureName, string> = {
   raid: 'Raid',
   checkin: 'Check-in',
   hall: 'Hall',
-  public_post: 'Public post'
+  public_post: 'Public post',
 };
 
 function nowMs(): number {
   return Date.now();
+}
+
+function toLocale(value: unknown): GuildLocale {
+  return value === 'en' ? 'en' : 'ru';
 }
 
 function toFeatures(value: unknown): GuildFeatureMap {
@@ -92,13 +103,26 @@ function toFeatures(value: unknown): GuildFeatureMap {
     raid: typeof source.raid === 'boolean' ? source.raid : featureDefaults.raid,
     checkin: typeof source.checkin === 'boolean' ? source.checkin : featureDefaults.checkin,
     hall: typeof source.hall === 'boolean' ? source.hall : featureDefaults.hall,
-    public_post: typeof source.public_post === 'boolean' ? source.public_post : featureDefaults.public_post
+    public_post:
+      typeof source.public_post === 'boolean' ? source.public_post : featureDefaults.public_post,
   };
 }
 
-function normalizeConfig(guildId: string, row: Awaited<ReturnType<typeof getGuildSettings>>): GuildConfig {
+function dependencyCodeToMessage(code: GuildFeatureDependencyCode): string {
+  if (code === 'anon_mod_role_not_selected') {
+    return 'moderator role is not selected';
+  }
+
+  return 'channel is not selected';
+}
+
+function normalizeConfig(
+  guildId: string,
+  row: Awaited<ReturnType<typeof getGuildSettings>>,
+): GuildConfig {
   return {
     guildId,
+    locale: toLocale(row?.locale),
     timezone: row?.timezone ?? env.DEFAULT_TIMEZONE,
     pairCategoryId: row?.pairCategoryId ?? null,
     horoscopeChannelId: row?.horoscopeChannelId ?? null,
@@ -108,33 +132,45 @@ function normalizeConfig(guildId: string, row: Awaited<ReturnType<typeof getGuil
     anonInboxChannelId: row?.anonInboxChannelId ?? row?.questionsChannelId ?? null,
     anonModRoleId: row?.anonModRoleId ?? row?.moderatorRoleId ?? null,
     features: toFeatures(row?.features),
-    updatedAt: row?.updatedAt ?? null
+    updatedAt: row?.updatedAt ?? null,
   };
 }
 
-function dependencyMessages(config: GuildConfig, feature: GuildFeatureName): string[] {
+function dependencyCodes(
+  config: GuildConfig,
+  feature: GuildFeatureName,
+): GuildFeatureDependencyCode[] {
   if (feature === 'horoscope') {
-    return config.horoscopeChannelId ? [] : ['horoscope channel is not selected'];
+    return config.horoscopeChannelId ? [] : ['channel_not_selected'];
   }
 
   if (feature === 'anon') {
-    return config.anonInboxChannelId ? [] : ['anonymous inbox channel is not selected'];
+    const result: GuildFeatureDependencyCode[] = [];
+    if (!config.anonInboxChannelId) {
+      result.push('channel_not_selected');
+    }
+
+    if (!config.anonModRoleId) {
+      result.push('anon_mod_role_not_selected');
+    }
+
+    return result;
   }
 
   if (feature === 'raid') {
-    return config.raidChannelId ? [] : ['raid channel is not selected'];
+    return config.raidChannelId ? [] : ['channel_not_selected'];
   }
 
   if (feature === 'checkin') {
-    return config.publicPostChannelId ? [] : ['public post channel is not selected'];
+    return config.publicPostChannelId ? [] : ['channel_not_selected'];
   }
 
   if (feature === 'hall') {
-    return config.hallChannelId ? [] : ['hall channel is not selected'];
+    return config.hallChannelId ? [] : ['channel_not_selected'];
   }
 
   if (feature === 'public_post') {
-    return config.publicPostChannelId ? [] : ['public post channel is not selected'];
+    return config.publicPostChannelId ? [] : ['channel_not_selected'];
   }
 
   return [];
@@ -143,7 +179,7 @@ function dependencyMessages(config: GuildConfig, feature: GuildFeatureName): str
 function cacheSet(guildId: string, value: GuildConfig): GuildConfig {
   configCache.set(guildId, {
     value,
-    expiresAt: nowMs() + CONFIG_CACHE_TTL_MS
+    expiresAt: nowMs() + CONFIG_CACHE_TTL_MS,
   });
 
   return value;
@@ -163,25 +199,30 @@ export async function getGuildConfig(guildId: string): Promise<GuildConfig> {
   return cacheSet(guildId, normalizeConfig(guildId, row));
 }
 
-export function evaluateFeatureState(config: GuildConfig, feature: GuildFeatureName): GuildFeatureState {
+export function evaluateFeatureState(
+  config: GuildConfig,
+  feature: GuildFeatureName,
+): GuildFeatureState {
   if (!config.features[feature]) {
     return {
       feature,
       enabled: false,
       configured: false,
       missingDependencies: [],
-      reason: 'disabled by admin'
+      reasonCode: 'disabled_by_admin',
+      reason: 'disabled by admin',
     };
   }
 
-  const missingDependencies = dependencyMessages(config, feature);
+  const missingDependencies = dependencyCodes(config, feature);
   if (missingDependencies.length > 0) {
     return {
       feature,
       enabled: true,
       configured: false,
       missingDependencies,
-      reason: `enabled, but not configured (${missingDependencies.join(', ')})`
+      reasonCode: 'enabled_not_configured',
+      reason: `enabled, but not configured (${missingDependencies.map((item) => dependencyCodeToMessage(item)).join(', ')})`,
     };
   }
 
@@ -190,16 +231,23 @@ export function evaluateFeatureState(config: GuildConfig, feature: GuildFeatureN
     enabled: true,
     configured: true,
     missingDependencies: [],
-    reason: 'configured'
+    reasonCode: 'configured',
+    reason: 'configured',
   };
 }
 
-export async function getGuildFeatureState(guildId: string, feature: GuildFeatureName): Promise<GuildFeatureState> {
+export async function getGuildFeatureState(
+  guildId: string,
+  feature: GuildFeatureName,
+): Promise<GuildFeatureState> {
   const config = await getGuildConfig(guildId);
   return evaluateFeatureState(config, feature);
 }
 
-export async function assertGuildFeatureEnabled(guildId: string, feature: GuildFeatureName): Promise<void> {
+export async function assertGuildFeatureEnabled(
+  guildId: string,
+  feature: GuildFeatureName,
+): Promise<void> {
   const state = await getGuildFeatureState(guildId, feature);
 
   if (!state.enabled) {
@@ -207,12 +255,18 @@ export async function assertGuildFeatureEnabled(guildId: string, feature: GuildF
   }
 
   if (!state.configured) {
-    throw new Error('Feature is enabled, but not configured: run `/setup start` to set required channels.');
+    throw new Error(
+      'Feature is enabled, but not configured: run `/setup start` to set required channels.',
+    );
   }
 }
 
-export async function updateGuildConfig(guildId: string, patch: GuildConfigPatch): Promise<GuildConfig> {
+export async function updateGuildConfig(
+  guildId: string,
+  patch: GuildConfigPatch,
+): Promise<GuildConfig> {
   const dbPatch: Parameters<typeof upsertGuildSettings>[1] = {
+    locale: patch.locale,
     timezone: patch.timezone,
     pairCategoryId: patch.pairCategoryId,
     horoscopeChannelId: patch.horoscopeChannelId,
@@ -225,26 +279,33 @@ export async function updateGuildConfig(guildId: string, patch: GuildConfigPatch
     // Keep legacy columns synchronized for compatibility with existing paths.
     duelPublicChannelId: patch.publicPostChannelId,
     questionsChannelId: patch.anonInboxChannelId,
-    moderatorRoleId: patch.anonModRoleId
+    moderatorRoleId: patch.anonModRoleId,
   };
 
   await upsertGuildSettings(guildId, dbPatch);
   invalidateGuildConfig(guildId);
 
   const next = await getGuildConfig(guildId);
-  logger.info({ feature: 'config', action: 'config.updated', guild_id: guildId }, 'Guild config updated');
+  logger.info(
+    { feature: 'config', action: 'config.updated', guild_id: guildId },
+    'Guild config updated',
+  );
   return next;
 }
 
-export async function setGuildFeature(guildId: string, feature: GuildFeatureName, enabled: boolean): Promise<GuildConfig> {
+export async function setGuildFeature(
+  guildId: string,
+  feature: GuildFeatureName,
+  enabled: boolean,
+): Promise<GuildConfig> {
   const config = await getGuildConfig(guildId);
   const nextFeatures: GuildFeatureMap = {
     ...config.features,
-    [feature]: enabled
+    [feature]: enabled,
   };
 
   await upsertGuildSettings(guildId, {
-    features: nextFeatures
+    features: nextFeatures,
   });
 
   invalidateGuildConfig(guildId);
@@ -256,7 +317,7 @@ export async function setGuildFeature(guildId: string, feature: GuildFeatureName
       action: 'feature.toggled',
       guild_id: guildId,
       feature_name: feature,
-      enabled
+      enabled,
     },
     'Guild feature toggled',
   );
@@ -264,21 +325,36 @@ export async function setGuildFeature(guildId: string, feature: GuildFeatureName
   return next;
 }
 
-export async function setGuildFeatures(guildId: string, patch: Partial<GuildFeatureMap>): Promise<GuildConfig> {
+export async function setGuildFeatures(
+  guildId: string,
+  patch: Partial<GuildFeatureMap>,
+): Promise<GuildConfig> {
   const config = await getGuildConfig(guildId);
   const nextFeatures: GuildFeatureMap = {
     ...config.features,
-    ...patch
+    ...patch,
   };
 
   await upsertGuildSettings(guildId, {
-    features: nextFeatures
+    features: nextFeatures,
   });
 
   invalidateGuildConfig(guildId);
   const next = await getGuildConfig(guildId);
-  logger.info({ feature: 'config', action: 'config.updated', guild_id: guildId }, 'Guild features updated');
+  logger.info(
+    { feature: 'config', action: 'config.updated', guild_id: guildId },
+    'Guild features updated',
+  );
   return next;
+}
+
+export async function setAllGuildFeatures(guildId: string, enabled: boolean): Promise<GuildConfig> {
+  const patch = guildFeatureNames.reduce((acc, feature) => {
+    acc[feature] = enabled;
+    return acc;
+  }, {} as GuildFeatureMap);
+
+  return setGuildFeatures(guildId, patch);
 }
 
 export function formatFeatureLabel(feature: GuildFeatureName): string {
