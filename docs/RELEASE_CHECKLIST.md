@@ -1,17 +1,20 @@
 # Release Checklist
 
 ## 0) Encoding guard (pre-commit / pre-push)
+
 - [ ] Use editor encoding `UTF-8` without BOM for migration files.
 - [ ] Optional hook command: `pnpm db:check-bom` (fail-fast) or `pnpm db:strip-bom` (auto-fix).
 - [ ] Keep `.editorconfig` as `charset = utf-8` (not `utf-8-bom`).
 
 ## 1) Pre-release
+
 - [ ] `pnpm install --frozen-lockfile`
 - [ ] `pnpm build`
 - [ ] `pnpm test`
 - [ ] `.env` contains all required runtime variables.
 
 Required variables:
+
 - `NODE_ENV=production`
 - `LOG_LEVEL=info`
 - `DATABASE_URL=<neon postgres url>`
@@ -25,6 +28,7 @@ Required variables:
 - `PHASE2_RAID_ENABLED=true`
 
 Optional but recommended:
+
 - `ALLOWED_GUILD_IDS=<guild_id_1,guild_id_2>`
 - `DISCORD_GUILD_ID=<single guild for fast command deploy>`
 - `SENTRY_DSN=<dsn>`
@@ -33,14 +37,17 @@ Optional but recommended:
 - `RAID_PROGRESS_EDIT_THROTTLE_SECONDS=15`
 
 ## 2) Database + seed
+
 - [ ] `pnpm db:migrate`
 - [ ] `pnpm seed`
 - [ ] `pnpm smoke`
 
 ## 3) Discord command deploy
-- [ ] `pnpm discord:deploy-commands`
+
+- [ ] `pnpm commands:deploy`
 
 ## 4) Start and verify runtime
+
 - [ ] `pnpm start`
 - [ ] `GET /healthz` returns `ok: true` and `db: "ok"`, `discord: "ready"`, `boss: "ok"`.
 - [ ] Logs show one startup self-check summary with:
@@ -51,6 +58,7 @@ Optional but recommended:
   - `schedules=[...]`
 
 ## 5) Final release gate
+
 - [ ] No unexpected startup errors in logs.
 - [ ] No repeated projection edit failures.
 - [ ] Manual smoke path from `docs/SMOKE_TEST.md` passed.

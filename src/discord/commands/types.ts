@@ -1,4 +1,5 @@
 import type { ChatInputCommandInteraction, Client } from 'discord.js';
+import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord.js';
 import type PgBoss from 'pg-boss';
 
 export type CommandContext = {
@@ -9,7 +10,7 @@ export type CommandContext = {
 export type CommandModule = {
   name: string;
   data: {
-    toJSON: () => unknown;
+    toJSON: () => RESTPostAPIApplicationCommandsJSONBody;
   };
   execute: (ctx: CommandContext, interaction: ChatInputCommandInteraction) => Promise<void>;
 };

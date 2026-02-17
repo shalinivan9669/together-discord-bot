@@ -3,42 +3,12 @@ import { MessageFlags } from 'discord.js';
 import { logger } from '../../lib/logger';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
-import { adminCommand } from './admin';
-import { anonCommand } from './anon';
-import { checkinCommand } from './checkin';
-import { dateCommand } from './date';
-import { duelCommand } from './duel';
-import { hallCommand } from './hall';
-import { horoscopeCommand } from './horoscope';
-import { pairCommand } from './pair';
-import { pingCommand } from './ping';
-import { raidCommand } from './raid';
-import { repairCommand } from './repair';
-import { sayCommand } from './say';
-import { seasonCommand } from './season';
-import { setupCommand } from './setup';
+import { commandDefinitions, commandModules } from '../commandDefinitions';
 import type { CommandContext, CommandModule } from './types';
-
-const commandModules: CommandModule[] = [
-  pingCommand,
-  adminCommand,
-  setupCommand,
-  pairCommand,
-  sayCommand,
-  repairCommand,
-  dateCommand,
-  duelCommand,
-  hallCommand,
-  horoscopeCommand,
-  checkinCommand,
-  anonCommand,
-  raidCommand,
-  seasonCommand
-];
 
 const commandMap = new Map<string, CommandModule>(commandModules.map((cmd) => [cmd.name, cmd]));
 
-export const commandPayloads = commandModules.map((cmd) => cmd.data.toJSON());
+export const commandPayloads = commandDefinitions;
 
 export async function handleChatInputCommand(
   ctx: CommandContext,
@@ -53,7 +23,7 @@ export async function handleChatInputCommand(
     action: 'invoke',
     correlationId,
     pairId: null,
-    jobId: null
+    jobId: null,
   });
 
   if (!command) {
@@ -75,7 +45,10 @@ export async function handleChatInputCommand(
     }
 
     if (!interaction.replied) {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Command failed. Please try again.' });
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Command failed. Please try again.',
+      });
     }
   }
 }

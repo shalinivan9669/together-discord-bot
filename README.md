@@ -15,7 +15,7 @@ Discord bot for pair rooms, horoscope, anon questions, raids, weekly check-ins, 
 ```bash
 pnpm install
 pnpm db:migrate
-pnpm discord:deploy-commands
+pnpm commands:deploy
 pnpm start
 ```
 
@@ -29,6 +29,7 @@ After bot is online:
 ## Required Discord Permissions
 
 Server level:
+
 - `View Channels`
 - `Send Messages`
 - `Embed Links`
@@ -36,6 +37,7 @@ Server level:
 - `Manage Channels` (required for `/pair create`)
 
 Configured category/channel level (pair category + target channels):
+
 - `View Channels`
 - `Send Messages`
 - `Embed Links`
@@ -51,9 +53,11 @@ Configured category/channel level (pair category + target channels):
 - `/setup start` - setup wizard
 
 Feature names:
+
 - `horoscope`, `anon`, `raid`, `checkin`, `hall`, `public_post`
 
 Schedule names:
+
 - `weekly.horoscope.publish`
 - `weekly.checkin.nudge`
 - `weekly.raid.start`
@@ -66,12 +70,15 @@ Schedule names:
 ## Minimal Env Variables
 
 Required:
+
 - `DATABASE_URL`
 - `DISCORD_TOKEN`
 - `DISCORD_APP_ID`
 
 Common optional:
+
 - `DISCORD_GUILD_ID` (for guild-scoped command deploy)
+- `COMMAND_DEPLOY_MODE` (`guild` or `global`; if omitted, deploy script uses guild mode when `DISCORD_GUILD_ID` exists)
 - `ALLOWED_GUILD_IDS`
 - `LOG_LEVEL`
 - `NODE_ENV`
@@ -79,3 +86,13 @@ Common optional:
 - `DEFAULT_TIMEZONE` (default: `Asia/Almaty`)
 
 Legacy phase flags still exist in env schema, but runtime feature control is now guild-config based through `/setup` and `/admin feature`.
+
+## Railway Start Command
+
+Set Railway Start Command to:
+
+```bash
+pnpm db:migrate && pnpm seed && pnpm commands:deploy && pnpm start
+```
+
+This keeps command registration deterministic on each redeploy. With `DISCORD_GUILD_ID` set, new slash command updates appear in that guild within seconds. Without it, deployment is global and Discord propagation can take up to about an hour.

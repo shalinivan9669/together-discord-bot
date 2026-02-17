@@ -22,7 +22,8 @@
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "discord:deploy-commands": "tsx scripts/deploy-commands.ts"
+    "commands:deploy": "tsx scripts/deploy-commands.ts",
+    "discord:deploy-commands": "pnpm commands:deploy"
   },
   "dependencies": {
     "@discordjs/rest": "2.6.0",
