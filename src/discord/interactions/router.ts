@@ -7,7 +7,7 @@ import type {
   StringSelectMenuInteraction
 } from 'discord.js';
 import { createHash } from 'node:crypto';
-import { PermissionFlagsBits } from 'discord.js';
+import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import type PgBoss from 'pg-boss';
 import { z } from 'zod';
 import { rememberOperation } from '../../infra/db/queries/dedupe';
@@ -200,19 +200,19 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'anon_queue' && decoded.action === 'page') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const settings = await getGuildSettings(interaction.guildId);
     if (!isAdminOrConfiguredModeratorForComponent(interaction, settings?.moderatorRoleId ?? null)) {
-      await interaction.reply({ ephemeral: true, content: 'Admin or configured moderator role is required.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Admin or configured moderator role is required.' });
       return;
     }
 
     const parsedPayload = anonQueuePayloadSchema.safeParse(decoded.payload);
     if (!parsedPayload.success) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed moderation queue payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed moderation queue payload.' });
       return;
     }
 
@@ -231,7 +231,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'duel_board' && decoded.action === 'rules') {
     duelBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content:
         'Rules: one submission per pair per active round. A moderator starts and closes rounds. ' +
         'Pair totals rank by points first and pair id as deterministic tiebreaker.',
@@ -242,7 +242,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'duel_board' && (decoded.action === 'participate' || decoded.action === 'how')) {
     duelBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content:
         'How to participate: join your pair room, wait for a round start message, press Submit answer, ' +
         'then complete the modal once before the timer ends.',
@@ -253,11 +253,11 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'duel_board' && decoded.action === 'my_contribution') {
     duelBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const contribution = await getDuelContributionForUser({
       guildId: interaction.guildId,
       userId: interaction.user.id
@@ -278,13 +278,13 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'duel_board' && decoded.action === 'open_room') {
     duelBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: pair ? `Your pair room: <#${pair.privateChannelId}>` : 'You do not have an active pair room yet.',
     });
     return;
@@ -293,7 +293,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'rules') {
     raidBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content:
         'Raid rules: claim one of today quests, then your partner confirms in the pair room. ' +
         'Daily pair cap applies automatically.',
@@ -304,7 +304,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'how') {
     raidBoardPayloadSchema.parse(decoded.payload);
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content:
         'How it works: open your pair room, pick one today quest, claim it, then ask your partner to confirm. ' +
         'Progress and contribution update automatically.',
@@ -315,13 +315,13 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'open_room') {
     raidBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: pair ? `Your pair room: <#${pair.privateChannelId}>` : 'You do not have an active pair room yet.',
     });
     return;
@@ -330,11 +330,11 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'take_quests') {
     raidBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const data = await getTodayRaidOffers(interaction.guildId);
     if (data.offers.length === 0) {
       await interaction.editReply('No raid offers found for today.');
@@ -355,11 +355,11 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'raid_board' && decoded.action === 'my_contribution') {
     raidBoardPayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const contribution = await getRaidContributionForUser({
       guildId: interaction.guildId,
       userId: interaction.user.id
@@ -379,7 +379,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'mediator' && decoded.action.startsWith('say_tone_')) {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
@@ -394,7 +394,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     });
 
     if (!session) {
-      await interaction.reply({ ephemeral: true, content: 'Session expired. Run `/say` again.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Session expired. Run `/say` again.' });
       return;
     }
 
@@ -412,7 +412,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'mediator' && decoded.action === 'say_send_pair') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
@@ -425,12 +425,12 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       sessionId: payload.s
     });
     if (!existingSession) {
-      await interaction.followUp({ ephemeral: true, content: 'Session expired. Run `/say` again.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Session expired. Run `/say` again.' });
       return;
     }
 
     if (!existingSession.pairId) {
-      await interaction.followUp({ ephemeral: true, content: 'No active pair room found for this account.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'No active pair room found for this account.' });
       await interaction.editReply({
         content: renderMediatorSayReply(existingSession),
         components: buildMediatorSayToneButtons({
@@ -445,7 +445,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     if (!pair || pair.id !== existingSession.pairId) {
-      await interaction.followUp({ ephemeral: true, content: 'Pair room is not available anymore.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Pair room is not available anymore.' });
       await interaction.editReply({
         content: renderMediatorSayReply(existingSession),
         components: buildMediatorSayToneButtons({
@@ -460,7 +460,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
     const pairChannel = await interaction.client.channels.fetch(pair.privateChannelId);
     if (!pairChannel?.isTextBased() || !('send' in pairChannel) || typeof pairChannel.send !== 'function') {
-      await interaction.followUp({ ephemeral: true, content: 'Pair room channel is not sendable.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Pair room channel is not sendable.' });
       await interaction.editReply({
         content: renderMediatorSayReply(existingSession),
         components: buildMediatorSayToneButtons({
@@ -481,7 +481,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
     const session = marked.session;
     if (!session) {
-      await interaction.followUp({ ephemeral: true, content: 'Session not found.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Session not found.' });
       return;
     }
 
@@ -489,9 +489,9 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       await pairChannel.send({
         content: `<@${interaction.user.id}> drafted this with /say:\n\n${getMediatorSaySelectedText(session)}`
       });
-      await interaction.followUp({ ephemeral: true, content: 'Sent to your pair room.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Sent to your pair room.' });
     } else {
-      await interaction.followUp({ ephemeral: true, content: 'Already sent to pair room earlier.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Already sent to pair room earlier.' });
     }
 
     await interaction.editReply({
@@ -509,7 +509,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'date' && decoded.action === 'generate_ideas') {
     const filters = parseDateFilters(decoded.payload);
     if (!filters) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed date generator payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed date generator payload.' });
       return;
     }
 
@@ -531,17 +531,17 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'date' && decoded.action === 'save_weekend') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const filters = parseDateFilters(decoded.payload);
     if (!filters) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed date save payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed date save payload.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     const ideas = buildDateIdeas(filters);
     const saved = await saveDateIdeasForWeekend({
@@ -563,7 +563,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'anon_qotd' && decoded.action === 'propose_question') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
@@ -574,12 +574,12 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'anon_qotd' && decoded.action === 'mascot_answer') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const payload = anonQuestionPayloadSchema.parse(decoded.payload);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const quota = await consumeDailyQuota({
       guildId: interaction.guildId,
@@ -611,11 +611,11 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'pair_home' && decoded.action === 'checkin') {
     const payload = pairHomePayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const pair = await getPairForCheckinChannel({
       guildId: interaction.guildId,
       channelId: interaction.channelId,
@@ -645,17 +645,17 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'pair_home' && decoded.action === 'raid') {
     const payload = pairHomePayloadSchema.parse(decoded.payload);
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     if (!pair || pair.id !== payload.p) {
-      await interaction.reply({ ephemeral: true, content: 'This panel action is only for your active pair.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'This panel action is only for your active pair.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const data = await getTodayRaidOffers(interaction.guildId);
     if (data.offers.length === 0) {
       await interaction.editReply('No raid offers found for today.');
@@ -677,12 +677,12 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     const payload = pairHomePayloadSchema.parse(decoded.payload);
     const snapshot = await getPairHomeSnapshot(payload.p);
     if (!snapshot) {
-      await interaction.reply({ ephemeral: true, content: 'Pair panel is not available.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Pair panel is not available.' });
       return;
     }
 
     if (snapshot.user1Id !== interaction.user.id && snapshot.user2Id !== interaction.user.id) {
-      await interaction.reply({ ephemeral: true, content: 'This panel action is only for pair members.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'This panel action is only for pair members.' });
       return;
     }
 
@@ -693,7 +693,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
         : `Round #${snapshot.duel.roundNo} is active${snapshot.duel.roundEndsAt
           ? ` and ends <t:${Math.floor(snapshot.duel.roundEndsAt.getTime() / 1000)}:R>`
           : ''}.`;
-    await interaction.reply({ ephemeral: true, content: text });
+    await interaction.reply({ flags: MessageFlags.Ephemeral, content: text });
     return;
   }
 
@@ -703,7 +703,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     const pairId = decoded.payload.pairId;
 
     if (!duelId || !roundId || !pairId) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed duel payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed duel payload.' });
       return;
     }
 
@@ -723,12 +723,12 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'horoscope' && decoded.action === 'claim_open') {
     const selection = parseHoroscopeSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed horoscope payload.' });
       return;
     }
 
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: 'Pick your mode and context, then press **Get privately**.',
       components: buildHoroscopeClaimPicker({
         guildId: selection.guildId,
@@ -742,13 +742,13 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'horoscope' && decoded.action === 'claim_submit') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const selection = parseHoroscopeSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope selection.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed horoscope selection.' });
       return;
     }
 
@@ -799,7 +799,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'horoscope' && decoded.action === 'about') {
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content:
         'Weekly horoscope is deterministic and built from seeded templates. ' +
         'No runtime LLM generation is used in production loops.',
@@ -809,7 +809,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'horoscope' && decoded.action === 'start_pair_ritual') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
@@ -826,7 +826,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     }
 
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: pair
         ? `Open your pair panel in <#${pair.privateChannelId}> and start the ritual there.`
         : 'Create a pair room first with `/pair create`, then start the ritual there.',
@@ -836,17 +836,17 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'checkin' && decoded.action === 'share_agreement') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const checkinId = decoded.payload.c;
     if (!checkinId) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed check-in payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed check-in payload.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const shared = await scheduleCheckinAgreementShare({
       guildId: interaction.guildId,
       checkinId,
@@ -872,20 +872,20 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'anon' && (decoded.action === 'approve' || decoded.action === 'reject')) {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const questionId = decoded.payload.q;
     if (!questionId) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed anon moderation payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed anon moderation payload.' });
       return;
     }
 
     await interaction.deferUpdate();
     const settings = await getGuildSettings(interaction.guildId);
     if (!isAdminOrConfiguredModeratorForComponent(interaction, settings?.moderatorRoleId ?? null)) {
-      await interaction.followUp({ ephemeral: true, content: 'Admin or configured moderator role is required.' });
+      await interaction.followUp({ flags: MessageFlags.Ephemeral, content: 'Admin or configured moderator role is required.' });
       return;
     }
 
@@ -927,24 +927,24 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       content: queue.content,
       components: queue.components as never
     });
-    await interaction.followUp({ ephemeral: true, content: feedback });
+    await interaction.followUp({ flags: MessageFlags.Ephemeral, content: feedback });
 
     return;
   }
 
   if (decoded.feature === 'raid' && decoded.action === 'claim') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const questKey = decoded.payload.q;
     if (!questKey) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed raid claim payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed raid claim payload.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const result = await claimRaidQuest({
       guildId: interaction.guildId,
@@ -975,17 +975,17 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
 
   if (decoded.feature === 'raid' && decoded.action === 'confirm') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const claimId = decoded.payload.c;
     if (!claimId) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed raid confirm payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed raid confirm payload.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const result = await confirmRaidClaim({
       guildId: interaction.guildId,
       claimId,
@@ -1017,7 +1017,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
-  await interaction.reply({ ephemeral: true, content: 'Unsupported action.' });
+  await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported action.' });
 }
 
 function parseCheckinScores(interaction: ModalSubmitInteraction): [number, number, number, number, number] {
@@ -1037,7 +1037,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
   if (decoded.feature === 'duel' && decoded.action === 'submit_modal') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
@@ -1046,11 +1046,11 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     const pairId = decoded.payload.pairId;
 
     if (!duelId || !roundId || !pairId) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed duel submission payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed duel submission payload.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const answer = interaction.fields.getTextInputValue('answer');
     const result = await duelSubmitUsecase({
@@ -1084,11 +1084,11 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
   if (decoded.feature === 'mediator' && decoded.action === 'say_submit') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const source = interaction.fields.getTextInputValue('source');
     const pair = await getPairForUser(interaction.guildId, interaction.user.id);
     const session = await createMediatorSaySession({
@@ -1112,11 +1112,11 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
   if (decoded.feature === 'anon' && decoded.action === 'ask_modal') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const question = interaction.fields.getTextInputValue('question').trim();
 
     const quota = await consumeDailyQuota({
@@ -1158,17 +1158,17 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
 
   if (decoded.feature === 'checkin' && decoded.action === 'submit_modal') {
     if (!interaction.guildId) {
-      await interaction.reply({ ephemeral: true, content: 'Guild-only action.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Guild-only action.' });
       return;
     }
 
     const agreementKey = decoded.payload.a;
     if (!agreementKey) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed check-in payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed check-in payload.' });
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (!interaction.channelId) {
       await interaction.editReply('Unable to resolve channel for check-in submission.');
       return;
@@ -1221,7 +1221,7 @@ async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInte
     return;
   }
 
-  await interaction.reply({ ephemeral: true, content: 'Unsupported modal action.' });
+  await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported modal action.' });
 }
 
 async function handleSelect(
@@ -1231,11 +1231,6 @@ async function handleSelect(
   const decoded = decodeCustomId(interaction.customId);
 
   if (decoded.feature === 'setup_wizard') {
-    if (!interaction.isChannelSelectMenu() && !interaction.isRoleSelectMenu()) {
-      await interaction.reply({ ephemeral: true, content: 'Unsupported setup wizard selector.' });
-      return;
-    }
-
     const handled = await handleSetupWizardComponent(ctx, interaction, decoded);
     if (handled) {
       return;
@@ -1244,14 +1239,14 @@ async function handleSelect(
 
   if (decoded.feature === 'checkin' && decoded.action === 'agreement_select') {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ ephemeral: true, content: 'Unsupported check-in selector.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported check-in selector.' });
       return;
     }
 
     const agreementKey = interaction.values[0];
 
     if (!interaction.guildId || !agreementKey) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed check-in selection payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed check-in selection payload.' });
       return;
     }
 
@@ -1262,19 +1257,19 @@ async function handleSelect(
 
   if (decoded.feature === 'horoscope' && (decoded.action === 'pick_mode' || decoded.action === 'pick_context')) {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ ephemeral: true, content: 'Unsupported horoscope selector.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported horoscope selector.' });
       return;
     }
 
     const selection = parseHoroscopeSelection(decoded.payload);
     if (!selection) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed horoscope selection payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed horoscope selection payload.' });
       return;
     }
 
     const selected = interaction.values[0];
     if (!selected) {
-      await interaction.reply({ ephemeral: true, content: 'No selection value.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'No selection value.' });
       return;
     }
 
@@ -1286,7 +1281,7 @@ async function handleSelect(
       : selection.context;
 
     if (!nextMode || !nextContext) {
-      await interaction.reply({ ephemeral: true, content: 'Invalid horoscope selection option.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid horoscope selection option.' });
       return;
     }
 
@@ -1307,19 +1302,19 @@ async function handleSelect(
     && (decoded.action === 'pick_energy' || decoded.action === 'pick_budget' || decoded.action === 'pick_time')
   ) {
     if (!interaction.isStringSelectMenu()) {
-      await interaction.reply({ ephemeral: true, content: 'Unsupported date selector.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported date selector.' });
       return;
     }
 
     const current = parseDateFilters(decoded.payload);
     if (!current) {
-      await interaction.reply({ ephemeral: true, content: 'Malformed date selector payload.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Malformed date selector payload.' });
       return;
     }
 
     const selected = interaction.values[0];
     if (!selected) {
-      await interaction.reply({ ephemeral: true, content: 'No selection value.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'No selection value.' });
       return;
     }
 
@@ -1332,7 +1327,7 @@ async function handleSelect(
     if (decoded.action === 'pick_energy') {
       const parsed = parseDateEnergy(selected);
       if (!parsed) {
-        await interaction.reply({ ephemeral: true, content: 'Invalid energy option.' });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid energy option.' });
         return;
       }
       next.energy = parsed;
@@ -1341,7 +1336,7 @@ async function handleSelect(
     if (decoded.action === 'pick_budget') {
       const parsed = parseDateBudget(selected);
       if (!parsed) {
-        await interaction.reply({ ephemeral: true, content: 'Invalid budget option.' });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid budget option.' });
         return;
       }
       next.budget = parsed;
@@ -1350,7 +1345,7 @@ async function handleSelect(
     if (decoded.action === 'pick_time') {
       const parsed = parseDateTimeWindow(selected);
       if (!parsed) {
-        await interaction.reply({ ephemeral: true, content: 'Invalid time option.' });
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Invalid time option.' });
         return;
       }
       next.timeWindow = parsed;
@@ -1366,7 +1361,7 @@ async function handleSelect(
     return;
   }
 
-  await interaction.reply({ ephemeral: true, content: 'Unsupported select action.' });
+  await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unsupported select action.' });
 }
 
 export async function routeInteractionComponent(
@@ -1401,7 +1396,8 @@ export async function routeInteractionComponent(
     }
 
     if (!interaction.replied) {
-      await interaction.reply({ ephemeral: true, content: 'Interaction failed. Please try again.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Interaction failed. Please try again.' });
     }
   }
 }
+

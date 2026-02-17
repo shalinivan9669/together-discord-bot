@@ -1,7 +1,6 @@
 import type PgBoss from 'pg-boss';
-import type { FeatureFlagKey } from '../../config/featureFlags';
-import { isFeatureEnabled } from '../../config/featureFlags';
 import { logger } from '../../lib/logger';
+import { listSchedulerSettings, upsertSchedulerSetting } from '../db/queries/schedulerSettings';
 import { type JobName, JobNames } from './jobs';
 
 function schedulerPayload(feature: string, action: string) {
@@ -13,12 +12,11 @@ function schedulerPayload(feature: string, action: string) {
   };
 }
 
-type RecurringScheduleDefinition = {
+export type RecurringScheduleDefinition = {
   name: JobName;
   cron: string;
   payloadFeature: string;
   payloadAction: string;
-  featureFlag?: FeatureFlagKey;
 };
 
 export type RecurringScheduleStatus = {
@@ -32,43 +30,37 @@ const recurringScheduleDefinitions: readonly RecurringScheduleDefinition[] = [
     name: JobNames.WeeklyHoroscopePublish,
     cron: '0 10 * * 1',
     payloadFeature: 'horoscope',
-    payloadAction: 'weekly_publish',
-    featureFlag: 'horoscope'
+    payloadAction: 'weekly_publish'
   },
   {
     name: JobNames.WeeklyCheckinNudge,
     cron: '0 12 * * 3',
     payloadFeature: 'checkin',
-    payloadAction: 'weekly_nudge',
-    featureFlag: 'checkin'
+    payloadAction: 'weekly_nudge'
   },
   {
     name: JobNames.WeeklyRaidStart,
     cron: '0 9 * * 1',
     payloadFeature: 'raid',
-    payloadAction: 'weekly_start',
-    featureFlag: 'raid'
+    payloadAction: 'weekly_start'
   },
   {
     name: JobNames.WeeklyRaidEnd,
     cron: '5 9 * * 1',
     payloadFeature: 'raid',
-    payloadAction: 'weekly_end',
-    featureFlag: 'raid'
+    payloadAction: 'weekly_end'
   },
   {
     name: JobNames.DailyRaidOffersGenerate,
     cron: '0 9 * * *',
     payloadFeature: 'raid',
-    payloadAction: 'daily_offers_generate',
-    featureFlag: 'raid'
+    payloadAction: 'daily_offers_generate'
   },
   {
     name: JobNames.RaidProgressRefresh,
     cron: '*/10 * * * *',
     payloadFeature: 'raid',
-    payloadAction: 'progress_refresh',
-    featureFlag: 'raid'
+    payloadAction: 'progress_refresh'
   },
   {
     name: JobNames.MonthlyHallRefresh,
@@ -84,47 +76,72 @@ const recurringScheduleDefinitions: readonly RecurringScheduleDefinition[] = [
   }
 ] as const;
 
-function isScheduleEnabled(definition: RecurringScheduleDefinition): boolean {
-  return definition.featureFlag ? isFeatureEnabled(definition.featureFlag) : true;
+function definitionByName(name: JobName): RecurringScheduleDefinition {
+  const definition = recurringScheduleDefinitions.find((item) => item.name === name);
+  if (!definition) {
+    throw new Error(`Unknown schedule: ${name}`);
+  }
+
+  return definition;
 }
 
-export function listRecurringScheduleStatus(): RecurringScheduleStatus[] {
+export function listRecurringScheduleDefinitions(): readonly RecurringScheduleDefinition[] {
+  return recurringScheduleDefinitions;
+}
+
+export async function listRecurringScheduleStatus(): Promise<RecurringScheduleStatus[]> {
+  const rows = await listSchedulerSettings();
+  const rowMap = new Map(rows.map((row) => [row.scheduleName, row.enabled]));
+
   return recurringScheduleDefinitions.map((definition) => ({
     name: definition.name,
     cron: definition.cron,
-    enabled: isScheduleEnabled(definition)
+    enabled: rowMap.get(definition.name) ?? true
   }));
 }
 
+async function applyScheduleState(
+  boss: PgBoss,
+  definition: RecurringScheduleDefinition,
+  enabled: boolean,
+): Promise<void> {
+  if (enabled) {
+    await boss.schedule(
+      definition.name,
+      definition.cron,
+      schedulerPayload(definition.payloadFeature, definition.payloadAction),
+    );
+    return;
+  }
+
+  try {
+    await boss.unschedule(definition.name);
+  } catch (error) {
+    logger.debug(
+      {
+        feature: 'queue.scheduler',
+        schedule: definition.name,
+        error
+      },
+      'Unable to unschedule disabled recurring job',
+    );
+  }
+}
+
 export async function configureRecurringSchedules(boss: PgBoss): Promise<RecurringScheduleStatus[]> {
-  const statuses = listRecurringScheduleStatus();
+  const statuses = await listRecurringScheduleStatus();
   const enabledNames: string[] = [];
   const disabledNames: string[] = [];
 
-  for (const definition of recurringScheduleDefinitions) {
-    if (isScheduleEnabled(definition)) {
-      await boss.schedule(
-        definition.name,
-        definition.cron,
-        schedulerPayload(definition.payloadFeature, definition.payloadAction),
-      );
-      enabledNames.push(definition.name);
-      continue;
-    }
+  for (const status of statuses) {
+    const definition = definitionByName(status.name);
+    await applyScheduleState(boss, definition, status.enabled);
 
-    try {
-      await boss.unschedule(definition.name);
-    } catch (error) {
-      logger.debug(
-        {
-          feature: 'queue.scheduler',
-          schedule: definition.name,
-          error
-        },
-        'Unable to unschedule disabled recurring job',
-      );
+    if (status.enabled) {
+      enabledNames.push(status.name);
+    } else {
+      disabledNames.push(status.name);
     }
-    disabledNames.push(definition.name);
   }
 
   logger.info(
@@ -137,4 +154,30 @@ export async function configureRecurringSchedules(boss: PgBoss): Promise<Recurri
   );
 
   return statuses;
+}
+
+export async function setRecurringScheduleEnabled(
+  boss: PgBoss,
+  scheduleName: JobName,
+  enabled: boolean,
+): Promise<RecurringScheduleStatus> {
+  const definition = definitionByName(scheduleName);
+  await upsertSchedulerSetting(scheduleName, enabled);
+  await applyScheduleState(boss, definition, enabled);
+
+  logger.info(
+    {
+      feature: 'queue.scheduler',
+      action: 'schedule.toggled',
+      schedule_name: scheduleName,
+      enabled
+    },
+    'Recurring schedule toggled',
+  );
+
+  return {
+    name: scheduleName,
+    cron: definition.cron,
+    enabled
+  };
 }

@@ -1,10 +1,11 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import {
   getMonthlyHallOptInStatus,
   MONTHLY_HALL_CATEGORIES,
   setMonthlyHallOptIn,
   type MonthlyHallCategory,
 } from '../../app/services/monthlyHallService';
+import { getGuildFeatureState } from '../../app/services/guildConfigService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
 import { assertGuildOnly } from '../middleware/guard';
@@ -83,7 +84,18 @@ export const hallCommand: CommandModule = {
     .addSubcommand((sub) => sub.setName('status').setDescription('Show your Monthly Hall opt-in status')),
   async execute(_ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const featureState = await getGuildFeatureState(interaction.guildId, 'hall');
+    if (!featureState.enabled) {
+      await interaction.editReply('Hall feature is disabled.');
+      return;
+    }
+
+    if (!featureState.configured) {
+      await interaction.editReply('Hall feature is enabled, but not configured. Run `/setup start` first.');
+      return;
+    }
 
     const correlationId = createCorrelationId();
     const subcommand = interaction.options.getSubcommand();

@@ -3,13 +3,16 @@
 Production-focused Discord bot for relationship server engagement loops.
 
 ## Scope
-- Phase 1 (enabled and working): boot/runtime, `/healthz`, command deploy script, `/setup`, pair private text channels, duel rounds with modal submissions, single editable scoreboard.
-- Phase 2 (implemented, default OFF by flags where applicable): weekly horoscope loop, weekly check-in, anonymous moderation queue + QoTD UX, rewards helper, raid cooperative loop, seasons basic status, mediator `/say` + `/repair`, date generator `/date`.
+- Runtime: Discord gateway, `/healthz`, queue workers, scheduled jobs.
+- Core: pair private rooms, duel rounds/scoreboard, mediator, date ideas.
+- Activities: weekly horoscope, weekly check-in nudges, anon moderation queue, raids.
+- Projections: monthly hall card, scheduled public post publishing.
+- Ops: `/setup start` wizard and `/admin` diagnostics/toggles.
 
 ## Stack
 - Node.js 20+, TypeScript
 - discord.js v14 (Gateway + Interactions)
-- Neon Postgres + Drizzle ORM
+- Postgres + Drizzle ORM
 - pg-boss queue/scheduler
 - Fastify `/healthz`
 - Pino logs, optional Sentry
@@ -20,7 +23,8 @@ Production-focused Discord bot for relationship server engagement loops.
 - Seed content: `scripts/seed.ts`
 
 ## Key principles
-- Postgres is source of truth; Discord is projection.
-- Interactions ACK immediately.
-- Public scoreboard/progress are single messages edited via throttled pipeline.
-- Idempotency via unique constraints + dedupe keys + advisory locks.
+- Postgres is source of truth; Discord is a projection layer.
+- Interactions are ACKed quickly.
+- Feature toggles and guild config are DB-driven (multi-guild safe).
+- Recurring schedules are DB-driven (`scheduler_settings`) and toggleable at runtime.
+- Admin status includes explicit permission diagnostics.

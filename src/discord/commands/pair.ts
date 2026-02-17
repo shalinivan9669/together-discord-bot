@@ -1,10 +1,11 @@
-import { ChannelType, SlashCommandBuilder } from 'discord.js';
+import { ChannelType, DiscordAPIError, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { requestPairHomeRefresh } from '../../app/projections/pairHomeProjection';
 import { pairCreateUsecase, pairRoomUsecase } from '../../app/usecases/pairUsecases';
-import { getGuildSettings } from '../../infra/db/queries/guildSettings';
+import { getGuildConfig } from '../../app/services/guildConfigService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
+import { describePairCreatePermissionIssue } from '../permissions/check';
 import { buildPairRoomOverwrites } from '../permissions/overwrites';
 import type { CommandModule } from './types';
 
@@ -32,40 +33,62 @@ export const pairCommand: CommandModule = {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === 'create') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const targetUser = interaction.options.getUser('user', true);
-      const settings = await getGuildSettings(interaction.guildId);
-      assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
+      const config = await getGuildConfig(interaction.guildId);
+      assertAdminOrConfiguredModerator(interaction, config.anonModRoleId);
 
       const botUserId = interaction.client.user?.id;
       if (!botUserId) {
         throw new Error('Bot user not available');
       }
 
-      const result = await pairCreateUsecase({
-        guildId: interaction.guildId,
-        userA: interaction.user.id,
-        userB: targetUser.id,
-        createPrivateChannel: async ([userLow, userHigh]) => {
-          const lowMember = await interaction.guild.members.fetch(userLow);
-          const highMember = await interaction.guild.members.fetch(userHigh);
-
-          const channel = await interaction.guild.channels.create({
-            name: roomName(lowMember.displayName, highMember.displayName),
-            type: ChannelType.GuildText,
-            permissionOverwrites: buildPairRoomOverwrites({
-              guildId: interaction.guildId,
-              botUserId,
-              memberIds: [userLow, userHigh],
-              moderatorRoleId: settings?.moderatorRoleId ?? null
-            }),
-            reason: `Pair room for ${userLow} and ${userHigh}`
-          });
-
-          return channel.id;
-        }
+      const permissionIssue = await describePairCreatePermissionIssue({
+        guild: interaction.guild,
+        pairCategoryId: config.pairCategoryId
       });
+      if (permissionIssue) {
+        await interaction.editReply(`${permissionIssue} Ask a server admin to grant the missing permission and retry.`);
+        return;
+      }
+
+      let result: Awaited<ReturnType<typeof pairCreateUsecase>>;
+      try {
+        result = await pairCreateUsecase({
+          guildId: interaction.guildId,
+          userA: interaction.user.id,
+          userB: targetUser.id,
+          createPrivateChannel: async ([userLow, userHigh]) => {
+            const lowMember = await interaction.guild.members.fetch(userLow);
+            const highMember = await interaction.guild.members.fetch(userHigh);
+
+            const channel = await interaction.guild.channels.create({
+              name: roomName(lowMember.displayName, highMember.displayName),
+              type: ChannelType.GuildText,
+              parent: config.pairCategoryId ?? undefined,
+              permissionOverwrites: buildPairRoomOverwrites({
+                guildId: interaction.guildId,
+                botUserId,
+                memberIds: [userLow, userHigh],
+                moderatorRoleId: config.anonModRoleId
+              }),
+              reason: `Pair room for ${userLow} and ${userHigh}`
+            });
+
+            return channel.id;
+          }
+        });
+      } catch (error) {
+        if (error instanceof DiscordAPIError && error.code === 50013) {
+          await interaction.editReply(
+            'Cannot create pair room: Missing Manage Channels permission in the selected category or server.',
+          );
+          return;
+        }
+
+        throw error;
+      }
 
       logInteraction({
         interaction,
@@ -92,7 +115,7 @@ export const pairCommand: CommandModule = {
     }
 
     if (subcommand === 'room') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const pair = await pairRoomUsecase(interaction.guildId, interaction.user.id);
       logInteraction({
@@ -112,6 +135,6 @@ export const pairCommand: CommandModule = {
       return;
     }
 
-    await interaction.reply({ ephemeral: true, content: 'Unknown pair subcommand.' });
+    await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unknown pair subcommand.' });
   }
 };

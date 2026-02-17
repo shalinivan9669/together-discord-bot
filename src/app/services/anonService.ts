@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { and, desc, eq, gte, isNotNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { ANON_DAILY_PENDING_LIMIT, ANON_MAX_LENGTH } from '../../config/constants';
-import { isFeatureEnabled } from '../../config/featureFlags';
 import { db } from '../../infra/db/drizzle';
-import { anonQuestions, guildSettings } from '../../infra/db/schema';
+import { anonQuestions } from '../../infra/db/schema';
+import { assertGuildFeatureEnabled, getGuildConfig } from './guildConfigService';
 import { createScheduledPost } from './publicPostService';
 
 const mascotAnswerTemplates = {
@@ -45,10 +45,8 @@ function detectMascotBucket(text: string): MascotBucket {
   return 'connection';
 }
 
-export function ensureAnonEnabled(): void {
-  if (!isFeatureEnabled('anon')) {
-    throw new Error('Anonymous questions feature is disabled');
-  }
+export async function ensureAnonEnabled(guildId: string): Promise<void> {
+  await assertGuildFeatureEnabled(guildId, 'anon');
 }
 
 export async function createAnonQuestion(input: {
@@ -57,7 +55,7 @@ export async function createAnonQuestion(input: {
   questionText: string;
   now?: Date;
 }) {
-  ensureAnonEnabled();
+  await ensureAnonEnabled(input.guildId);
 
   const normalized = input.questionText.trim();
   if (normalized.length < 2 || normalized.length > ANON_MAX_LENGTH) {
@@ -159,7 +157,7 @@ export async function buildAnonMascotAnswer(input: {
   guildId: string;
   questionId: string;
 }) {
-  ensureAnonEnabled();
+  await ensureAnonEnabled(input.guildId);
 
   const row = await getAnonQuestionById(input.guildId, input.questionId);
   if (!row) {
@@ -185,7 +183,7 @@ export async function rejectAnonQuestion(input: {
   questionId: string;
   moderatorUserId: string;
 }) {
-  ensureAnonEnabled();
+  await ensureAnonEnabled(input.guildId);
 
   const updated = await db
     .update(anonQuestions)
@@ -211,17 +209,10 @@ export async function approveAnonQuestion(input: {
   questionId: string;
   moderatorUserId: string;
 }) {
-  ensureAnonEnabled();
-
-  const settingsRows = await db
-    .select({
-      questionsChannelId: guildSettings.questionsChannelId
-    })
-    .from(guildSettings)
-    .where(and(eq(guildSettings.guildId, input.guildId), isNotNull(guildSettings.questionsChannelId)))
-    .limit(1);
-  const questionsChannelId = settingsRows[0]?.questionsChannelId;
-  if (!questionsChannelId) {
+  await ensureAnonEnabled(input.guildId);
+  const config = await getGuildConfig(input.guildId);
+  const inboxChannelId = config.anonInboxChannelId;
+  if (!inboxChannelId) {
     throw new Error('Questions channel is not configured');
   }
 
@@ -259,7 +250,7 @@ export async function approveAnonQuestion(input: {
   const scheduled = await createScheduledPost({
     guildId: input.guildId,
     type: 'anon_question',
-    targetChannelId: questionsChannelId,
+    targetChannelId: inboxChannelId,
     payloadJson: {
       questionId: row.id,
       questionText: row.questionText,

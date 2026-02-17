@@ -1,9 +1,7 @@
 import { and, eq } from 'drizzle-orm';
-import { isFeatureEnabled } from '../../config/featureFlags';
 import { getRaidProgressSnapshot } from '../../app/services/raidService';
 import { db } from '../../infra/db/drizzle';
 import { raids } from '../../infra/db/schema';
-import { logger } from '../../lib/logger';
 import type { ThrottledMessageEditor } from './messageEditor';
 import { renderRaidProgress } from './raidProgressRenderer';
 import { COMPONENTS_V2_FLAGS } from '../ui-v2';
@@ -28,11 +26,6 @@ export async function refreshRaidProgressProjection(
   messageEditor: ThrottledMessageEditor,
   raidId?: string,
 ): Promise<void> {
-  if (!isFeatureEnabled('raid')) {
-    logger.debug({ feature: 'raid' }, 'Raid projection skipped because feature is disabled');
-    return;
-  }
-
   if (raidId) {
     await refreshOneRaid(raidId, messageEditor);
     return;

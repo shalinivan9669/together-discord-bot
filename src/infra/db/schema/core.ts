@@ -14,13 +14,24 @@ import {
 export const guildSettings = pgTable('guild_settings', {
   guildId: varchar('guild_id', { length: 32 }).primaryKey(),
   timezone: varchar('timezone', { length: 64 }).notNull().default('Asia/Almaty'),
+  pairCategoryId: varchar('pair_category_id', { length: 32 }),
   horoscopeChannelId: varchar('horoscope_channel_id', { length: 32 }),
+  publicPostChannelId: varchar('public_post_channel_id', { length: 32 }),
+  anonInboxChannelId: varchar('anon_inbox_channel_id', { length: 32 }),
+  anonModRoleId: varchar('anon_mod_role_id', { length: 32 }),
+  features: jsonb('features').$type<Record<string, boolean>>().notNull().default({}),
   questionsChannelId: varchar('questions_channel_id', { length: 32 }),
   raidChannelId: varchar('raid_channel_id', { length: 32 }),
   duelPublicChannelId: varchar('duel_public_channel_id', { length: 32 }),
   hallChannelId: varchar('hall_channel_id', { length: 32 }),
   moderatorRoleId: varchar('moderator_role_id', { length: 32 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+export const schedulerSettings = pgTable('scheduler_settings', {
+  scheduleName: varchar('schedule_name', { length: 128 }).primaryKey(),
+  enabled: boolean('enabled').notNull().default(true),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
 

@@ -16,8 +16,16 @@ function channelLine(label: string, channelId: string | null): string {
   return `${label}: ${channelId ? `<#${channelId}>` : '_not set_'}`;
 }
 
+function categoryLine(categoryId: string | null): string {
+  return `Pair rooms category: ${categoryId ? `<#${categoryId}>` : '_not set_'}`;
+}
+
 function roleLine(roleId: string | null): string {
-  return `Moderator role: ${roleId ? `<@&${roleId}>` : '_not set_'}`;
+  return `Anon moderator role: ${roleId ? `<@&${roleId}>` : '_not set_'}`;
+}
+
+function timezoneLine(timezone: string): string {
+  return `Timezone: \`${timezone}\``;
 }
 
 function setupCustomId(action: string): string {
@@ -41,16 +49,62 @@ function channelSelect(action: string, placeholder: string) {
   ]);
 }
 
+function categorySelect(action: string, placeholder: string) {
+  return actionRowSelects([
+    {
+      type: ComponentType.ChannelSelect,
+      custom_id: setupCustomId(action),
+      placeholder,
+      min_values: 0,
+      max_values: 1,
+      channel_types: [ChannelType.GuildCategory]
+    }
+  ]);
+}
+
+function timezoneSelect(current: string) {
+  const options = [
+    'Asia/Almaty',
+    'UTC',
+    'Europe/Moscow',
+    'Europe/Berlin',
+    'Asia/Dubai',
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles'
+  ];
+
+  return actionRowSelects([
+    {
+      type: ComponentType.StringSelect,
+      custom_id: setupCustomId('pick_timezone'),
+      placeholder: 'Select timezone',
+      min_values: 1,
+      max_values: 1,
+      options: options.map((timezone) => ({
+        label: timezone,
+        value: timezone,
+        default: timezone === current
+      }))
+    }
+  ]);
+}
+
 export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Message {
   const summary = [
-    'Pick channels and role below, then press Save.',
+    'Step 1: select pair category and channels.',
+    'Step 2: select optional anon moderator role and timezone.',
+    'Step 3: press Complete setup.',
     '',
-    channelLine('Duel scoreboard', draft.duelPublicChannelId),
+    categoryLine(draft.pairCategoryId),
     channelLine('Weekly horoscope', draft.horoscopeChannelId),
-    channelLine('Questions inbox', draft.questionsChannelId),
     channelLine('Raid progress', draft.raidChannelId),
     channelLine('Monthly hall', draft.hallChannelId),
-    roleLine(draft.moderatorRoleId),
+    channelLine('Public posts', draft.publicPostChannelId),
+    channelLine('Anon inbox', draft.anonInboxChannelId),
+    roleLine(draft.anonModRoleId),
+    timezoneLine(draft.timezone),
   ].join('\n');
 
   return {
@@ -61,11 +115,12 @@ export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Mes
         accentColor: 0x3d5a80,
         components: [
           textBlock(summary),
-          channelSelect('pick_duel_channel', 'Select duel scoreboard channel'),
+          categorySelect('pick_pair_category', 'Select pair rooms category'),
           channelSelect('pick_horoscope_channel', 'Select weekly horoscope channel'),
-          channelSelect('pick_questions_channel', 'Select questions channel'),
           channelSelect('pick_raid_channel', 'Select raid progress channel'),
           channelSelect('pick_hall_channel', 'Select monthly hall channel'),
+          channelSelect('pick_public_post_channel', 'Select public post channel'),
+          channelSelect('pick_anon_inbox_channel', 'Select anon inbox channel'),
           actionRowSelects([
             {
               type: ComponentType.RoleSelect,
@@ -75,12 +130,13 @@ export function renderSetupWizardPanel(draft: SetupWizardDraft): ComponentsV2Mes
               max_values: 1,
             }
           ]),
+          timezoneSelect(draft.timezone),
           actionRowButtons([
             {
               type: ComponentType.Button,
               style: ButtonStyle.Success,
-              custom_id: setupCustomId('save'),
-              label: 'Save'
+              custom_id: setupCustomId('complete'),
+              label: 'Complete Setup'
             },
             {
               type: ComponentType.Button,

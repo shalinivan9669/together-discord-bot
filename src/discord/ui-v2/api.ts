@@ -35,6 +35,7 @@ export enum SeparatorSpacingSize {
 }
 
 export enum ChannelType {
+  GuildCategory = 4,
   GuildText = 0,
   GuildAnnouncement = 5,
 }
@@ -66,7 +67,24 @@ export type APIRoleSelectComponent = {
   disabled?: boolean;
 };
 
-export type APISelectMenuComponent = APIChannelSelectComponent | APIRoleSelectComponent;
+export type APIStringSelectOption = {
+  label: string;
+  value: string;
+  description?: string;
+  default?: boolean;
+};
+
+export type APIStringSelectComponent = {
+  type: ComponentType.StringSelect;
+  custom_id: string;
+  placeholder?: string;
+  min_values?: number;
+  max_values?: number;
+  disabled?: boolean;
+  options: APIStringSelectOption[];
+};
+
+export type APISelectMenuComponent = APIChannelSelectComponent | APIRoleSelectComponent | APIStringSelectComponent;
 
 export type APIActionRowComponent<TComponent> = {
   type: ComponentType.ActionRow;

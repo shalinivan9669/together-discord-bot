@@ -164,6 +164,19 @@ export async function refreshMonthlyHallProjection(input: {
 
   for (const guild of configuredGuilds) {
     try {
+      if (guild.hallFeatureEnabled === false) {
+        logger.info(
+          {
+            feature: 'monthly_hall',
+            action: 'refresh_skipped',
+            guild_id: guild.guildId,
+            reason: 'hall feature disabled'
+          },
+          'skipped: missing channel config',
+        );
+        continue;
+      }
+
       const result = await refreshOneGuild({
         guildId: guild.guildId,
         hallChannelId: guild.hallChannelId,

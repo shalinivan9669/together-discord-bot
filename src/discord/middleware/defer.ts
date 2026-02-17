@@ -4,6 +4,7 @@ import type {
   ModalSubmitInteraction,
   StringSelectMenuInteraction
 } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 
 export async function deferEphemeral(
   interaction:
@@ -17,9 +18,9 @@ export async function deferEphemeral(
   }
 
   if (interaction.isMessageComponent()) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 }

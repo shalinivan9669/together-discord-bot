@@ -1,4 +1,5 @@
 import {
+  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 import { ensureAnonEnabled } from '../../app/services/anonService';
@@ -23,10 +24,10 @@ export const anonCommand: CommandModule = {
     const correlationId = createCorrelationId();
 
     try {
-      ensureAnonEnabled();
+      await ensureAnonEnabled(interaction.guildId);
     } catch (error) {
       await interaction.reply({
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
         content: error instanceof Error ? error.message : 'Anonymous questions are disabled.'
       });
       return;
@@ -48,7 +49,7 @@ export const anonCommand: CommandModule = {
 
     const settings = await getGuildSettings(interaction.guildId);
     assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const queue = await buildAnonQueueView(interaction.guildId, 0, 3);
 

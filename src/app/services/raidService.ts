@@ -6,10 +6,10 @@ import {
   RAID_DAILY_PAIR_CAP_POINTS,
   RAID_DEFAULT_GOAL_POINTS,
 } from '../../config/constants';
-import { isFeatureEnabled } from '../../config/featureFlags';
 import { requestRaidProgressRefresh } from '../projections/raidProjection';
 import { requestPairHomeRefresh } from '../projections/pairHomeProjection';
 import { addDays, dateOnly, startOfWeekIso } from '../../lib/time';
+import { logger } from '../../lib/logger';
 import { db } from '../../infra/db/drizzle';
 import {
   guildSettings,
@@ -21,12 +21,11 @@ import {
   raids,
 } from '../../infra/db/schema';
 import { getPairForUser } from '../../infra/db/queries/pairs';
+import { assertGuildFeatureEnabled, getGuildFeatureState } from './guildConfigService';
 import { awardPairReward } from './rewardsService';
 
-export function ensureRaidEnabled(): void {
-  if (!isFeatureEnabled('raid')) {
-    throw new Error('Raid feature is disabled');
-  }
+export async function ensureRaidEnabled(guildId: string): Promise<void> {
+  await assertGuildFeatureEnabled(guildId, 'raid');
 }
 
 function hashNumber(input: string): number {
@@ -142,7 +141,6 @@ async function ensureDailyOffersForRaid(raidId: string, dayDate: string): Promis
 }
 
 export async function generateDailyRaidOffers(now: Date = new Date()): Promise<number> {
-  ensureRaidEnabled();
   const day = dateOnly(now);
 
   const activeRaids = await db
@@ -153,6 +151,21 @@ export async function generateDailyRaidOffers(now: Date = new Date()): Promise<n
   let generated = 0;
 
   for (const raid of activeRaids) {
+    const state = await getGuildFeatureState(raid.guildId, 'raid');
+    if (!state.enabled || !state.configured) {
+      logger.info(
+        {
+          feature: 'raid',
+          action: 'daily_offers_skipped',
+          guild_id: raid.guildId,
+          raid_id: raid.id,
+          reason: state.reason
+        },
+        'skipped: missing channel config',
+      );
+      continue;
+    }
+
     const beforeRows = await db
       .select({ id: raidDailyOffers.id })
       .from(raidDailyOffers)
@@ -180,7 +193,7 @@ export async function startRaid(input: {
   userId?: string;
   now?: Date;
 }) {
-  ensureRaidEnabled();
+  await ensureRaidEnabled(input.guildId);
 
   const now = input.now ?? new Date();
   const weekStartDate = weekStartDateUtc(now);
@@ -288,7 +301,6 @@ export async function startWeeklyRaidsForConfiguredGuilds(input: {
   correlationId: string;
   now?: Date;
 }) {
-  ensureRaidEnabled();
   const now = input.now ?? new Date();
 
   const guildRows = await db
@@ -302,6 +314,20 @@ export async function startWeeklyRaidsForConfiguredGuilds(input: {
   let created = 0;
 
   for (const guild of guildRows) {
+    const state = await getGuildFeatureState(guild.guildId, 'raid');
+    if (!state.enabled || !state.configured) {
+      logger.info(
+        {
+          feature: 'raid',
+          action: 'weekly_start_skipped',
+          guild_id: guild.guildId,
+          reason: state.reason
+        },
+        'skipped: missing channel config',
+      );
+      continue;
+    }
+
     const channelId = guild.raidChannelId;
     if (!channelId) {
       continue;
@@ -337,8 +363,6 @@ export async function endExpiredRaids(
     correlationId: string;
   },
 ): Promise<number> {
-  ensureRaidEnabled();
-
   const ended = await db
     .update(raids)
     .set({ status: 'ended' })
@@ -362,7 +386,7 @@ export async function endExpiredRaids(
 }
 
 export async function getTodayRaidOffers(guildId: string, now: Date = new Date()) {
-  ensureRaidEnabled();
+  await ensureRaidEnabled(guildId);
 
   const activeRaid = await getActiveRaidForGuild(guildId);
   if (!activeRaid) {
@@ -400,7 +424,7 @@ export async function claimRaidQuest(input: {
   }) => Promise<void>;
   now?: Date;
 }) {
-  ensureRaidEnabled();
+  await ensureRaidEnabled(input.guildId);
 
   const now = input.now ?? new Date();
   const dayDate = dateOnly(now);
@@ -491,7 +515,7 @@ export async function confirmRaidClaim(input: {
   boss: PgBoss;
   correlationId: string;
 }) {
-  ensureRaidEnabled();
+  await ensureRaidEnabled(input.guildId);
 
   const txResult = await db.transaction(async (tx) => {
     const lockResult = await tx.execute<{ locked: boolean }>(
@@ -662,7 +686,6 @@ export type RaidProgressSnapshot = {
 };
 
 export async function getRaidProgressSnapshot(input: { raidId?: string; guildId?: string; now?: Date }) {
-  ensureRaidEnabled();
   const now = input.now ?? new Date();
 
   let raid: typeof raids.$inferSelect | null = null;
@@ -674,6 +697,11 @@ export async function getRaidProgressSnapshot(input: { raidId?: string; guildId?
   }
 
   if (!raid) {
+    return null;
+  }
+
+  const state = await getGuildFeatureState(raid.guildId, 'raid');
+  if (!state.enabled || !state.configured) {
     return null;
   }
 
@@ -758,7 +786,7 @@ export async function getRaidContributionForUser(input: {
   weekPoints: number;
   dayDate: string;
 } | null> {
-  ensureRaidEnabled();
+  await ensureRaidEnabled(input.guildId);
   const now = input.now ?? new Date();
   const raid = await getActiveRaidForGuild(input.guildId);
   if (!raid) {

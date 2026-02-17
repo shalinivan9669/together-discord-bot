@@ -2,7 +2,12 @@ import { upsertGuildSettings } from '../../infra/db/queries/guildSettings';
 
 export type GuildSettingsPatch = Partial<{
   timezone: string;
+  pairCategoryId: string | null;
   horoscopeChannelId: string | null;
+  publicPostChannelId: string | null;
+  anonInboxChannelId: string | null;
+  anonModRoleId: string | null;
+  features: Record<string, boolean>;
   questionsChannelId: string | null;
   raidChannelId: string | null;
   duelPublicChannelId: string | null;

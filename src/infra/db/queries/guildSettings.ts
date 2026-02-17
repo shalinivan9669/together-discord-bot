@@ -11,7 +11,12 @@ export async function upsertGuildSettings(
   guildId: string,
   patch: Partial<{
     timezone: string;
+    pairCategoryId: string | null;
     horoscopeChannelId: string | null;
+    publicPostChannelId: string | null;
+    anonInboxChannelId: string | null;
+    anonModRoleId: string | null;
+    features: Record<string, boolean>;
     questionsChannelId: string | null;
     raidChannelId: string | null;
     duelPublicChannelId: string | null;
@@ -19,13 +24,17 @@ export async function upsertGuildSettings(
     moderatorRoleId: string | null;
   }>,
 ) {
+  const normalizedPatch = Object.fromEntries(
+    Object.entries(patch).filter(([, value]) => value !== undefined),
+  ) as typeof patch;
+
   const [row] = await db
     .insert(guildSettings)
-    .values({ guildId, ...patch })
+    .values({ guildId, ...normalizedPatch })
     .onConflictDoUpdate({
       target: guildSettings.guildId,
       set: {
-        ...patch,
+        ...normalizedPatch,
         updatedAt: new Date()
       }
     })

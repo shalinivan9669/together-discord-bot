@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import {
   ensureHoroscopeEnabled,
 } from '../../app/services/horoscopeService';
@@ -21,10 +21,10 @@ export const horoscopeCommand: CommandModule = {
     ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      ensureHoroscopeEnabled();
+      await ensureHoroscopeEnabled(interaction.guildId);
     } catch (error) {
       await interaction.editReply(error instanceof Error ? error.message : 'Horoscope is disabled.');
       return;

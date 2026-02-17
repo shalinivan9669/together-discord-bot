@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type GuildBasedChannel, type MessageCreateOptions } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder, type GuildBasedChannel, type MessageCreateOptions } from 'discord.js';
 import {
   duelEndUsecase,
   duelRoundStartUsecase,
@@ -52,7 +52,7 @@ export const duelCommand: CommandModule = {
     .addSubcommand((sub) => sub.setName('end').setDescription('End active duel')),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const correlationId = createCorrelationId();
     const settings = await getGuildSettings(interaction.guildId);

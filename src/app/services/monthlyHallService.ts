@@ -118,21 +118,43 @@ function emptyOptInStatus(): MonthlyHallOptInStatus {
   };
 }
 
-export async function listConfiguredMonthlyHallGuilds(): Promise<Array<{ guildId: string; hallChannelId: string }>> {
+export async function listConfiguredMonthlyHallGuilds(): Promise<Array<{
+  guildId: string;
+  hallChannelId: string;
+  hallFeatureEnabled: boolean;
+}>> {
   const rows = await db
     .select({
       guildId: guildSettings.guildId,
-      hallChannelId: guildSettings.hallChannelId
+      hallChannelId: guildSettings.hallChannelId,
+      features: guildSettings.features
     })
     .from(guildSettings)
     .where(isNotNull(guildSettings.hallChannelId));
 
-  return rows
-    .filter((row): row is { guildId: string; hallChannelId: string } => Boolean(row.hallChannelId))
-    .map((row) => ({
+  const configured: Array<{ guildId: string; hallChannelId: string; hallFeatureEnabled: boolean }> = [];
+
+  for (const row of rows) {
+    if (!row.hallChannelId) {
+      continue;
+    }
+
+    const hallFeatureEnabled =
+      !row.features
+      || typeof row.features !== 'object'
+      || Array.isArray(row.features)
+      || typeof (row.features as Record<string, unknown>).hall !== 'boolean'
+      ? true
+      : Boolean((row.features as Record<string, unknown>).hall);
+
+    configured.push({
       guildId: row.guildId,
-      hallChannelId: row.hallChannelId
-    }));
+      hallChannelId: row.hallChannelId,
+      hallFeatureEnabled
+    });
+  }
+
+  return configured;
 }
 
 export async function ensureMonthlyHallCardRecord(input: {

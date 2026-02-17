@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { isFeatureEnabled } from '../../config/featureFlags';
 import { startOfWeekIso } from '../../lib/time';
+import { logger } from '../../lib/logger';
 import { db } from '../../infra/db/drizzle';
 import { contentHoroscopeArchetypes, guildSettings, horoscopeClaims, horoscopeWeeks } from '../../infra/db/schema';
+import { assertGuildFeatureEnabled, getGuildFeatureState } from './guildConfigService';
 
 export const HOROSCOPE_MODES = ['soft', 'neutral', 'hard'] as const;
 export type HoroscopeMode = (typeof HOROSCOPE_MODES)[number];
@@ -89,10 +90,8 @@ function buildClaimText(params: {
   ].join('\n');
 }
 
-export function ensureHoroscopeEnabled(): void {
-  if (!isFeatureEnabled('horoscope')) {
-    throw new Error('Horoscope feature is disabled');
-  }
+export async function ensureHoroscopeEnabled(guildId: string): Promise<void> {
+  await assertGuildFeatureEnabled(guildId, 'horoscope');
 }
 
 export function parseHoroscopeMode(input: string): HoroscopeMode | null {
@@ -156,7 +155,6 @@ export async function ensureHoroscopeWeek(guildId: string, weekStartDate: string
 }
 
 export async function scheduleWeeklyHoroscopePosts(now: Date = new Date()): Promise<number> {
-  ensureHoroscopeEnabled();
   const weekStartDate = startOfWeekIso(now);
 
   const guilds = await db
@@ -169,6 +167,20 @@ export async function scheduleWeeklyHoroscopePosts(now: Date = new Date()): Prom
   let preparedCount = 0;
 
   for (const guild of guilds) {
+    const state = await getGuildFeatureState(guild.guildId, 'horoscope');
+    if (!state.enabled || !state.configured) {
+      logger.info(
+        {
+          feature: 'horoscope',
+          action: 'schedule_prepare_skipped',
+          guild_id: guild.guildId,
+          reason: state.reason
+        },
+        'skipped: missing channel config',
+      );
+      continue;
+    }
+
     await ensureHoroscopeWeek(guild.guildId, weekStartDate);
     preparedCount += 1;
   }
@@ -184,7 +196,7 @@ export async function claimHoroscope(input: {
   context: HoroscopeContext;
   now?: Date;
 }) {
-  ensureHoroscopeEnabled();
+  await ensureHoroscopeEnabled(input.guildId);
   const now = input.now ?? new Date();
   const weekStartDate = startOfWeekIso(now);
 

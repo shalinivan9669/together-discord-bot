@@ -1,7 +1,9 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 import { logger } from '../../lib/logger';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { adminCommand } from './admin';
 import { anonCommand } from './anon';
 import { checkinCommand } from './checkin';
 import { dateCommand } from './date';
@@ -19,6 +21,7 @@ import type { CommandContext, CommandModule } from './types';
 
 const commandModules: CommandModule[] = [
   pingCommand,
+  adminCommand,
   setupCommand,
   pairCommand,
   sayCommand,
@@ -56,7 +59,7 @@ export async function handleChatInputCommand(
   if (!command) {
     logger.warn({ command: interaction.commandName }, 'Unknown command invoked');
     if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({ ephemeral: true, content: 'Unknown command.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Unknown command.' });
     }
     return;
   }
@@ -72,7 +75,7 @@ export async function handleChatInputCommand(
     }
 
     if (!interaction.replied) {
-      await interaction.reply({ ephemeral: true, content: 'Command failed. Please try again.' });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Command failed. Please try again.' });
     }
   }
 }

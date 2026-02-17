@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import {
   ensureCheckinEnabled,
   getPairForCheckinChannel,
@@ -18,10 +18,10 @@ export const checkinCommand: CommandModule = {
     .addSubcommand((sub) => sub.setName('start').setDescription('Start weekly check-in in your pair room')),
   async execute(_ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      ensureCheckinEnabled();
+      await ensureCheckinEnabled(interaction.guildId);
     } catch (error) {
       await interaction.editReply(error instanceof Error ? error.message : 'Check-in is disabled.');
       return;

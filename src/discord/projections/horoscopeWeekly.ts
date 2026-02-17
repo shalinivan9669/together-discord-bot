@@ -1,6 +1,7 @@
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Client } from 'discord.js';
 import { ensureHoroscopeWeek } from '../../app/services/horoscopeService';
+import { getGuildFeatureState } from '../../app/services/guildConfigService';
 import { startOfWeekIso } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
 import { guildSettings } from '../../infra/db/schema';
@@ -85,15 +86,14 @@ export async function refreshWeeklyHoroscopeProjection(input: {
           horoscopeMessageId: sql<string | null>`horoscope_message_id`
         })
         .from(guildSettings)
-        .where(and(eq(guildSettings.guildId, input.guildId), isNotNull(guildSettings.horoscopeChannelId)))
+        .where(eq(guildSettings.guildId, input.guildId))
     : await db
         .select({
           guildId: guildSettings.guildId,
           horoscopeChannelId: guildSettings.horoscopeChannelId,
           horoscopeMessageId: sql<string | null>`horoscope_message_id`
         })
-        .from(guildSettings)
-        .where(isNotNull(guildSettings.horoscopeChannelId));
+        .from(guildSettings);
 
   let processed = 0;
   let created = 0;
@@ -101,8 +101,31 @@ export async function refreshWeeklyHoroscopeProjection(input: {
   let failed = 0;
 
   for (const row of rows) {
+    const state = await getGuildFeatureState(row.guildId, 'horoscope');
+    if (!state.enabled || !state.configured) {
+      logger.info(
+        {
+          feature: 'horoscope_weekly',
+          action: 'refresh_skipped',
+          guild_id: row.guildId,
+          reason: state.reason
+        },
+        'skipped: missing channel config',
+      );
+      continue;
+    }
+
     const channelId = row.horoscopeChannelId;
     if (!channelId) {
+      logger.info(
+        {
+          feature: 'horoscope_weekly',
+          action: 'refresh_skipped',
+          guild_id: row.guildId,
+          reason: 'horoscope channel not configured'
+        },
+        'skipped: missing channel config',
+      );
       continue;
     }
 

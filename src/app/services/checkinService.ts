@@ -4,17 +4,16 @@ import {
   CHECKIN_SCALE_MAX,
   CHECKIN_SCALE_MIN,
 } from '../../config/constants';
-import { isFeatureEnabled } from '../../config/featureFlags';
 import { startOfWeekIso } from '../../lib/time';
+import { logger } from '../../lib/logger';
 import { db } from '../../infra/db/drizzle';
 import { agreementsLibrary, checkins, guildSettings, pairs } from '../../infra/db/schema';
+import { assertGuildFeatureEnabled, getGuildConfig, getGuildFeatureState } from './guildConfigService';
 import { createScheduledPost } from './publicPostService';
 import { awardPairReward } from './rewardsService';
 
-export function ensureCheckinEnabled(): void {
-  if (!isFeatureEnabled('checkin')) {
-    throw new Error('Check-in feature is disabled');
-  }
+export async function ensureCheckinEnabled(guildId: string): Promise<void> {
+  await assertGuildFeatureEnabled(guildId, 'checkin');
 }
 
 export async function getPairForCheckinChannel(input: {
@@ -74,7 +73,7 @@ export async function submitWeeklyCheckin(input: {
   scores: [number, number, number, number, number];
   now?: Date;
 }) {
-  ensureCheckinEnabled();
+  await ensureCheckinEnabled(input.guildId);
   validateScores(input.scores);
 
   const now = input.now ?? new Date();
@@ -160,7 +159,7 @@ export async function scheduleCheckinAgreementShare(input: {
   checkinId: string;
   requesterUserId: string;
 }) {
-  ensureCheckinEnabled();
+  await ensureCheckinEnabled(input.guildId);
 
   const checkinRows = await db
     .select()
@@ -186,16 +185,10 @@ export async function scheduleCheckinAgreementShare(input: {
     throw new Error('Only pair members can share agreement');
   }
 
-  const settingsRows = await db
-    .select({
-      duelPublicChannelId: guildSettings.duelPublicChannelId
-    })
-    .from(guildSettings)
-    .where(and(eq(guildSettings.guildId, input.guildId), isNotNull(guildSettings.duelPublicChannelId)))
-    .limit(1);
-  const publicChannelId = settingsRows[0]?.duelPublicChannelId;
+  const config = await getGuildConfig(input.guildId);
+  const publicChannelId = config.publicPostChannelId;
   if (!publicChannelId) {
-    throw new Error('Duel public channel is not configured for agreement sharing');
+    throw new Error('Public post channel is not configured for agreement sharing');
   }
 
   const agreementRows = await db
@@ -229,21 +222,34 @@ export async function scheduleCheckinAgreementShare(input: {
 }
 
 export async function scheduleWeeklyCheckinNudges(now: Date = new Date()): Promise<number> {
-  ensureCheckinEnabled();
   const weekStartDate = startOfWeekIso(now);
 
   const guildRows = await db
     .select({
       guildId: guildSettings.guildId,
-      duelPublicChannelId: guildSettings.duelPublicChannelId
+      publicPostChannelId: guildSettings.publicPostChannelId
     })
     .from(guildSettings)
-    .where(isNotNull(guildSettings.duelPublicChannelId));
+    .where(isNotNull(guildSettings.publicPostChannelId));
 
   let created = 0;
 
   for (const guild of guildRows) {
-    const channelId = guild.duelPublicChannelId;
+    const state = await getGuildFeatureState(guild.guildId, 'checkin');
+    if (!state.enabled || !state.configured) {
+      logger.info(
+        {
+          feature: 'checkin',
+          action: 'nudge_skipped',
+          guild_id: guild.guildId,
+          reason: state.reason
+        },
+        'skipped: missing channel config',
+      );
+      continue;
+    }
+
+    const channelId = guild.publicPostChannelId;
     if (!channelId) {
       continue;
     }

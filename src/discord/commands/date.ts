@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import type { DateFilters } from '../../domain/date';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
@@ -23,7 +23,7 @@ export const dateCommand: CommandModule = {
     .setDescription('Generate deterministic weekend date ideas from energy/budget/time'),
   async execute(_ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const correlationId = createCorrelationId();
     logInteraction({

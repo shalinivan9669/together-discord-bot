@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type MessageCreateOptions } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder, type MessageCreateOptions } from 'discord.js';
 import {
   ensureRaidEnabled,
   getRaidProgressSnapshot,
@@ -41,10 +41,10 @@ export const raidCommand: CommandModule = {
     .addSubcommand((sub) => sub.setName('progress').setDescription('Show raid progress')),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
-      ensureRaidEnabled();
+      await ensureRaidEnabled(interaction.guildId);
     } catch (error) {
       await interaction.editReply(error instanceof Error ? error.message : 'Raid is disabled.');
       return;

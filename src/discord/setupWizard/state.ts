@@ -1,18 +1,18 @@
-import type { getGuildSettings } from '../../infra/db/queries/guildSettings';
-
-type GuildSettingsRow = Awaited<ReturnType<typeof getGuildSettings>>;
+import type { GuildConfig } from '../../app/services/guildConfigService';
 
 const DRAFT_TTL_MS = 30 * 60 * 1000;
 
 export type SetupWizardDraft = {
   guildId: string;
   userId: string;
-  duelPublicChannelId: string | null;
+  pairCategoryId: string | null;
   horoscopeChannelId: string | null;
-  questionsChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
-  moderatorRoleId: string | null;
+  publicPostChannelId: string | null;
+  anonInboxChannelId: string | null;
+  anonModRoleId: string | null;
+  timezone: string;
   updatedAtMs: number;
 };
 
@@ -34,16 +34,18 @@ function pruneExpiredDrafts(now: number): void {
   }
 }
 
-function toDraft(guildId: string, userId: string, settings: GuildSettingsRow): SetupWizardDraft {
+function toDraft(guildId: string, userId: string, settings: GuildConfig): SetupWizardDraft {
   return {
     guildId,
     userId,
-    duelPublicChannelId: settings?.duelPublicChannelId ?? null,
-    horoscopeChannelId: settings?.horoscopeChannelId ?? null,
-    questionsChannelId: settings?.questionsChannelId ?? null,
-    raidChannelId: settings?.raidChannelId ?? null,
-    hallChannelId: settings?.hallChannelId ?? null,
-    moderatorRoleId: settings?.moderatorRoleId ?? null,
+    pairCategoryId: settings.pairCategoryId,
+    horoscopeChannelId: settings.horoscopeChannelId,
+    raidChannelId: settings.raidChannelId,
+    hallChannelId: settings.hallChannelId,
+    publicPostChannelId: settings.publicPostChannelId,
+    anonInboxChannelId: settings.anonInboxChannelId,
+    anonModRoleId: settings.anonModRoleId,
+    timezone: settings.timezone,
     updatedAtMs: nowMs()
   };
 }
@@ -51,7 +53,7 @@ function toDraft(guildId: string, userId: string, settings: GuildSettingsRow): S
 export function ensureSetupWizardDraft(
   guildId: string,
   userId: string,
-  settings: GuildSettingsRow,
+  settings: GuildConfig,
 ): SetupWizardDraft {
   const now = nowMs();
   pruneExpiredDrafts(now);
@@ -72,7 +74,7 @@ export function ensureSetupWizardDraft(
 export function resetSetupWizardDraft(
   guildId: string,
   userId: string,
-  settings: GuildSettingsRow,
+  settings: GuildConfig,
 ): SetupWizardDraft {
   const draft = toDraft(guildId, userId, settings);
   drafts.set(keyOf(guildId, userId), draft);

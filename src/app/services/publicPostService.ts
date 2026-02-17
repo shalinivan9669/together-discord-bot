@@ -8,6 +8,7 @@ import { buildAnonPublishedButtons } from '../../discord/interactions/components
 import { db } from '../../infra/db/drizzle';
 import { anonQuestions, scheduledPosts } from '../../infra/db/schema';
 import { logger } from '../../lib/logger';
+import { getGuildFeatureState } from './guildConfigService';
 
 const anonPayloadSchema = z.object({
   questionId: z.string(),
@@ -267,6 +268,32 @@ export async function publishDueScheduledPosts(input: {
     processed += 1;
 
     try {
+      const featureState = await getGuildFeatureState(claimed.guildId, 'public_post');
+      if (!featureState.enabled || !featureState.configured) {
+        skipped += 1;
+
+        await db
+          .update(scheduledPosts)
+          .set({
+            status: 'pending',
+            lastError: `public_post skipped: ${featureState.reason}`.slice(0, 800),
+            updatedAt: new Date()
+          })
+          .where(eq(scheduledPosts.id, claimed.id));
+
+        logger.info(
+          {
+            feature: 'public_post',
+            action: 'publish_skipped',
+            scheduled_post_id: claimed.id,
+            guild_id: claimed.guildId,
+            reason: featureState.reason
+          },
+          'skipped: missing channel config',
+        );
+        continue;
+      }
+
       const messageOptions = buildMessageOptions(claimed);
       let sentMessage: { id: string };
 

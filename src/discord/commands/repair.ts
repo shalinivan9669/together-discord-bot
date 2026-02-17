@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type MessageCreateOptions } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder, type MessageCreateOptions } from 'discord.js';
 import { startMediatorRepairFlow, getPairRoomForMediatorUser } from '../../app/services/mediatorService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
@@ -22,7 +22,7 @@ export const repairCommand: CommandModule = {
     .setDescription('Mediator: start a 7-minute guided repair flow in your pair room'),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const pair = await getPairRoomForMediatorUser({
       guildId: interaction.guildId,
