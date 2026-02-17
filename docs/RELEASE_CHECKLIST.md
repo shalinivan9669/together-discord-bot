@@ -1,5 +1,10 @@
 # Release Checklist
 
+## 0) Encoding guard (pre-commit / pre-push)
+- [ ] Use editor encoding `UTF-8` without BOM for migration files.
+- [ ] Optional hook command: `pnpm db:check-bom` (fail-fast) or `pnpm db:strip-bom` (auto-fix).
+- [ ] Keep `.editorconfig` as `charset = utf-8` (not `utf-8-bom`).
+
 ## 1) Pre-release
 - [ ] `pnpm install --frozen-lockfile`
 - [ ] `pnpm build`
