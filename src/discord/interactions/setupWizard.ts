@@ -1,8 +1,10 @@
 import {
+  ChannelType,
   MessageFlags,
   PermissionFlagsBits,
   type ButtonInteraction,
   type ChannelSelectMenuInteraction,
+  type GuildBasedChannel,
   type RoleSelectMenuInteraction,
   type StringSelectMenuInteraction,
 } from 'discord.js';
@@ -16,15 +18,15 @@ import {
   setGuildFeatures,
   updateGuildConfig,
 } from '../../app/services/guildConfigService';
+import { getSetupMissingRequirementKeys } from '../../app/services/configRequirements';
 import { createScheduledPost } from '../../app/services/publicPostService';
 import { type JobName, JobNames } from '../../infra/queue/jobs';
 import { setRecurringScheduleEnabled } from '../../infra/queue/scheduler';
 import { t, type AppLocale } from '../../i18n';
 import { createCorrelationId } from '../../lib/correlation';
+import { formatRequirementLabel } from '../featureErrors';
 import { logInteraction } from '../interactionLog';
-import { buildAdminStatusReport } from '../admin/statusReport';
 import type { CustomIdEnvelope } from './customId';
-import { COMPONENTS_V2_FLAGS } from '../ui-v2';
 import {
   clearSetupWizardDraft,
   ensureSetupWizardDraft,
@@ -33,7 +35,11 @@ import {
   resetSetupWizardDraft,
   type SetupWizardDraft,
 } from '../setupWizard/state';
-import { renderSetupWizardPanel } from '../setupWizard/view';
+import { isSupportedSetupWizardTimezone, isValidIanaTimezone } from '../setupWizard/timezones';
+import {
+  renderSetupWizardPanel,
+  type SetupWizardPanelMode,
+} from '../setupWizard/view';
 
 export type SetupWizardInteraction =
   | ButtonInteraction
@@ -71,6 +77,10 @@ function isAdmin(interaction: SetupWizardInteraction): boolean {
     && interaction.memberPermissions.has(PermissionFlagsBits.Administrator);
 }
 
+function localeForSetupWizard(): AppLocale {
+  return 'ru';
+}
+
 async function ensureDraft(interaction: SetupWizardInteraction): Promise<SetupWizardDraft> {
   const existing = getSetupWizardDraft(interaction.guildId ?? '', interaction.user.id);
   if (existing) {
@@ -89,13 +99,22 @@ async function updatePanel(
   interaction: SetupWizardInteraction,
   draft: SetupWizardDraft,
   locale: AppLocale,
+  mode: SetupWizardPanelMode = 'draft',
 ): Promise<void> {
-  const panel = renderSetupWizardPanel(draft, locale);
+  const panel = renderSetupWizardPanel(draft, locale, { mode });
+
+  if ('message' in interaction && interaction.message) {
+    await interaction.message.edit({
+      content: panel.content ?? null,
+      components: panel.components as never
+    });
+    return;
+  }
+
   await interaction.editReply({
     content: panel.content ?? null,
-    components: panel.components as never,
-    flags: COMPONENTS_V2_FLAGS
-  } as never);
+    components: panel.components as never
+  });
 }
 
 function selectTargetChannel(draft: SetupWizardDraft): string | null {
@@ -152,6 +171,80 @@ async function autoEnableSafeSchedules(boss: PgBoss, guildId: string): Promise<v
   }
 }
 
+function parseWizardOwner(decoded: CustomIdEnvelope): string | null {
+  const owner = decoded.payload.u;
+  return typeof owner === 'string' && owner.length > 0 ? owner : null;
+}
+
+async function fetchGuildChannel(
+  interaction: SetupWizardInteraction,
+  channelId: string,
+): Promise<GuildBasedChannel | null> {
+  try {
+    const guild = interaction.guild ?? await interaction.client.guilds.fetch(interaction.guildId!);
+    const channel = await guild.channels.fetch(channelId);
+    return channel;
+  } catch {
+    return null;
+  }
+}
+
+function isSetupTextChannel(channel: GuildBasedChannel): boolean {
+  return channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildAnnouncement;
+}
+
+async function validateDraftBeforeCommit(
+  interaction: SetupWizardInteraction,
+  draft: SetupWizardDraft,
+  locale: AppLocale,
+): Promise<string[]> {
+  const errors: string[] = [];
+
+  if (!isValidIanaTimezone(draft.timezone)) {
+    errors.push(t(locale, 'setup.wizard.error.invalid_timezone'));
+  }
+
+  if (draft.pairCategoryId) {
+    const category = await fetchGuildChannel(interaction, draft.pairCategoryId);
+    if (!category || category.type !== ChannelType.GuildCategory) {
+      errors.push(t(locale, 'setup.wizard.error.pair_category_not_category'));
+    }
+  }
+
+  const channelChecks: Array<{ id: string | null; labelKey: Parameters<typeof t>[1] }> = [
+    { id: draft.horoscopeChannelId, labelKey: 'setup.wizard.line.horoscope_channel' },
+    { id: draft.raidChannelId, labelKey: 'setup.wizard.line.raid_channel' },
+    { id: draft.hallChannelId, labelKey: 'setup.wizard.line.hall_channel' },
+    { id: draft.publicPostChannelId, labelKey: 'setup.wizard.line.public_post_channel' },
+    { id: draft.anonInboxChannelId, labelKey: 'setup.wizard.line.anon_inbox_channel' }
+  ];
+
+  for (const check of channelChecks) {
+    if (!check.id) {
+      continue;
+    }
+
+    const channel = await fetchGuildChannel(interaction, check.id);
+    if (!channel || !isSetupTextChannel(channel)) {
+      errors.push(
+        t(locale, 'setup.wizard.error.invalid_channel_type', {
+          target: t(locale, check.labelKey)
+        }),
+      );
+    }
+  }
+
+  if (draft.anonModRoleId) {
+    const guild = interaction.guild ?? await interaction.client.guilds.fetch(interaction.guildId!);
+    const role = await guild.roles.fetch(draft.anonModRoleId);
+    if (!role) {
+      errors.push(t(locale, 'setup.wizard.error.mod_role_not_found'));
+    }
+  }
+
+  return errors;
+}
+
 export async function handleSetupWizardComponent(
   ctx: { boss: PgBoss },
   interaction: SetupWizardInteraction,
@@ -162,19 +255,26 @@ export async function handleSetupWizardComponent(
   }
 
   const action = actionSchema.parse(decoded.action);
+  const locale = localeForSetupWizard();
 
   if (!interaction.guildId) {
-    await interaction.reply({ flags: MessageFlags.Ephemeral, content: t('ru', 'error.guild_only_action') });
+    await interaction.reply({ flags: MessageFlags.Ephemeral, content: t(locale, 'error.guild_only_action') });
     return true;
   }
-
-  const currentConfig = await getGuildConfig(interaction.guildId);
-  const locale = currentConfig.locale;
 
   if (!isAdmin(interaction)) {
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       content: t(locale, 'error.admin_required')
+    });
+    return true;
+  }
+
+  const ownerId = parseWizardOwner(decoded);
+  if (ownerId && ownerId !== interaction.user.id) {
+    await interaction.reply({
+      flags: MessageFlags.Ephemeral,
+      content: t(locale, 'setup.wizard.error.not_owner')
     });
     return true;
   }
@@ -215,6 +315,14 @@ export async function handleSetupWizardComponent(
       }
 
       const timezone = interaction.values[0] ?? 'Asia/Almaty';
+      if (!isSupportedSetupWizardTimezone(timezone) || !isValidIanaTimezone(timezone)) {
+        await interaction.followUp({
+          flags: MessageFlags.Ephemeral,
+          content: t(locale, 'setup.wizard.error.invalid_timezone')
+        });
+        return true;
+      }
+
       const draft = patchSetupWizardDraft(interaction.guildId, interaction.user.id, {
         timezone
       });
@@ -230,6 +338,24 @@ export async function handleSetupWizardComponent(
     }
 
     const channelId = interaction.values[0] ?? null;
+    if (channelId) {
+      const selected = await fetchGuildChannel(interaction, channelId);
+      if (action === 'pick_pair_category') {
+        if (!selected || selected.type !== ChannelType.GuildCategory) {
+          await interaction.followUp({
+            flags: MessageFlags.Ephemeral,
+            content: t(locale, 'setup.wizard.error.pair_category_not_category')
+          });
+          return true;
+        }
+      } else if (!selected || !isSetupTextChannel(selected)) {
+        await interaction.followUp({
+          flags: MessageFlags.Ephemeral,
+          content: t(locale, 'setup.wizard.error.channel_not_text')
+        });
+        return true;
+      }
+    }
 
     const patch = action === 'pick_pair_category'
       ? { pairCategoryId: channelId }
@@ -258,6 +384,28 @@ export async function handleSetupWizardComponent(
   const draft = await ensureDraft(interaction);
 
   if (action === 'complete') {
+    const missingKeys = getSetupMissingRequirementKeys(draft);
+    if (missingKeys.length > 0) {
+      await updatePanel(interaction, draft, locale, 'draft');
+      await interaction.followUp({
+        flags: MessageFlags.Ephemeral,
+        content: t(locale, 'setup.wizard.error.required_missing', {
+          missing: missingKeys.map((key) => formatRequirementLabel(locale, key)).join(', ')
+        }),
+      });
+      return true;
+    }
+
+    const commitErrors = await validateDraftBeforeCommit(interaction, draft, locale);
+    if (commitErrors.length > 0) {
+      await updatePanel(interaction, draft, locale, 'draft');
+      await interaction.followUp({
+        flags: MessageFlags.Ephemeral,
+        content: `${t(locale, 'setup.wizard.error.commit_validation_failed')}\n- ${commitErrors.join('\n- ')}`
+      });
+      return true;
+    }
+
     await updateGuildConfig(interaction.guildId, {
       pairCategoryId: draft.pairCategoryId,
       horoscopeChannelId: draft.horoscopeChannelId,
@@ -279,14 +427,14 @@ export async function handleSetupWizardComponent(
       correlationId
     });
 
+    const config = await getGuildConfig(interaction.guildId);
+    const committedDraft = ensureSetupWizardDraft(interaction.guildId, interaction.user.id, config);
+    await updatePanel(interaction, committedDraft, locale, 'completed');
     clearSetupWizardDraft(interaction.guildId, interaction.user.id);
-
-    const guild = interaction.guild ?? await interaction.client.guilds.fetch(interaction.guildId);
-    const report = await buildAdminStatusReport(guild);
 
     await interaction.followUp({
       flags: MessageFlags.Ephemeral,
-      content: `${t(locale, 'setup.wizard.followup.complete')}\n\n${report}`
+      content: t(locale, 'setup.wizard.followup.complete_short')
     });
     return true;
   }

@@ -61,5 +61,6 @@ Optional but recommended:
 
 - [ ] No unexpected startup errors in logs.
 - [ ] No repeated projection edit failures.
+- [ ] In a test guild, run `/setup start` -> complete wizard -> verify `/admin status` and `/admin doctor` return `OK`/expected warnings only.
 - [ ] Manual smoke path from `docs/SMOKE_TEST.md` passed.
 - [ ] Server setup checklist from `docs/SERVER_SETUP_CHECKLIST.md` completed.

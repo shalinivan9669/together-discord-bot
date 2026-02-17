@@ -5,8 +5,9 @@ import {
   setMonthlyHallOptIn,
   type MonthlyHallCategory,
 } from '../../app/services/monthlyHallService';
-import { getGuildFeatureState } from '../../app/services/guildConfigService';
+import { assertGuildFeatureEnabled } from '../../app/services/guildConfigService';
 import { createCorrelationId } from '../../lib/correlation';
+import { formatFeatureUnavailableError } from '../featureErrors';
 import { logInteraction } from '../interactionLog';
 import { createInteractionTranslator } from '../locale';
 import { assertGuildOnly } from '../middleware/guard';
@@ -112,14 +113,11 @@ export const hallCommand: CommandModule = {
     const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    const featureState = await getGuildFeatureState(interaction.guildId, 'hall');
-    if (!featureState.enabled) {
-      await interaction.editReply(tr.t('hall.reply.feature_disabled'));
-      return;
-    }
-
-    if (!featureState.configured) {
-      await interaction.editReply(tr.t('hall.reply.feature_not_configured'));
+    try {
+      await assertGuildFeatureEnabled(interaction.guildId, 'hall');
+    } catch (error) {
+      const featureError = formatFeatureUnavailableError('ru', error);
+      await interaction.editReply(featureError ?? tr.t('hall.reply.feature_disabled'));
       return;
     }
 

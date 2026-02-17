@@ -6,6 +6,7 @@ import {
 } from '../../app/services/checkinService';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { formatFeatureUnavailableError } from '../featureErrors';
 import { createInteractionTranslator } from '../locale';
 import { buildCheckinAgreementSelect } from '../interactions/components';
 import { assertGuildOnly } from '../middleware/guard';
@@ -32,8 +33,9 @@ export const checkinCommand: CommandModule = {
 
     try {
       await ensureCheckinEnabled(interaction.guildId);
-    } catch {
-      await interaction.editReply(tr.t('checkin.reply.disabled_fallback'));
+    } catch (error) {
+      const featureError = formatFeatureUnavailableError('ru', error);
+      await interaction.editReply(featureError ?? tr.t('checkin.reply.disabled_fallback'));
       return;
     }
 

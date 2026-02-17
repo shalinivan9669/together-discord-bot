@@ -36,6 +36,7 @@ const targetChannelRequirements: readonly PermissionRequirement[] = [
   { bit: PermissionFlagsBits.ViewChannel, key: 'permissions.view_channels' },
   { bit: PermissionFlagsBits.SendMessages, key: 'permissions.send_messages' },
   { bit: PermissionFlagsBits.EmbedLinks, key: 'permissions.embed_links' },
+  { bit: PermissionFlagsBits.AttachFiles, key: 'permissions.attach_files' },
   { bit: PermissionFlagsBits.ReadMessageHistory, key: 'permissions.read_history' },
   { bit: PermissionFlagsBits.ManageMessages, key: 'permissions.manage_messages' }
 ];

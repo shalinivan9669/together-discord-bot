@@ -57,6 +57,10 @@ export const pairCommand: CommandModule = {
       const targetUser = interaction.options.getUser('user', true);
       const config = await getGuildConfig(interaction.guildId);
       assertAdminOrConfiguredModerator(interaction, config.anonModRoleId);
+      if (!config.pairCategoryId) {
+        await interaction.editReply(tr.t('pair.reply.category_not_configured'));
+        return;
+      }
 
       const botUserId = interaction.client.user?.id;
       if (!botUserId) {
@@ -90,7 +94,7 @@ export const pairCommand: CommandModule = {
             const channel = await interaction.guild.channels.create({
               name: roomName(lowMember.displayName, highMember.displayName),
               type: ChannelType.GuildText,
-              parent: config.pairCategoryId ?? undefined,
+              parent: config.pairCategoryId,
               permissionOverwrites: buildPairRoomOverwrites({
                 guildId: interaction.guildId,
                 botUserId,

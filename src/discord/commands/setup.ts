@@ -2,11 +2,11 @@ import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { createCorrelationId } from '../../lib/correlation';
 import { getGuildConfig } from '../../app/services/guildConfigService';
 import { logInteraction } from '../interactionLog';
-import { createInteractionTranslator } from '../locale';
 import { assertGuildOnly, hasAdminPermission } from '../middleware/guard';
-import { COMPONENTS_V2_FLAGS } from '../ui-v2';
+import { sendComponentsV2Message } from '../ui-v2';
 import { ensureSetupWizardDraft } from '../setupWizard/state';
 import { renderSetupWizardPanel } from '../setupWizard/view';
+import { t } from '../../i18n';
 import type { CommandModule } from './types';
 
 export const setupCommand: CommandModule = {
@@ -25,18 +25,18 @@ export const setupCommand: CommandModule = {
     ),
   async execute(_ctx, interaction) {
     assertGuildOnly(interaction);
-    const tr = await createInteractionTranslator(interaction);
+    const locale = 'ru' as const;
 
     const sub = interaction.options.getSubcommand();
     if (sub !== 'start') {
-      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('setup.command.unknown_subcommand') });
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: t(locale, 'setup.command.unknown_subcommand') });
       return;
     }
 
     if (!hasAdminPermission(interaction)) {
       await interaction.reply({
         flags: MessageFlags.Ephemeral,
-        content: tr.t('error.admin_required')
+        content: t(locale, 'error.admin_required')
       });
       return;
     }
@@ -46,7 +46,10 @@ export const setupCommand: CommandModule = {
     const correlationId = createCorrelationId();
     const config = await getGuildConfig(interaction.guildId);
     const draft = ensureSetupWizardDraft(interaction.guildId, interaction.user.id, config);
-    const panel = renderSetupWizardPanel(draft, config.locale);
+    const panel = renderSetupWizardPanel(draft, locale);
+
+    const created = await sendComponentsV2Message(interaction.client, interaction.channelId, panel);
+    const jumpUrl = `https://discord.com/channels/${interaction.guildId}/${interaction.channelId}/${created.id}`;
 
     logInteraction({
       interaction,
@@ -56,9 +59,10 @@ export const setupCommand: CommandModule = {
     });
 
     await interaction.editReply({
-      content: panel.content ?? null,
-      components: panel.components as never,
-      flags: COMPONENTS_V2_FLAGS
-    } as never);
+      content: t(locale, 'setup.command.wizard_posted', {
+        channelId: interaction.channelId,
+        jumpUrl
+      })
+    });
   }
 };

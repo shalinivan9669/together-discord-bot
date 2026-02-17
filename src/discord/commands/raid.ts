@@ -8,6 +8,7 @@ import {
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { formatFeatureUnavailableError } from '../featureErrors';
 import { createInteractionTranslator } from '../locale';
 import { buildRaidClaimButton } from '../interactions/components';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
@@ -77,8 +78,9 @@ export const raidCommand: CommandModule = {
 
     try {
       await ensureRaidEnabled(interaction.guildId);
-    } catch {
-      await interaction.editReply(tr.t('raid.reply.disabled_fallback'));
+    } catch (error) {
+      const featureError = formatFeatureUnavailableError('ru', error);
+      await interaction.editReply(featureError ?? tr.t('raid.reply.disabled_fallback'));
       return;
     }
 

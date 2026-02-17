@@ -7,6 +7,7 @@ import { JobNames } from '../../infra/queue/jobs';
 import { createCorrelationId } from '../../lib/correlation';
 import { startOfWeekIso } from '../../lib/time';
 import { logInteraction } from '../interactionLog';
+import { formatFeatureUnavailableError } from '../featureErrors';
 import { createInteractionTranslator } from '../locale';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
@@ -39,8 +40,9 @@ export const horoscopeCommand: CommandModule = {
 
     try {
       await ensureHoroscopeEnabled(interaction.guildId);
-    } catch {
-      await interaction.editReply(tr.t('horoscope.reply.disabled_fallback'));
+    } catch (error) {
+      const featureError = formatFeatureUnavailableError('ru', error);
+      await interaction.editReply(featureError ?? tr.t('horoscope.reply.disabled_fallback'));
       return;
     }
 

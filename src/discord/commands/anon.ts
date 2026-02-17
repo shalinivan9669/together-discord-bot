@@ -6,6 +6,7 @@ import { ensureAnonEnabled } from '../../app/services/anonService';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
+import { formatFeatureUnavailableError } from '../featureErrors';
 import { createInteractionTranslator } from '../locale';
 import { buildAnonAskModal } from '../interactions/components';
 import { buildAnonQueueView } from '../interactions/anonQueueView';
@@ -41,10 +42,11 @@ export const anonCommand: CommandModule = {
 
     try {
       await ensureAnonEnabled(interaction.guildId);
-    } catch {
+    } catch (error) {
+      const featureError = formatFeatureUnavailableError('ru', error);
       await interaction.reply({
         flags: MessageFlags.Ephemeral,
-        content: tr.t('anon.reply.disabled_fallback')
+        content: featureError ?? tr.t('anon.reply.disabled_fallback')
       });
       return;
     }

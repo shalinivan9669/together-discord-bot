@@ -22,9 +22,11 @@ pnpm start
 After bot is online:
 
 1. Run `/setup start`
-2. Pick pair category + channels + optional anon mod role + timezone
-3. Press **Complete Setup**
-4. Run `/admin status` to verify feature/schedule/permission state
+2. Bot posts a persistent setup panel in the current channel
+3. Pick pair category + channels + optional anon mod role + timezone
+4. Wait until **Complete Setup** button becomes enabled
+5. Press **Complete Setup**
+6. Run `/admin status` and `/admin doctor` to verify feature/schedule/permission state
 
 ## Required Discord Permissions
 
@@ -41,6 +43,7 @@ Configured category/channel level (pair category + target channels):
 - `View Channels`
 - `Send Messages`
 - `Embed Links`
+- `Attach Files`
 - `Read Message History`
 - `Manage Messages` (used by some projection flows)
 - `Manage Channels` (pair category only, for room creation)
@@ -48,6 +51,7 @@ Configured category/channel level (pair category + target channels):
 ## Admin Commands
 
 - `/admin status` - full status (by default in Russian: features, schedules, config IDs, permission diagnostics, next setup actions)
+- `/admin doctor` - deep diagnostics (DB config, permissions, feature/config mismatches, scheduler sanity, actionable hints)
 - `/admin feature set <name> <on|off>`
 - `/admin feature enable-all`
 - `/admin feature disable-all`

@@ -2,6 +2,10 @@ import { env } from '../../config/env';
 import { logger } from '../../lib/logger';
 import type { AppLocale } from '../../i18n';
 import { getGuildSettings, upsertGuildSettings } from '../../infra/db/queries/guildSettings';
+import {
+  getMissingFeatureRequirementKeys,
+  type GuildConfigRequirementKey,
+} from './configRequirements';
 
 const CONFIG_CACHE_TTL_MS = 45_000;
 
@@ -20,6 +24,30 @@ export type GuildLocale = AppLocale;
 export type GuildFeatureMap = Record<GuildFeatureName, boolean>;
 export type GuildFeatureDependencyCode = 'channel_not_selected' | 'anon_mod_role_not_selected';
 export type GuildFeatureReasonCode = 'disabled_by_admin' | 'enabled_not_configured' | 'configured';
+
+export type GuildFeatureUnavailableCode = 'feature_disabled' | 'feature_not_configured';
+
+export class GuildFeatureUnavailableError extends Error {
+  readonly code: GuildFeatureUnavailableCode;
+  readonly feature: GuildFeatureName;
+  readonly missingRequirements: GuildConfigRequirementKey[];
+
+  constructor(input: {
+    code: GuildFeatureUnavailableCode;
+    feature: GuildFeatureName;
+    missingRequirements?: GuildConfigRequirementKey[];
+  }) {
+    const suffix =
+      input.code === 'feature_not_configured' && input.missingRequirements && input.missingRequirements.length > 0
+        ? ` (${input.missingRequirements.join(', ')})`
+        : '';
+    super(`${input.feature}:${input.code}${suffix}`);
+    this.name = 'GuildFeatureUnavailableError';
+    this.code = input.code;
+    this.feature = input.feature;
+    this.missingRequirements = input.missingRequirements ?? [];
+  }
+}
 
 export type GuildConfig = {
   guildId: string;
@@ -140,40 +168,7 @@ function dependencyCodes(
   config: GuildConfig,
   feature: GuildFeatureName,
 ): GuildFeatureDependencyCode[] {
-  if (feature === 'horoscope') {
-    return config.horoscopeChannelId ? [] : ['channel_not_selected'];
-  }
-
-  if (feature === 'anon') {
-    const result: GuildFeatureDependencyCode[] = [];
-    if (!config.anonInboxChannelId) {
-      result.push('channel_not_selected');
-    }
-
-    if (!config.anonModRoleId) {
-      result.push('anon_mod_role_not_selected');
-    }
-
-    return result;
-  }
-
-  if (feature === 'raid') {
-    return config.raidChannelId ? [] : ['channel_not_selected'];
-  }
-
-  if (feature === 'checkin') {
-    return config.publicPostChannelId ? [] : ['channel_not_selected'];
-  }
-
-  if (feature === 'hall') {
-    return config.hallChannelId ? [] : ['channel_not_selected'];
-  }
-
-  if (feature === 'public_post') {
-    return config.publicPostChannelId ? [] : ['channel_not_selected'];
-  }
-
-  return [];
+  return getMissingFeatureRequirementKeys(config, feature).map(() => 'channel_not_selected');
 }
 
 function cacheSet(guildId: string, value: GuildConfig): GuildConfig {
@@ -248,16 +243,22 @@ export async function assertGuildFeatureEnabled(
   guildId: string,
   feature: GuildFeatureName,
 ): Promise<void> {
-  const state = await getGuildFeatureState(guildId, feature);
+  const config = await getGuildConfig(guildId);
+  const state = evaluateFeatureState(config, feature);
 
   if (!state.enabled) {
-    throw new Error(`${featureLabels[feature]} feature is disabled`);
+    throw new GuildFeatureUnavailableError({
+      code: 'feature_disabled',
+      feature
+    });
   }
 
   if (!state.configured) {
-    throw new Error(
-      'Feature is enabled, but not configured: run `/setup start` to set required channels.',
-    );
+    throw new GuildFeatureUnavailableError({
+      code: 'feature_not_configured',
+      feature,
+      missingRequirements: getMissingFeatureRequirementKeys(config, feature)
+    });
   }
 }
 

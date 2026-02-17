@@ -72,6 +72,7 @@ import { handleSetupWizardComponent } from './setupWizard';
 import { ANON_MASCOT_DAILY_LIMIT, ANON_PROPOSE_DAILY_LIMIT } from '../../config/constants';
 import { t, type AppLocale } from '../../i18n';
 import { createInteractionTranslator } from '../locale';
+import { formatFeatureUnavailableError } from '../featureErrors';
 
 export type InteractionContext = {
   client: Client;
@@ -1421,6 +1422,23 @@ export async function routeInteractionComponent(
     }
   } catch (error) {
     logger.error({ error, interaction_id: interaction.id }, 'Interaction component routing failed');
+    const featureError = formatFeatureUnavailableError('ru', error);
+    if (featureError) {
+      if (interaction.deferred) {
+        try {
+          await interaction.followUp({ flags: MessageFlags.Ephemeral, content: featureError });
+        } catch {
+          await interaction.editReply(featureError);
+        }
+        return;
+      }
+
+      if (!interaction.replied) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: featureError });
+      }
+      return;
+    }
+
     const tr = await createInteractionTranslator(interaction);
 
     if (interaction.deferred) {

@@ -52,12 +52,20 @@ Recurring schedules (enabled by feature flags where applicable):
 ## Admin controls
 
 - `/admin status`
+- `/admin doctor`
 - `/admin feature set <name> <on|off>`
 - `/admin feature enable-all`
 - `/admin feature disable-all`
 - `/admin config set locale <ru|en>`
 - `/admin config get locale`
 - `/admin schedule <name> <on|off>`
+
+`/admin doctor` checks:
+
+- required setup keys in DB
+- guild and channel permissions
+- feature state vs configuration mismatches
+- recurring schedule sanity (cron validity + feature/schedule consistency)
 
 Language policy:
 

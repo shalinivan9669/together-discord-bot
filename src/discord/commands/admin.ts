@@ -12,6 +12,7 @@ import {
   type GuildLocale,
 } from '../../app/services/guildConfigService';
 import { buildAdminStatusReport } from '../admin/statusReport';
+import { buildAdminDoctorReport } from '../admin/doctorReport';
 import { createInteractionTranslator } from '../locale';
 import { assertGuildOnly, hasAdminPermission } from '../middleware/guard';
 import type { CommandModule } from './types';
@@ -111,6 +112,13 @@ export const adminCommand: CommandModule = {
         .setNameLocalizations({ ru: 'status', 'en-US': 'status' })
         .setDescription('Показать конфиг, функции, расписания и права')
         .setDescriptionLocalizations({ 'en-US': 'Show config, features, schedules and permissions' }),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('doctor')
+        .setNameLocalizations({ ru: 'doctor', 'en-US': 'doctor' })
+        .setDescription('РџРѕР»РЅР°СЏ РґРёР°РіРЅРѕСЃС‚РёРєР° РЅР°СЃС‚СЂРѕРµРє, РїСЂР°РІ Рё СЂР°СЃРїРёСЃР°РЅРёР№')
+        .setDescriptionLocalizations({ 'en-US': 'Full diagnostic report: config, permissions, schedules' }),
     )
     .addSubcommandGroup((group) =>
       group
@@ -334,6 +342,11 @@ export const adminCommand: CommandModule = {
       return;
     }
 
-    await interaction.editReply(await buildAdminStatusReport(interaction.guild));
+    if (sub === 'doctor') {
+      await interaction.editReply(await buildAdminDoctorReport(interaction.guild));
+      return;
+    }
+
+    await interaction.editReply(await buildAdminStatusReport(interaction.guild, { locale: 'ru' }));
   },
 };

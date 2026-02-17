@@ -5,6 +5,7 @@ import { createCorrelationId } from '../../lib/correlation';
 import { logInteraction } from '../interactionLog';
 import { createInteractionTranslator } from '../locale';
 import { commandDefinitions, commandModules } from '../commandDefinitions';
+import { formatFeatureUnavailableError } from '../featureErrors';
 import type { CommandContext, CommandModule } from './types';
 
 const commandMap = new Map<string, CommandModule>(commandModules.map((cmd) => [cmd.name, cmd]));
@@ -39,6 +40,22 @@ export async function handleChatInputCommand(
   try {
     await command.execute(ctx, interaction);
   } catch (error) {
+    const featureError = formatFeatureUnavailableError('ru', error);
+    if (featureError) {
+      if (interaction.deferred) {
+        await interaction.editReply(featureError);
+        return;
+      }
+
+      if (!interaction.replied) {
+        await interaction.reply({
+          flags: MessageFlags.Ephemeral,
+          content: featureError,
+        });
+      }
+      return;
+    }
+
     logger.error({ error, command: interaction.commandName }, 'Command execution failed');
 
     if (interaction.deferred) {
