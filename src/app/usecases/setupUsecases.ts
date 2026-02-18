@@ -3,12 +3,15 @@
 export async function setupSetChannelsUsecase(input: {
   guildId: string;
   duelPublicChannelId?: string | null;
+  duelsChannelId?: string | null;
   oracleChannelId?: string | null;
   questionsChannelId?: string | null;
   raidChannelId?: string | null;
 }) {
+  const duelsChannelId = input.duelsChannelId ?? input.duelPublicChannelId;
   return setGuildSettings(input.guildId, {
-    duelPublicChannelId: input.duelPublicChannelId,
+    duelPublicChannelId: duelsChannelId,
+    duelsChannelId,
     oracleChannelId: input.oracleChannelId,
     questionsChannelId: input.questionsChannelId,
     raidChannelId: input.raidChannelId

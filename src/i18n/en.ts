@@ -158,6 +158,7 @@ export const en: Record<I18nKey, string> = {
   'setup.wizard.followup.horoscope_test_already': 'Horoscope test publish already queued for <#{channelId}>.',
   'setup.wizard.followup.oracle_test_queued': 'Oracle test post queued for <#{channelId}>.',
   'setup.wizard.followup.oracle_test_already': 'Oracle test post already queued for <#{channelId}>.',
+  'setup.wizard.followup.oracle_test_failed': 'Oracle test failed: {reason}',
   'setup.wizard.error.role_selector': 'Use the role selector for this action.',
   'setup.wizard.error.timezone_selector': 'Use the timezone selector for this action.',
   'setup.wizard.error.channel_selector': 'Use a channel selector for this action.',
@@ -441,9 +442,10 @@ export const en: Record<I18nKey, string> = {
     'DM and pair-room fallback unavailable, showing here:\n\n{text}',
   'interaction.oracle.claimed': 'Oracle guidance claimed. {delivery}',
   'interaction.oracle.already_claimed': 'You already claimed for this week. {delivery}',
-  'interaction.oracle.about': 'Not astrology. Practical relationship skill guidance for this week.',
+  'interaction.oracle.about':
+    'Weekly Oracle is a short relationship prompt for this week. It helps you choose one small practical step instead of arguing about who is right.\n\nButtons:\n• "Get guidance" — choose tone and situation, then get your personal guidance.\n• "What is this?" — open this explanation.\n• "Pair ritual" — move to your pair room and do the step together.\n\nImportant: this is a metaphor/ritual, not science and not a prediction.\n\nToday: pick one 10-minute step and tell your partner when you will do it.',
   'interaction.astro.about':
-    'This is not astrology and not a prediction. It is a short ritual-metaphor with practical steps for the next 4 days.\n\nHow to use:\n1. Open Horoscope and read the card.\n2. Pick one small step for today.\n3. Tell your partner what exactly you will do.\n4. Repeat and adjust in the next cycle.\n\nWho it is for: couples who want less drama and more clear communication.',
+    'Horoscope is a short card with ideas for your relationship. It is not magic and not destiny, just a simple ritual to start a useful conversation.\n\nButtons:\n• "Получить приватно" — private guidance only for you.\n• "Для пары" — guidance for both partners.\n• "About" — open this explanation.\n• "Настроить знак" — save your sign to reuse later.\n\nImportant: astrology here is a metaphor/ritual, not science and not prediction.\n\nToday: choose one 10-15 minute action and agree when to do it.',
   'interaction.oracle.ritual_open_pair_panel':
     'Open your pair panel in <#{channelId}> and start the ritual there.',
   'interaction.oracle.ritual_create_pair_first':

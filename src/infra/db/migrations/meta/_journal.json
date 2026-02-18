@@ -85,6 +85,13 @@
       "when": 1772640000000,
       "tag": "0011_duels_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772726400000,
+      "tag": "0012_oracle_snowflake_text",
+      "breakpoints": true
     }
   ]
 }

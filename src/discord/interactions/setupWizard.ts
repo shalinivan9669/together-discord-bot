@@ -24,6 +24,7 @@ import { setRecurringScheduleEnabled } from '../../infra/queue/scheduler';
 import { t, type AppLocale } from '../../i18n';
 import { createCorrelationId } from '../../lib/correlation';
 import { startOfWeekIso } from '../../lib/time';
+import { waitForSetupTestStatus } from '../../app/services/setupTestStatusService';
 import { formatRequirementLabel } from '../featureErrors';
 import { logInteraction } from '../interactionLog';
 import { editComponentsV2Message, toComponentsV2EditBody } from '../ui-v2';
@@ -341,6 +342,18 @@ async function queueOracleTestPost(input: {
       retryLimit: 3
     },
   );
+
+  if (jobId) {
+    const status = await waitForSetupTestStatus(input.correlationId, 2500, 125);
+    if (status?.feature === 'oracle' && status.state === 'failed') {
+      return {
+        ok: false,
+        content: t(input.locale, 'setup.wizard.followup.oracle_test_failed', {
+          reason: status.message
+        })
+      };
+    }
+  }
 
   return {
     ok: true,

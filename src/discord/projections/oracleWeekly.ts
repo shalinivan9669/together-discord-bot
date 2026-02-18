@@ -74,6 +74,7 @@ export async function refreshWeeklyOracleProjection(input: {
   messageEditor: ThrottledMessageEditor;
   weekStartDate?: string;
   guildId?: string;
+  correlationId?: string;
   now?: Date;
 }): Promise<WeeklyOracleRefreshStats> {
   const weekStartDate = input.weekStartDate ?? startOfWeekIso(input.now ?? new Date());
@@ -101,13 +102,15 @@ export async function refreshWeeklyOracleProjection(input: {
   let failed = 0;
 
   for (const row of rows) {
-    const state = await getGuildFeatureState(row.guildId, 'oracle');
+    const guildId = String(row.guildId);
+    const state = await getGuildFeatureState(guildId, 'oracle');
     if (!state.enabled || !state.configured) {
       logger.info(
         {
           feature: 'oracle_weekly',
           action: 'refresh_skipped',
-          guild_id: row.guildId,
+          guild_id: guildId,
+          correlation_id: input.correlationId,
           reason: state.reason,
         },
         'skipped: missing channel config',
@@ -115,13 +118,14 @@ export async function refreshWeeklyOracleProjection(input: {
       continue;
     }
 
-    const channelId = row.oracleChannelId;
+    const channelId = normalizeSnowflake(row.oracleChannelId);
     if (!channelId) {
       logger.info(
         {
           feature: 'oracle_weekly',
           action: 'refresh_skipped',
-          guild_id: row.guildId,
+          guild_id: guildId,
+          correlation_id: input.correlationId,
           reason: 'oracle channel not configured',
         },
         'skipped: missing channel config',
@@ -130,58 +134,99 @@ export async function refreshWeeklyOracleProjection(input: {
     }
 
     processed += 1;
+    let step = 'ensure_oracle_week';
+    const existingMessageId = normalizeSnowflake(row.oracleMessageId);
 
     try {
-      await ensureOracleWeek(row.guildId, weekStartDate);
+      logger.info(
+        {
+          feature: 'oracle_weekly',
+          action: 'refresh_started',
+          guild_id: guildId,
+          week_start_date: weekStartDate,
+          correlation_id: input.correlationId,
+        },
+        'Weekly oracle projection refresh started',
+      );
+      await ensureOracleWeek(guildId, weekStartDate);
+      step = 'render_view';
       const view = renderWeeklyOraclePost({
-        guildId: row.guildId,
+        guildId,
         weekStartDate,
       });
 
-      if (row.oracleMessageId) {
+      if (existingMessageId) {
+        step = 'edit_existing_message';
         try {
           await input.messageEditor.queueEdit({
             channelId,
-            messageId: row.oracleMessageId,
+            messageId: existingMessageId,
             components: view.components,
             flags: COMPONENTS_V2_FLAGS,
           });
           updated += 1;
+          logger.info(
+            {
+              feature: 'oracle_weekly',
+              action: 'refresh_updated',
+              guild_id: guildId,
+              week_start_date: weekStartDate,
+              correlation_id: input.correlationId,
+            },
+            'Weekly oracle projection refresh updated existing message',
+          );
           continue;
         } catch (error) {
           if (getDiscordErrorStatus(error) !== 404) {
             throw error;
           }
 
-          await clearOracleMessageId(row.guildId);
+          step = 'clear_missing_message_id';
+          await clearOracleMessageId(guildId);
         }
       }
 
+      step = 'create_message';
       const createdMessage = await sendComponentsV2Message(input.client, channelId, view);
+      step = 'claim_message_id';
       const claimed = await setOracleMessageIdIfUnset({
-        guildId: row.guildId,
+        guildId,
         messageId: createdMessage.id,
       });
 
       if (claimed) {
         created += 1;
+        logger.info(
+          {
+            feature: 'oracle_weekly',
+            action: 'refresh_created',
+            guild_id: guildId,
+            week_start_date: weekStartDate,
+            correlation_id: input.correlationId,
+            message_id: createdMessage.id,
+          },
+          'Weekly oracle projection refresh created message',
+        );
         continue;
       }
 
+      step = 'sync_latest_message';
       const latestRows = await db
         .select({
           oracleMessageId: sql<string | null>`oracle_message_id`,
           oracleChannelId: guildSettings.oracleChannelId,
         })
         .from(guildSettings)
-        .where(eq(guildSettings.guildId, row.guildId))
+        .where(eq(guildSettings.guildId, guildId))
         .limit(1);
 
       const latest = latestRows[0];
-      if (latest?.oracleMessageId) {
+      const latestMessageId = normalizeSnowflake(latest?.oracleMessageId ?? null);
+      const latestChannelId = normalizeSnowflake(latest?.oracleChannelId ?? null) ?? channelId;
+      if (latestMessageId) {
         await input.messageEditor.queueEdit({
-          channelId: latest.oracleChannelId ?? channelId,
-          messageId: latest.oracleMessageId,
+          channelId: latestChannelId,
+          messageId: latestMessageId,
           components: view.components,
           flags: COMPONENTS_V2_FLAGS,
         });
@@ -190,16 +235,31 @@ export async function refreshWeeklyOracleProjection(input: {
         created += 1;
       }
 
-      if (latest?.oracleMessageId !== createdMessage.id) {
+      if (latestMessageId !== createdMessage.id) {
+        step = 'delete_duplicate_message';
         await deleteMessageBestEffort(input.client, channelId, createdMessage.id);
       }
+      logger.info(
+        {
+          feature: 'oracle_weekly',
+          action: 'refresh_completed',
+          guild_id: guildId,
+          week_start_date: weekStartDate,
+          correlation_id: input.correlationId,
+          created,
+          updated,
+        },
+        'Weekly oracle projection refresh completed',
+      );
     } catch (error) {
       failed += 1;
       logger.error(
         {
           feature: 'oracle_weekly',
-          guild_id: row.guildId,
+          guild_id: guildId,
           week_start_date: weekStartDate,
+          step,
+          correlation_id: input.correlationId,
           error,
         },
         'Weekly oracle projection refresh failed',
@@ -213,4 +273,17 @@ export async function refreshWeeklyOracleProjection(input: {
     updated,
     failed,
   };
+}
+
+function normalizeSnowflake(value: unknown): string | null {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+    return String(Math.trunc(value));
+  }
+  if (typeof value === 'bigint' && value >= 0n) {
+    return value.toString();
+  }
+  return null;
 }

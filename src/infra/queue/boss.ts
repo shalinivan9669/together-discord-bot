@@ -30,6 +30,7 @@ import { configureRecurringSchedules, type RecurringScheduleStatus } from './sch
 import { publishDueScheduledPosts } from '../../app/services/publicPostService';
 import { scheduleWeeklyCheckinNudges } from '../../app/services/checkinService';
 import { markHoroscopePublished, queueAstroPublishForTick } from '../../app/services/astroHoroscopeService';
+import { recordSetupTestStatus } from '../../app/services/setupTestStatusService';
 import {
   endExpiredRaids,
   generateDailyRaidOffers,
@@ -69,6 +70,20 @@ function isQueueExistsError(error: unknown): boolean {
 
   const message = parsed.message?.toLowerCase() ?? '';
   return message.includes('queue') && message.includes('already exists');
+}
+
+function toUserSafeQueueError(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    if (error.message.includes('Missing Access') || error.message.includes('Missing Permissions')) {
+      return 'Бот не может отправить сообщение в выбранный канал. Проверьте права канала.';
+    }
+
+    if (error.message.includes('Unknown Channel')) {
+      return 'Канал Оракула недоступен или удален. Выберите другой канал в настройке.';
+    }
+  }
+
+  return 'Не удалось опубликовать тест Оракула. Проверьте настройки канала и попробуйте снова.';
 }
 
 export async function ensureQueues(boss: PgBoss, jobNames: readonly JobName[]): Promise<void> {
@@ -337,7 +352,16 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
             },
           );
 
-          logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+          logger.info(
+            {
+              feature: parsed.feature,
+              action: parsed.action,
+              job_id: job.id,
+              correlation_id: parsed.correlationId,
+              guild_id: parsed.guildId
+            },
+            'job started',
+          );
 
           if (!messageEditor) {
             throw new Error('Message editor not initialized for oracle publish');
@@ -347,29 +371,72 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
             throw new Error('Discord client not initialized for oracle publish');
           }
 
-          const refreshed = await refreshWeeklyOracleProjection({
-            client: discordClient,
-            messageEditor,
-            weekStartDate: parsed.weekStartDate,
-            guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId
-          });
+          const isSetupTest = parsed.action === 'setup_test_post';
 
-          if (refreshed.failed > 0) {
-            throw new Error(`Oracle refresh failed for ${refreshed.failed} guild(s)`);
+          try {
+            const refreshed = await refreshWeeklyOracleProjection({
+              client: discordClient,
+              messageEditor,
+              weekStartDate: parsed.weekStartDate,
+              guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId,
+              correlationId: parsed.correlationId
+            });
+
+            if (refreshed.failed > 0) {
+              throw new Error(`Oracle refresh failed for ${refreshed.failed} guild(s)`);
+            }
+
+            if (isSetupTest) {
+              recordSetupTestStatus({
+                correlationId: parsed.correlationId,
+                guildId: parsed.guildId,
+                userId: parsed.userId,
+                feature: 'oracle',
+                state: 'succeeded',
+                message: 'ok'
+              });
+            }
+
+            logger.info(
+              {
+                feature: parsed.feature,
+                action: parsed.action,
+                job_id: job.id,
+                correlation_id: parsed.correlationId,
+                guild_id: parsed.guildId,
+                processed: refreshed.processed,
+                created: refreshed.created,
+                updated: refreshed.updated,
+                failed: refreshed.failed
+              },
+              'job completed',
+            );
+          } catch (error) {
+            logger.error(
+              {
+                feature: parsed.feature,
+                action: parsed.action,
+                job_id: job.id,
+                correlation_id: parsed.correlationId,
+                guild_id: parsed.guildId,
+                error
+              },
+              'Oracle publish job failed',
+            );
+
+            if (isSetupTest) {
+              recordSetupTestStatus({
+                correlationId: parsed.correlationId,
+                guildId: parsed.guildId,
+                userId: parsed.userId,
+                feature: 'oracle',
+                state: 'failed',
+                message: toUserSafeQueueError(error)
+              });
+            }
+
+            throw error;
           }
-
-          logger.info(
-            {
-              feature: parsed.feature,
-              action: parsed.action,
-              job_id: job.id,
-              processed: refreshed.processed,
-              created: refreshed.created,
-              updated: refreshed.updated,
-              failed: refreshed.failed
-            },
-            'job completed',
-          );
         }
       });
     }
