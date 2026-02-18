@@ -35,6 +35,8 @@ export const guildSettings = pgTable('guild_settings', {
   questionsChannelId: varchar('questions_channel_id', { length: 32 }),
   raidChannelId: varchar('raid_channel_id', { length: 32 }),
   duelPublicChannelId: varchar('duel_public_channel_id', { length: 32 }),
+  duelsChannelId: varchar('duels_channel_id', { length: 32 }),
+  duelsEnabled: boolean('duels_enabled').notNull().default(true),
   hallChannelId: varchar('hall_channel_id', { length: 32 }),
   moderatorRoleId: varchar('moderator_role_id', { length: 32 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

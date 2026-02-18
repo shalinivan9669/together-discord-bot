@@ -21,6 +21,7 @@ import {
   buildAstroClaimPicker,
   buildAstroPairPicker
 } from '../interactions/components';
+import { createInteractionTranslator } from '../locale';
 import { assertAdminOrConfiguredModerator, assertGuildOnly } from '../middleware/guard';
 import type { CommandModule } from './types';
 
@@ -107,6 +108,7 @@ export const horoscopeCommand: CommandModule = {
     ),
   async execute(ctx, interaction) {
     assertGuildOnly(interaction);
+    const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const sub = interaction.options.getSubcommand();
@@ -181,7 +183,7 @@ export const horoscopeCommand: CommandModule = {
 
       const state = await getAstroFeatureState(interaction.guildId);
       if (!state.enabled) {
-        await interaction.editReply('Astro Horoscope выключен. Запустите `/horoscope setup`.');
+        await interaction.editReply(tr.t('horoscope.reply.channel_not_configured_publish_now'));
         return;
       }
 
@@ -203,8 +205,8 @@ export const horoscopeCommand: CommandModule = {
       assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
 
       const state = await getAstroFeatureState(interaction.guildId);
-      if (!state.enabled || !state.configured) {
-        await interaction.editReply('Сначала выполните `/horoscope setup`.');
+      if (!state.enabled || !state.configured || !state.channelId) {
+        await interaction.editReply(tr.t('horoscope.reply.channel_not_configured_publish_now'));
         return;
       }
 
@@ -232,7 +234,9 @@ export const horoscopeCommand: CommandModule = {
         correlationId
       });
 
-      await interaction.editReply('Astro publish поставлен в очередь.');
+      await interaction.editReply(
+        tr.t('horoscope.reply.publish_job_queued_eta', { channelId: state.channelId }),
+      );
       return;
     }
 

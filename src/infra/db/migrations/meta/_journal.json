@@ -78,6 +78,13 @@
       "when": 1772553600000,
       "tag": "0010_horoscope_scheduler_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772640000000,
+      "tag": "0011_duels_settings",
+      "breakpoints": true
     }
   ]
 }

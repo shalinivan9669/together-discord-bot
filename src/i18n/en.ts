@@ -116,6 +116,9 @@ export const en: Record<I18nKey, string> = {
   'setup.wizard.line.horoscope_channel': 'Horoscope (public post)',
   'setup.wizard.line.horoscope_enabled': 'Horoscope status',
   'setup.wizard.line.horoscope_frequency': 'Horoscope frequency',
+  'setup.wizard.line.duels_channel': 'Duels channel',
+  'setup.wizard.line.duels_status_channel_missing': 'Duels status: disabled until channel is configured.',
+  'setup.wizard.line.duels_status_ready': 'Duels status: ready.',
   'setup.wizard.line.raid_channel': 'Raid progress',
   'setup.wizard.line.hall_channel': 'Hall of fame',
   'setup.wizard.line.public_post_channel': 'Public posts',
@@ -126,6 +129,7 @@ export const en: Record<I18nKey, string> = {
   'setup.wizard.placeholder.pair_category': 'Select pair category',
   'setup.wizard.placeholder.oracle_channel': 'Select Weekly Oracle channel',
   'setup.wizard.placeholder.horoscope_channel': 'Select Horoscope channel',
+  'setup.wizard.placeholder.duels_channel': 'Select duels channel',
   'setup.wizard.placeholder.horoscope_enabled': 'Select Horoscope status',
   'setup.wizard.placeholder.horoscope_frequency': 'Select Horoscope frequency',
   'setup.wizard.placeholder.raid_channel': 'Select raid channel',
@@ -137,6 +141,9 @@ export const en: Record<I18nKey, string> = {
   'setup.wizard.button.complete': 'Complete setup',
   'setup.wizard.button.reset': 'Reset',
   'setup.wizard.button.test_post': 'Test post',
+  'setup.wizard.button.test_oracle': 'Test Oracle',
+  'setup.wizard.button.test_horoscope': 'Test Horoscope',
+  'setup.wizard.button.test_both': 'Test Both',
   'setup.wizard.option.horoscope_enabled': 'Enabled',
   'setup.wizard.option.horoscope_disabled': 'Disabled',
   'setup.wizard.frequency.days': 'Every {days} day(s)',
@@ -149,6 +156,8 @@ export const en: Record<I18nKey, string> = {
   'setup.wizard.followup.test_post_already': 'Test post already queued for <#{channelId}> in this minute.',
   'setup.wizard.followup.horoscope_test_queued': 'Test post published to <#{channelId}>.',
   'setup.wizard.followup.horoscope_test_already': 'Horoscope test publish already queued for <#{channelId}>.',
+  'setup.wizard.followup.oracle_test_queued': 'Oracle test post queued for <#{channelId}>.',
+  'setup.wizard.followup.oracle_test_already': 'Oracle test post already queued for <#{channelId}>.',
   'setup.wizard.error.role_selector': 'Use the role selector for this action.',
   'setup.wizard.error.timezone_selector': 'Use the timezone selector for this action.',
   'setup.wizard.error.channel_selector': 'Use a channel selector for this action.',
@@ -165,6 +174,10 @@ export const en: Record<I18nKey, string> = {
   'setup.wizard.error.commit_validation_failed':
     'Cannot complete setup because validation failed. Fix the following:',
   'setup.wizard.error.unsupported_action': 'Unsupported setup wizard action.',
+  'setup.wizard.error.test_post_channel_missing': 'Configure the channel in Setup Wizard first.',
+  'setup.wizard.error.test_post_invalid_channel': 'Configured channel is missing or not a text channel.',
+  'setup.wizard.error.test_post_permissions_missing':
+    'Bot is missing permissions in <#{channelId}>: {missing}.',
   'setup.wizard.test_post.title': '## Setup Wizard Test Post',
   'setup.wizard.test_post.guild': 'Guild: `{guildId}`',
   'setup.wizard.test_post.body':
@@ -257,6 +270,11 @@ export const en: Record<I18nKey, string> = {
   'oracle.reply.configured_channel': 'Configured channel: {channel}',
   'oracle.reply.weekly_publish': 'Oracle publish runs every Monday at 10:00.',
   'oracle.reply.publish_job_queued': 'Oracle refresh job queued.',
+  'oracle.reply.channel_not_configured_publish_now': 'Set weekly Oracle channel in Setup Wizard.',
+  'oracle.reply.publish_job_queued_eta': 'Queued. It will post to <#{channelId}> in ~5 sec.',
+
+  'horoscope.reply.channel_not_configured_publish_now': 'Set Horoscope channel in Setup Wizard.',
+  'horoscope.reply.publish_job_queued_eta': 'Queued. It will post to <#{channelId}> in ~5 sec.',
 
   'checkin.command.description': 'Weekly pair check-in',
   'checkin.command.start.description': 'Start weekly check-in in your pair room',
@@ -424,6 +442,8 @@ export const en: Record<I18nKey, string> = {
   'interaction.oracle.claimed': 'Oracle guidance claimed. {delivery}',
   'interaction.oracle.already_claimed': 'You already claimed for this week. {delivery}',
   'interaction.oracle.about': 'Not astrology. Practical relationship skill guidance for this week.',
+  'interaction.astro.about':
+    'This is not astrology and not a prediction. It is a short ritual-metaphor with practical steps for the next 4 days.\n\nHow to use:\n1. Open Horoscope and read the card.\n2. Pick one small step for today.\n3. Tell your partner what exactly you will do.\n4. Repeat and adjust in the next cycle.\n\nWho it is for: couples who want less drama and more clear communication.',
   'interaction.oracle.ritual_open_pair_panel':
     'Open your pair panel in <#{channelId}> and start the ritual there.',
   'interaction.oracle.ritual_create_pair_first':

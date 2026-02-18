@@ -23,6 +23,7 @@ import { type JobName, JobNames } from '../../infra/queue/jobs';
 import { setRecurringScheduleEnabled } from '../../infra/queue/scheduler';
 import { t, type AppLocale } from '../../i18n';
 import { createCorrelationId } from '../../lib/correlation';
+import { startOfWeekIso } from '../../lib/time';
 import { formatRequirementLabel } from '../featureErrors';
 import { logInteraction } from '../interactionLog';
 import { editComponentsV2Message, toComponentsV2EditBody } from '../ui-v2';
@@ -53,6 +54,7 @@ const actionSchema = z.enum([
   'pick_horoscope_channel',
   'pick_horoscope_enabled',
   'pick_horoscope_frequency',
+  'pick_duels_channel',
   'pick_raid_channel',
   'pick_hall_channel',
   'pick_public_post_channel',
@@ -61,7 +63,10 @@ const actionSchema = z.enum([
   'pick_timezone',
   'complete',
   'reset',
-  'test_post'
+  'test_post',
+  'test_post_oracle',
+  'test_post_horoscope',
+  'test_post_both'
 ]);
 
 const scheduleFeatureMap: ReadonlyArray<{ name: JobName; feature: (typeof guildFeatureNames)[number] }> = [
@@ -115,16 +120,33 @@ async function updatePanel(
   await interaction.editReply(payload as never);
 }
 
-function selectTargetChannel(draft: SetupWizardDraft): string | null {
-  return draft.horoscopeChannelId ?? null;
-}
+async function getMissingPostPermissions(
+  interaction: SetupWizardInteraction,
+  channelId: string,
+  locale: AppLocale,
+): Promise<string[] | null> {
+  const channel = await fetchGuildChannel(interaction, channelId);
+  if (!channel || !isSetupTextChannel(channel)) {
+    return null;
+  }
 
-function testPostContent(locale: AppLocale, guildId: string): string {
-  return [
-    t(locale, 'setup.wizard.test_post.title'),
-    t(locale, 'setup.wizard.test_post.guild', { guildId }),
-    t(locale, 'setup.wizard.test_post.body')
-  ].join('\n');
+  const me = channel.guild.members.me ?? await channel.guild.members.fetchMe();
+  const permissions = me.permissionsIn(channel.id);
+  const missing: string[] = [];
+  if (!permissions.has(PermissionFlagsBits.ViewChannel)) {
+    missing.push(t(locale, 'permissions.view_channels'));
+  }
+  if (!permissions.has(PermissionFlagsBits.SendMessages)) {
+    missing.push(t(locale, 'permissions.send_messages'));
+  }
+  if (!permissions.has(PermissionFlagsBits.EmbedLinks)) {
+    missing.push(t(locale, 'permissions.embed_links'));
+  }
+  if (!permissions.has(PermissionFlagsBits.ReadMessageHistory)) {
+    missing.push(t(locale, 'permissions.read_history'));
+  }
+
+  return missing;
 }
 
 async function autoEnableConfiguredFeatures(guildId: string): Promise<void> {
@@ -209,6 +231,7 @@ async function validateDraftBeforeCommit(
   const channelChecks: Array<{ id: string | null; labelKey: Parameters<typeof t>[1] }> = [
     { id: draft.oracleChannelId, labelKey: 'setup.wizard.line.oracle_channel' },
     { id: draft.horoscopeChannelId, labelKey: 'setup.wizard.line.horoscope_channel' },
+    { id: draft.duelsChannelId, labelKey: 'setup.wizard.line.duels_channel' },
     { id: draft.raidChannelId, labelKey: 'setup.wizard.line.raid_channel' },
     { id: draft.hallChannelId, labelKey: 'setup.wizard.line.hall_channel' },
     { id: draft.publicPostChannelId, labelKey: 'setup.wizard.line.public_post_channel' },
@@ -265,6 +288,133 @@ async function validateDraftBeforeCommit(
   }
 
   return errors;
+}
+
+async function queueOracleTestPost(input: {
+  boss: PgBoss;
+  interaction: SetupWizardInteraction;
+  locale: AppLocale;
+  correlationId: string;
+  draft: SetupWizardDraft;
+}): Promise<{ ok: true; content: string } | { ok: false; content: string }> {
+  const channelId = input.draft.oracleChannelId;
+  if (!channelId) {
+    return {
+      ok: false,
+      content: t(input.locale, 'setup.wizard.error.test_post_channel_missing')
+    };
+  }
+
+  const missingPermissions = await getMissingPostPermissions(input.interaction, channelId, input.locale);
+  if (!missingPermissions) {
+    return {
+      ok: false,
+      content: t(input.locale, 'setup.wizard.error.test_post_invalid_channel')
+    };
+  }
+
+  if (missingPermissions.length > 0) {
+    return {
+      ok: false,
+      content: t(input.locale, 'setup.wizard.error.test_post_permissions_missing', {
+        channelId,
+        missing: missingPermissions.join(', ')
+      })
+    };
+  }
+
+  const minuteKey = new Date().toISOString().slice(0, 16);
+  const jobId = await input.boss.send(
+    JobNames.OraclePublish,
+    {
+      correlationId: input.correlationId,
+      interactionId: input.interaction.id,
+      guildId: input.interaction.guildId!,
+      userId: input.interaction.user.id,
+      weekStartDate: startOfWeekIso(new Date()),
+      feature: 'oracle',
+      action: 'setup_test_post'
+    },
+    {
+      singletonKey: `oracle:test:${input.interaction.guildId}:${minuteKey}`,
+      singletonSeconds: 60,
+      retryLimit: 3
+    },
+  );
+
+  return {
+    ok: true,
+    content: jobId
+      ? t(input.locale, 'setup.wizard.followup.oracle_test_queued', { channelId })
+      : t(input.locale, 'setup.wizard.followup.oracle_test_already', { channelId })
+  };
+}
+
+async function queueHoroscopeTestPost(input: {
+  boss: PgBoss;
+  interaction: SetupWizardInteraction;
+  locale: AppLocale;
+  correlationId: string;
+  draft: SetupWizardDraft;
+}): Promise<{ ok: true; content: string } | { ok: false; content: string }> {
+  const channelId = input.draft.horoscopeChannelId;
+  if (!channelId) {
+    return {
+      ok: false,
+      content: t(input.locale, 'setup.wizard.error.test_post_channel_missing')
+    };
+  }
+
+  const missingPermissions = await getMissingPostPermissions(input.interaction, channelId, input.locale);
+  if (!missingPermissions) {
+    return {
+      ok: false,
+      content: t(input.locale, 'setup.wizard.error.test_post_invalid_channel')
+    };
+  }
+
+  if (missingPermissions.length > 0) {
+    return {
+      ok: false,
+      content: t(input.locale, 'setup.wizard.error.test_post_permissions_missing', {
+        channelId,
+        missing: missingPermissions.join(', ')
+      })
+    };
+  }
+
+  const now = new Date();
+  const dedupeKey = buildHoroscopeDedupeKey({
+    guildId: input.interaction.guildId!,
+    runAt: now,
+    isTest: true
+  });
+  const jobId = await input.boss.send(
+    JobNames.AstroPublish,
+    {
+      correlationId: input.correlationId,
+      interactionId: input.interaction.id,
+      guildId: input.interaction.guildId!,
+      userId: input.interaction.user.id,
+      runAtIso: now.toISOString(),
+      dedupeKey,
+      isTest: true,
+      feature: 'astro',
+      action: 'setup_test_post'
+    },
+    {
+      singletonKey: dedupeKey,
+      singletonSeconds: 300,
+      retryLimit: 3
+    },
+  );
+
+  return {
+    ok: true,
+    content: jobId
+      ? t(input.locale, 'setup.wizard.followup.horoscope_test_queued', { channelId })
+      : t(input.locale, 'setup.wizard.followup.horoscope_test_already', { channelId })
+  };
 }
 
 export async function handleSetupWizardComponent(
@@ -424,6 +574,8 @@ export async function handleSetupWizardComponent(
         ? { oracleChannelId: channelId }
       : action === 'pick_horoscope_channel'
         ? { horoscopeChannelId: channelId }
+      : action === 'pick_duels_channel'
+          ? { duelsChannelId: channelId }
       : action === 'pick_raid_channel'
           ? { raidChannelId: channelId }
       : action === 'pick_hall_channel'
@@ -482,6 +634,8 @@ export async function handleSetupWizardComponent(
             everyDays: draft.horoscopeEveryDays
           })
         : null,
+      duelsEnabled: draft.duelsEnabled,
+      duelsChannelId: draft.duelsChannelId,
       raidChannelId: draft.raidChannelId,
       hallChannelId: draft.hallChannelId,
       publicPostChannelId: draft.publicPostChannelId,
@@ -528,54 +682,42 @@ export async function handleSetupWizardComponent(
     return true;
   }
 
-  const channelId = selectTargetChannel(draft);
-  if (!channelId) {
-    await interaction.followUp({
-      flags: MessageFlags.Ephemeral,
-      content: `${t(locale, 'setup.wizard.followup.preview')}:\n\n${testPostContent(locale, interaction.guildId)}`
+  const testOracle = action === 'test_post_oracle' || action === 'test_post_both';
+  const testHoroscope = action === 'test_post' || action === 'test_post_horoscope' || action === 'test_post_both';
+  const followupLines: string[] = [];
+
+  if (testOracle) {
+    const result = await queueOracleTestPost({
+      boss: ctx.boss,
+      interaction,
+      locale,
+      correlationId,
+      draft
     });
-    return true;
+    followupLines.push(result.content);
   }
 
-  const now = new Date();
-  const dedupeKey = buildHoroscopeDedupeKey({
-    guildId: interaction.guildId,
-    runAt: now,
-    isTest: true
-  });
-  const jobId = await ctx.boss.send(
-    JobNames.AstroPublish,
-    {
+  if (testHoroscope) {
+    const result = await queueHoroscopeTestPost({
+      boss: ctx.boss,
+      interaction,
+      locale,
       correlationId,
-      interactionId: interaction.id,
-      guildId: interaction.guildId,
-      userId: interaction.user.id,
-      runAtIso: now.toISOString(),
-      dedupeKey,
-      isTest: true,
-      feature: 'astro',
-      action: 'setup_test_post'
-    },
-    {
-      singletonKey: dedupeKey,
-      singletonSeconds: 300,
-      retryLimit: 3
-    },
-  );
+      draft
+    });
+    followupLines.push(result.content);
+  }
 
   logInteraction({
     interaction,
     feature: 'setup',
-    action: 'wizard_test_post',
-    correlationId,
-    jobId: typeof jobId === 'string' ? jobId : null
+    action: action === 'test_post_both' ? 'wizard_test_post_both' : action,
+    correlationId
   });
 
   await interaction.followUp({
     flags: MessageFlags.Ephemeral,
-    content: jobId
-      ? t(locale, 'setup.wizard.followup.horoscope_test_queued', { channelId })
-      : t(locale, 'setup.wizard.followup.horoscope_test_already', { channelId }),
+    content: followupLines.join('\n')
   });
 
   await updatePanel(interaction, draft, locale);

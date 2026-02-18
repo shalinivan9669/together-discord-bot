@@ -8,6 +8,8 @@ type SetupWizardDraft = {
   horoscopeEnabled: boolean;
   horoscopeChannelId: string | null;
   horoscopeEveryDays: number;
+  duelsEnabled: boolean;
+  duelsChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -26,6 +28,8 @@ function draft(overrides?: Partial<SetupWizardDraft>): SetupWizardDraft {
     horoscopeEnabled: true,
     horoscopeChannelId: null,
     horoscopeEveryDays: 4,
+    duelsEnabled: true,
+    duelsChannelId: null,
     raidChannelId: null,
     hallChannelId: null,
     publicPostChannelId: null,
@@ -145,10 +149,11 @@ describe('setup wizard v2 view', () => {
         pairCategoryId: 'cat1',
         oracleChannelId: 'ch1',
         horoscopeChannelId: 'ch2',
-        raidChannelId: 'ch3',
-        hallChannelId: 'ch4',
-        publicPostChannelId: 'ch5',
-        anonInboxChannelId: 'ch6'
+        duelsChannelId: 'ch3',
+        raidChannelId: 'ch4',
+        hallChannelId: 'ch5',
+        publicPostChannelId: 'ch6',
+        anonInboxChannelId: 'ch7'
       }) as never,
       'ru',
     );
@@ -165,6 +170,7 @@ describe('setup wizard v2 view', () => {
     const textChannelActions = [
       'pick_oracle_channel',
       'pick_horoscope_channel',
+      'pick_duels_channel',
       'pick_raid_channel',
       'pick_hall_channel',
       'pick_public_post_channel',
@@ -214,10 +220,20 @@ describe('setup wizard v2 view', () => {
     });
     const testPostButton = completeControls.find((item) => {
       const customId = item.custom_id;
-      return typeof customId === 'string' && decodeCustomId(customId).action === 'test_post';
+      return typeof customId === 'string' && decodeCustomId(customId).action === 'test_post_oracle';
+    });
+    const testHoroscopeButton = completeControls.find((item) => {
+      const customId = item.custom_id;
+      return typeof customId === 'string' && decodeCustomId(customId).action === 'test_post_horoscope';
+    });
+    const testBothButton = completeControls.find((item) => {
+      const customId = item.custom_id;
+      return typeof customId === 'string' && decodeCustomId(customId).action === 'test_post_both';
     });
     expect(resetButton?.type).toBe(ComponentType.Button);
     expect(testPostButton?.type).toBe(ComponentType.Button);
+    expect(testHoroscopeButton?.type).toBe(ComponentType.Button);
+    expect(testBothButton?.type).toBe(ComponentType.Button);
   });
 
   it('disables complete when horoscope is enabled but channel is missing', async () => {
@@ -233,10 +249,11 @@ describe('setup wizard v2 view', () => {
         oracleChannelId: 'ch1',
         horoscopeEnabled: true,
         horoscopeChannelId: null,
-        raidChannelId: 'ch2',
-        hallChannelId: 'ch3',
-        publicPostChannelId: 'ch4',
-        anonInboxChannelId: 'ch5'
+        duelsChannelId: 'ch2',
+        raidChannelId: 'ch3',
+        hallChannelId: 'ch4',
+        publicPostChannelId: 'ch5',
+        anonInboxChannelId: 'ch6'
       }) as never,
       'ru',
     );

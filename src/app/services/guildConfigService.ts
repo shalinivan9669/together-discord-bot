@@ -56,6 +56,8 @@ export type GuildConfig = {
   pairCategoryId: string | null;
   oracleChannelId: string | null;
   raidChannelId: string | null;
+  duelsChannelId: string | null;
+  duelsEnabled: boolean;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
   anonInboxChannelId: string | null;
@@ -76,6 +78,8 @@ export type GuildConfigPatch = Partial<{
   pairCategoryId: string | null;
   oracleChannelId: string | null;
   raidChannelId: string | null;
+  duelsChannelId: string | null;
+  duelsEnabled: boolean;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
   anonInboxChannelId: string | null;
@@ -171,8 +175,10 @@ function normalizeConfig(
     pairCategoryId: row?.pairCategoryId ?? null,
     oracleChannelId: row?.oracleChannelId ?? null,
     raidChannelId: row?.raidChannelId ?? null,
+    duelsChannelId: row?.duelsChannelId ?? row?.duelPublicChannelId ?? null,
+    duelsEnabled: row?.duelsEnabled ?? true,
     hallChannelId: row?.hallChannelId ?? null,
-    publicPostChannelId: row?.publicPostChannelId ?? row?.duelPublicChannelId ?? null,
+    publicPostChannelId: row?.publicPostChannelId ?? null,
     anonInboxChannelId: row?.anonInboxChannelId ?? row?.questionsChannelId ?? null,
     anonModRoleId: row?.anonModRoleId ?? row?.moderatorRoleId ?? null,
     horoscopeEnabled: row?.horoscopeEnabled ?? true,
@@ -294,6 +300,8 @@ export async function updateGuildConfig(
     pairCategoryId: patch.pairCategoryId,
     oracleChannelId: patch.oracleChannelId,
     raidChannelId: patch.raidChannelId,
+    duelsChannelId: patch.duelsChannelId,
+    duelsEnabled: patch.duelsEnabled,
     hallChannelId: patch.hallChannelId,
     publicPostChannelId: patch.publicPostChannelId,
     anonInboxChannelId: patch.anonInboxChannelId,
@@ -306,7 +314,7 @@ export async function updateGuildConfig(
     horoscopePostMessageId: patch.horoscopePostMessageId,
     features: patch.features,
     // Keep mirrored fields in sync for shared admin/setup flows.
-    duelPublicChannelId: patch.publicPostChannelId,
+    duelPublicChannelId: patch.duelsChannelId,
     questionsChannelId: patch.anonInboxChannelId,
     moderatorRoleId: patch.anonModRoleId,
   };

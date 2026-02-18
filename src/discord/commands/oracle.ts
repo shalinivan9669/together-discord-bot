@@ -36,18 +36,18 @@ export const oracleCommand: CommandModule = {
     const tr = await createInteractionTranslator(interaction);
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-    try {
-      await ensureOracleEnabled(interaction.guildId);
-    } catch (error) {
-      const featureError = formatFeatureUnavailableError('ru', error);
-      await interaction.editReply(featureError ?? tr.t('oracle.reply.disabled_fallback'));
-      return;
-    }
-
     const correlationId = createCorrelationId();
     const sub = interaction.options.getSubcommand();
 
     if (sub === 'status') {
+      try {
+        await ensureOracleEnabled(interaction.guildId);
+      } catch (error) {
+        const featureError = formatFeatureUnavailableError('ru', error);
+        await interaction.editReply(featureError ?? tr.t('oracle.reply.disabled_fallback'));
+        return;
+      }
+
       const settings = await getGuildSettings(interaction.guildId);
       const week = startOfWeekIso(new Date());
 
@@ -70,6 +70,18 @@ export const oracleCommand: CommandModule = {
     if (sub === 'publish-now') {
       const settings = await getGuildSettings(interaction.guildId);
       assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
+      if (!settings?.oracleChannelId) {
+        await interaction.editReply(tr.t('oracle.reply.channel_not_configured_publish_now'));
+        return;
+      }
+
+      try {
+        await ensureOracleEnabled(interaction.guildId);
+      } catch (error) {
+        const featureError = formatFeatureUnavailableError('ru', error);
+        await interaction.editReply(featureError ?? tr.t('oracle.reply.disabled_fallback'));
+        return;
+      }
 
       await ctx.boss.send(JobNames.OraclePublish, {
         correlationId,
@@ -88,7 +100,9 @@ export const oracleCommand: CommandModule = {
         correlationId,
       });
 
-      await interaction.editReply(tr.t('oracle.reply.publish_job_queued'));
+      await interaction.editReply(
+        tr.t('oracle.reply.publish_job_queued_eta', { channelId: settings.oracleChannelId }),
+      );
       return;
     }
 

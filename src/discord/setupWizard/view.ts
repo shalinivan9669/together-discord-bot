@@ -202,6 +202,10 @@ export function buildSetupWizardV2View(
     channelLine(locale, t(locale, 'setup.wizard.line.horoscope_channel'), draft.horoscopeChannelId),
     horoscopeEnabledLine(locale, draft.horoscopeEnabled),
     horoscopeFrequencyLine(locale, draft.horoscopeEveryDays),
+    channelLine(locale, t(locale, 'setup.wizard.line.duels_channel'), draft.duelsChannelId),
+    draft.duelsEnabled && !draft.duelsChannelId
+      ? t(locale, 'setup.wizard.line.duels_status_channel_missing')
+      : t(locale, 'setup.wizard.line.duels_status_ready'),
     channelLine(locale, t(locale, 'setup.wizard.line.raid_channel'), draft.raidChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.hall_channel'), draft.hallChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.public_post_channel'), draft.publicPostChannelId),
@@ -234,6 +238,7 @@ export function buildSetupWizardV2View(
             t(locale, 'setup.wizard.placeholder.horoscope_channel'),
             draft.userId,
           ),
+          channelSelect('pick_duels_channel', t(locale, 'setup.wizard.placeholder.duels_channel'), draft.userId),
           channelSelect('pick_raid_channel', t(locale, 'setup.wizard.placeholder.raid_channel'), draft.userId),
           channelSelect('pick_hall_channel', t(locale, 'setup.wizard.placeholder.hall_channel'), draft.userId),
           channelSelect(
@@ -281,8 +286,20 @@ export function buildSetupWizardV2View(
             {
               type: ComponentType.Button,
               style: ButtonStyle.Primary,
-              custom_id: setupCustomId('test_post', draft.userId),
-              label: t(locale, 'setup.wizard.button.test_post')
+              custom_id: setupCustomId('test_post_oracle', draft.userId),
+              label: t(locale, 'setup.wizard.button.test_oracle')
+            },
+            {
+              type: ComponentType.Button,
+              style: ButtonStyle.Primary,
+              custom_id: setupCustomId('test_post_horoscope', draft.userId),
+              label: t(locale, 'setup.wizard.button.test_horoscope')
+            },
+            {
+              type: ComponentType.Button,
+              style: ButtonStyle.Primary,
+              custom_id: setupCustomId('test_post_both', draft.userId),
+              label: t(locale, 'setup.wizard.button.test_both')
             }
           ])
         ]

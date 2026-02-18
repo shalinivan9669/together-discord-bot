@@ -966,11 +966,7 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
   if (decoded.feature === 'astro' && decoded.action === 'about') {
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
-      content: [
-        'Astro Horoscope использует астрологический язык как метафору ритуалов общения.',
-        'Формат: знак, аспект и короткие практические шаги на 6 дней.',
-        ASTRO_PUBLIC_DISCLAIMER
-      ].join('\n'),
+      content: `${tr.t('interaction.astro.about')}\n\n${ASTRO_PUBLIC_DISCLAIMER}`,
     });
     return;
   }

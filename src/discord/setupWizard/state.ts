@@ -10,6 +10,8 @@ export type SetupWizardDraft = {
   horoscopeEnabled: boolean;
   horoscopeChannelId: string | null;
   horoscopeEveryDays: number;
+  duelsEnabled: boolean;
+  duelsChannelId: string | null;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -46,6 +48,8 @@ function toDraft(guildId: string, userId: string, settings: GuildConfig): SetupW
     horoscopeEnabled: settings.horoscopeEnabled,
     horoscopeChannelId: settings.horoscopeChannelId,
     horoscopeEveryDays: settings.horoscopeEveryDays,
+    duelsEnabled: settings.duelsEnabled,
+    duelsChannelId: settings.duelsChannelId,
     raidChannelId: settings.raidChannelId,
     hallChannelId: settings.hallChannelId,
     publicPostChannelId: settings.publicPostChannelId,

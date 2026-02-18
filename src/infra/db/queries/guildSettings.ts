@@ -35,6 +35,8 @@ export async function upsertGuildSettings(
     questionsChannelId: string | null;
     raidChannelId: string | null;
     duelPublicChannelId: string | null;
+    duelsChannelId: string | null;
+    duelsEnabled: boolean;
     hallChannelId: string | null;
     moderatorRoleId: string | null;
   }>,
