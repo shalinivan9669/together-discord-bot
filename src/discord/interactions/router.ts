@@ -1,7 +1,9 @@
-﻿import type {
+import type {
   ButtonInteraction,
   ChannelSelectMenuInteraction,
   Client,
+  Interaction,
+  MessageComponentInteraction,
   ModalSubmitInteraction,
   RoleSelectMenuInteraction,
   StringSelectMenuInteraction
@@ -1873,16 +1875,357 @@ async function handleSelect(
   await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.unsupported_select_action') });
 }
 
+function componentTypeOfMessage(interaction: MessageComponentInteraction): string {
+  if (interaction.isButton()) {
+    return 'button';
+  }
+
+  if (interaction.isStringSelectMenu()) {
+    return 'string_select';
+  }
+
+  if (interaction.isChannelSelectMenu()) {
+    return 'channel_select';
+  }
+
+  if (interaction.isRoleSelectMenu()) {
+    return 'role_select';
+  }
+
+  if (interaction.isUserSelectMenu()) {
+    return 'user_select';
+  }
+
+  if (interaction.isMentionableSelectMenu()) {
+    return 'mentionable_select';
+  }
+
+  return 'component';
+}
+
+type RoutedMessageComponentInteraction =
+  | ButtonInteraction
+  | StringSelectMenuInteraction
+  | ChannelSelectMenuInteraction
+  | RoleSelectMenuInteraction;
+
+type RoutedInteraction = RoutedMessageComponentInteraction | ModalSubmitInteraction;
+
+type InteractionLogContext = {
+  interaction_id: string;
+  type: string;
+  component_type?: string;
+  custom_id?: string;
+  command_name?: string;
+  guild_id: string | null;
+  channel_id: string | null;
+  user_id: string | null;
+  message_id?: string;
+  correlation_id?: string;
+};
+
+type ErrorInfo = {
+  name: string;
+  message: string;
+  stack?: string;
+  code?: string | number;
+  status?: number;
+  cause?: {
+    name?: string;
+    message?: string;
+    code?: string | number;
+    status?: number;
+  };
+};
+
+type RouteDecision = {
+  routeKey: string;
+  decisionPath: string;
+};
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isRoutedInteraction(interaction: Interaction): interaction is RoutedInteraction {
+  return interaction.isMessageComponent() || interaction.isModalSubmit();
+}
+
+function hasReplyState(interaction: Interaction): interaction is Interaction & { deferred: boolean; replied: boolean } {
+  return 'deferred' in interaction && 'replied' in interaction;
+}
+
+function customIdOf(interaction: Interaction): string | undefined {
+  if (interaction.isMessageComponent() || interaction.isModalSubmit()) {
+    return interaction.customId;
+  }
+
+  return undefined;
+}
+
+function componentTypeOf(interaction: Interaction): string | undefined {
+  if (!interaction.isMessageComponent()) {
+    return undefined;
+  }
+
+  return componentTypeOfMessage(interaction);
+}
+
+function interactionCtx(
+  interaction: Interaction,
+  options?: {
+    correlation_id?: string;
+  },
+): InteractionLogContext {
+  const componentType = componentTypeOf(interaction);
+  const customId = customIdOf(interaction);
+  const context: InteractionLogContext = {
+    interaction_id: interaction.id,
+    type: String(interaction.type),
+    guild_id: interaction.guildId ?? null,
+    channel_id: interaction.channelId ?? null,
+    user_id: interaction.user?.id ?? null
+  };
+
+  if (componentType) {
+    context.component_type = componentType;
+  }
+
+  if (customId) {
+    context.custom_id = customId;
+  }
+
+  if (interaction.isChatInputCommand()) {
+    context.command_name = interaction.commandName;
+  }
+
+  if (interaction.isMessageComponent()) {
+    context.message_id = interaction.message.id;
+  }
+
+  if (options?.correlation_id) {
+    context.correlation_id = options.correlation_id;
+  }
+
+  return context;
+}
+
+function parseCode(value: unknown): string | number | undefined {
+  if (typeof value === 'string' || typeof value === 'number') {
+    return value;
+  }
+
+  return undefined;
+}
+
+function parseStatus(value: unknown): number | undefined {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  return undefined;
+}
+
+function parseCause(value: unknown): ErrorInfo['cause'] {
+  if (value instanceof Error) {
+    const errorLike = value as Error & {
+      code?: unknown;
+      status?: unknown;
+    };
+
+    return {
+      name: value.name,
+      message: value.message,
+      code: parseCode(errorLike.code),
+      status: parseStatus(errorLike.status)
+    };
+  }
+
+  if (!isObjectRecord(value)) {
+    return undefined;
+  }
+
+  const name = typeof value.name === 'string' ? value.name : undefined;
+  const message = typeof value.message === 'string' ? value.message : undefined;
+  const code = parseCode(value.code);
+  const status = parseStatus(value.status);
+
+  if (!name && !message && code === undefined && status === undefined) {
+    return undefined;
+  }
+
+  return {
+    name,
+    message,
+    code,
+    status
+  };
+}
+
+function errInfo(error: unknown): ErrorInfo {
+  if (error instanceof Error) {
+    const errorLike = error as Error & {
+      code?: unknown;
+      status?: unknown;
+      cause?: unknown;
+    };
+
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: parseCode(errorLike.code),
+      status: parseStatus(errorLike.status),
+      cause: parseCause(errorLike.cause)
+    };
+  }
+
+  if (!isObjectRecord(error)) {
+    return {
+      name: 'NonErrorThrown',
+      message: typeof error === 'string' ? error : 'Non-error value thrown'
+    };
+  }
+
+  return {
+    name: typeof error.name === 'string' ? error.name : 'NonErrorThrown',
+    message: typeof error.message === 'string' ? error.message : 'Non-error value thrown',
+    stack: typeof error.stack === 'string' ? error.stack : undefined,
+    code: parseCode(error.code),
+    status: parseStatus(error.status),
+    cause: parseCause(error.cause)
+  };
+}
+
+function deriveRouteDecision(interaction: Interaction): RouteDecision {
+  if (interaction.isButton()) {
+    return {
+      routeKey: 'button',
+      decisionPath: 'isButton -> handleButton'
+    };
+  }
+
+  if (interaction.isModalSubmit()) {
+    return {
+      routeKey: 'modal_submit',
+      decisionPath: 'isModalSubmit -> handleModal'
+    };
+  }
+
+  if (interaction.isStringSelectMenu()) {
+    return {
+      routeKey: 'string_select',
+      decisionPath: 'isStringSelectMenu -> handleSelect'
+    };
+  }
+
+  if (interaction.isChannelSelectMenu()) {
+    return {
+      routeKey: 'channel_select',
+      decisionPath: 'isChannelSelectMenu -> handleSelect'
+    };
+  }
+
+  if (interaction.isRoleSelectMenu()) {
+    return {
+      routeKey: 'role_select',
+      decisionPath: 'isRoleSelectMenu -> handleSelect'
+    };
+  }
+
+  if (interaction.isMessageComponent()) {
+    return {
+      routeKey: `unsupported_component:${componentTypeOfMessage(interaction)}`,
+      decisionPath: 'isMessageComponent -> unsupported component type'
+    };
+  }
+
+  if (interaction.isChatInputCommand()) {
+    return {
+      routeKey: `command:${interaction.commandName}`,
+      decisionPath: 'isChatInputCommand -> handled by command router'
+    };
+  }
+
+  return {
+    routeKey: 'unsupported_interaction',
+    decisionPath: 'no supported guard matched'
+  };
+}
+
+function deriveCustomRouteKey(interaction: Interaction): { routeKey?: string; reason?: string } {
+  const customId = customIdOf(interaction);
+  if (!customId) {
+    return { reason: 'custom_id_missing' };
+  }
+
+  try {
+    const decoded = decodeCustomId(customId);
+    return { routeKey: `${decoded.feature}:${decoded.action}` };
+  } catch {
+    return { reason: 'custom_id_unparseable' };
+  }
+}
+
 export async function routeInteractionComponent(
   ctx: InteractionContext,
-  interaction:
-    | ButtonInteraction
-    | ModalSubmitInteraction
-    | StringSelectMenuInteraction
-    | ChannelSelectMenuInteraction
-    | RoleSelectMenuInteraction,
+  interaction: Interaction,
 ): Promise<void> {
+  const correlationId = createCorrelationId();
+  const baseCtx = interactionCtx(interaction, { correlation_id: correlationId });
+  const decision = deriveRouteDecision(interaction);
+  const customRoute = deriveCustomRouteKey(interaction);
+  const routeKey = customRoute.routeKey ?? decision.routeKey;
+  const decisionPath = decision.decisionPath;
+
+  logger.info(
+    {
+      action: 'invoke',
+      ...baseCtx
+    },
+    'Interaction handler invoked',
+  );
+
+  if ((interaction.isMessageComponent() || interaction.isModalSubmit()) && customRoute.reason) {
+    logger.warn(
+      {
+        action: 'route_skip',
+        ...baseCtx,
+        routeKey,
+        reason: customRoute.reason,
+        decision_path: decisionPath
+      },
+      'Route metadata could not be derived from custom_id',
+    );
+  }
+
+  logger.info(
+    {
+      action: 'route',
+      ...baseCtx,
+      routeKey,
+      decision_path: decisionPath
+    },
+    'Routing interaction',
+  );
+
   try {
+    if (!isRoutedInteraction(interaction)) {
+      logger.warn(
+        {
+          action: 'route_skip',
+          ...baseCtx,
+          routeKey,
+          reason: interaction.isChatInputCommand()
+            ? 'chat_input_handled_in_command_router'
+            : 'unsupported_interaction_type',
+          decision_path: decisionPath
+        },
+        'Interaction is not routed by component router',
+      );
+      return;
+    }
+
     if (interaction.isButton()) {
       await handleButton(ctx, interaction);
       return;
@@ -1895,11 +2238,37 @@ export async function routeInteractionComponent(
 
     if (interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu()) {
       await handleSelect(ctx, interaction);
+      return;
     }
+
+    logger.warn(
+      {
+        action: 'route_skip',
+        ...baseCtx,
+        routeKey,
+        reason: 'unsupported_component_type',
+        decision_path: decisionPath
+      },
+      'Message component type is not supported by router',
+    );
   } catch (error) {
-    logger.error({ error, interaction_id: interaction.id }, 'Interaction component routing failed');
+    logger.error(
+      {
+        action: 'route_failed',
+        ...baseCtx,
+        routeKey,
+        decision_path: decisionPath,
+        custom_id: customIdOf(interaction),
+        component_type: componentTypeOf(interaction),
+        deferred: hasReplyState(interaction) ? interaction.deferred : undefined,
+        replied: hasReplyState(interaction) ? interaction.replied : undefined,
+        error: errInfo(error)
+      },
+      'Interaction component routing failed',
+    );
+
     const featureError = formatFeatureUnavailableError('ru', error);
-    if (featureError) {
+    if (featureError && interaction.isRepliable() && hasReplyState(interaction)) {
       if (interaction.deferred) {
         try {
           await interaction.followUp({ flags: MessageFlags.Ephemeral, content: featureError });
@@ -1915,6 +2284,10 @@ export async function routeInteractionComponent(
       return;
     }
 
+    if (!interaction.isRepliable() || !hasReplyState(interaction)) {
+      return;
+    }
+
     const tr = await createInteractionTranslator(interaction);
 
     if (interaction.deferred) {
@@ -1927,5 +2300,3 @@ export async function routeInteractionComponent(
     }
   }
 }
-
-
