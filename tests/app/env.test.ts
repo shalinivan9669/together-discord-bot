@@ -12,7 +12,6 @@ function setBaseEnv() {
   process.env.TZ = 'Asia/Almaty';
   process.env.DEFAULT_TIMEZONE = 'Asia/Almaty';
   process.env.PHASE2_ORACLE_ENABLED = 'false';
-  process.env.PHASE2_HOROSCOPE_ENABLED = '';
   process.env.PHASE2_CHECKIN_ENABLED = 'false';
   process.env.PHASE2_ANON_ENABLED = 'false';
   process.env.PHASE2_REWARDS_ENABLED = 'false';
@@ -43,10 +42,9 @@ describe('env parsing', () => {
     expect(module.env.ALLOWED_GUILD_IDS).toEqual(['123456789012345678', '987654321098765432']);
   });
 
-  it('uses legacy horoscope env as fallback for oracle flag', async () => {
+  it('uses default false for oracle flag when not provided', async () => {
     delete process.env.PHASE2_ORACLE_ENABLED;
-    process.env.PHASE2_HOROSCOPE_ENABLED = 'true';
     const module = await import('../../src/config/env');
-    expect(module.env.PHASE2_ORACLE_ENABLED).toBe(true);
+    expect(module.env.PHASE2_ORACLE_ENABLED).toBe(false);
   });
 });

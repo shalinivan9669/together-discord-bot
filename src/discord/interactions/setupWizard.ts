@@ -63,7 +63,7 @@ const actionSchema = z.enum([
 ]);
 
 const scheduleFeatureMap: ReadonlyArray<{ name: JobName; feature: (typeof guildFeatureNames)[number] }> = [
-  { name: JobNames.WeeklyOraclePublish, feature: 'oracle' },
+  { name: JobNames.OracleWeeklyPublish, feature: 'oracle' },
   { name: JobNames.WeeklyCheckinNudge, feature: 'checkin' },
   { name: JobNames.WeeklyRaidStart, feature: 'raid' },
   { name: JobNames.WeeklyRaidEnd, feature: 'raid' },

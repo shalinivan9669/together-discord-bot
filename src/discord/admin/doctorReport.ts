@@ -1,4 +1,4 @@
-﻿import type { Guild } from 'discord.js';
+import type { Guild } from 'discord.js';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import {
   evaluateFeatureState,
@@ -24,7 +24,7 @@ type DoctorFinding = {
 };
 
 const scheduleOwnerFeature: Partial<Record<JobName, GuildFeatureName>> = {
-  [JobNames.WeeklyOraclePublish]: 'oracle',
+  [JobNames.OracleWeeklyPublish]: 'oracle',
   [JobNames.WeeklyCheckinNudge]: 'checkin',
   [JobNames.WeeklyRaidStart]: 'raid',
   [JobNames.WeeklyRaidEnd]: 'raid',
@@ -206,43 +206,43 @@ export async function buildAdminDoctorReport(guild: Guild): Promise<string> {
   if (!dbRow) {
     findings.push({
       level: 'fail',
-      message: 'Р’ `guild_settings` РЅРµС‚ СЃС‚СЂРѕРєРё РґР»СЏ СЃРµСЂРІРµСЂР°. РЎРЅР°С‡Р°Р»Р° Р·Р°РІРµСЂС€РёС‚Рµ `/setup start`.'
+      message: 'В `guild_settings` нет строки для сервера. Сначала завершите `/setup start`.'
     });
-    hints.add('Р—Р°РІРµСЂС€РёС‚Рµ РјР°СЃС‚РµСЂ `/setup start` Рё РЅР°Р¶РјРёС‚Рµ В«Р—Р°РІРµСЂС€РёС‚СЊ РЅР°СЃС‚СЂРѕР№РєСѓВ».');
+    hints.add('Завершите мастер `/setup start` и нажмите «Завершить настройку».');
   } else {
     findings.push({
       level: 'ok',
-      message: 'РЎС‚СЂРѕРєР° `guild_settings` РЅР°Р№РґРµРЅР°.'
+      message: 'Строка `guild_settings` найдена.'
     });
   }
 
   if (missingSetupKeys.length === 0) {
     findings.push({
       level: 'ok',
-      message: 'Р’СЃРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РїРѕР»СЏ РјР°СЃС‚РµСЂР° setup Р·Р°РїРѕР»РЅРµРЅС‹.'
+      message: 'Все обязательные поля мастера setup заполнены.'
     });
   } else {
     findings.push({
       level: 'fail',
-      message: `РќРµ Р·Р°РїРѕР»РЅРµРЅС‹ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РїРѕР»СЏ setup: ${missingSetupKeys.map((key) => formatRequirementLabel(locale, key)).join(', ')}.`
+      message: `Не заполнены обязательные поля setup: ${missingSetupKeys.map((key) => formatRequirementLabel(locale, key)).join(', ')}.`
     });
-    hints.add('РћС‚РєСЂРѕР№С‚Рµ `/setup start` Рё Р·Р°РїРѕР»РЅРёС‚Рµ РІСЃРµ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ СЃРµР»РµРєС‚С‹.');
+    hints.add('Откройте `/setup start` и заполните все обязательные селекты.');
   }
 
   const failedPermissionChecks = checks.filter((check) => !check.ok);
   if (failedPermissionChecks.length === 0) {
     findings.push({
       level: 'ok',
-      message: 'РџСЂР°РІР° Р±РѕС‚Р° РЅР° СЃРµСЂРІРµСЂРµ Рё РІС‹Р±СЂР°РЅРЅС‹С… РєР°РЅР°Р»Р°С… РІ РїРѕСЂСЏРґРєРµ.'
+      message: 'Права бота на сервере и выбранных каналах в порядке.'
     });
   } else {
     for (const check of failedPermissionChecks) {
       findings.push({
         level: 'fail',
-        message: `РџСЂР°РІР°: ${check.where} -> РЅРµ С…РІР°С‚Р°РµС‚ (${check.missing.join(', ')})`
+        message: `Права: ${check.where} -> не хватает (${check.missing.join(', ')})`
       });
     }
-    hints.add('Р’С‹РґР°Р№С‚Рµ Р±РѕС‚Сѓ РЅРµРґРѕСЃС‚Р°СЋС‰РёРµ РїСЂР°РІР° РЅР° СЃРµСЂРІРµСЂРµ, РІ РєР°С‚РµРіРѕСЂРёРё РїР°СЂ Рё С†РµР»РµРІС‹С… РєР°РЅР°Р»Р°С….');
+    hints.add('Выдайте боту недостающие права на сервере, в категории пар и целевых каналах.');
   }
 
   const featureStates = new Map(
@@ -254,15 +254,15 @@ export async function buildAdminDoctorReport(guild: Guild): Promise<string> {
     if (state.enabled && !state.configured) {
       findings.push({
         level: 'fail',
-        message: `Р¤РёС‡Р° В«${featureLabel(feature)}В» РІРєР»СЋС‡РµРЅР°, РЅРѕ РЅРµ РЅР°СЃС‚СЂРѕРµРЅР° (${state.reason}).`
+        message: `Фича «${featureLabel(feature)}» включена, но не настроена (${state.reason}).`
       });
-      hints.add(`РџСЂРѕРІРµСЂСЊС‚Рµ С‚СЂРµР±РѕРІР°РЅРёСЏ С„РёС‡Рё В«${featureLabel(feature)}В» РІ \`/admin status\` Рё Р·Р°РїРѕР»РЅРёС‚Рµ setup.`);
+      hints.add(`Проверьте требования фичи «${featureLabel(feature)}» в \`/admin status\` и заполните setup.`);
       continue;
     }
 
     findings.push({
       level: state.enabled ? 'ok' : 'warn',
-      message: `Р¤РёС‡Р° В«${featureLabel(feature)}В»: ${state.enabled ? 'РІРєР»СЋС‡РµРЅР° Рё РЅР°СЃС‚СЂРѕРµРЅР°' : 'РІС‹РєР»СЋС‡РµРЅР° Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРј'}.`
+      message: `Фича «${featureLabel(feature)}»: ${state.enabled ? 'включена и настроена' : 'выключена администратором'}.`
     });
   }
 
@@ -271,7 +271,7 @@ export async function buildAdminDoctorReport(guild: Guild): Promise<string> {
     if (!definition) {
       findings.push({
         level: 'fail',
-        message: `Р Р°СЃРїРёСЃР°РЅРёРµ ${schedule.name}: РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ РѕРїСЂРµРґРµР»РµРЅРёРµ РІ РєРѕРґРµ.`
+        message: `Расписание ${schedule.name}: отсутствует определение в коде.`
       });
       continue;
     }
@@ -279,9 +279,9 @@ export async function buildAdminDoctorReport(guild: Guild): Promise<string> {
     if (!isCronExpressionValid(schedule.cron)) {
       findings.push({
         level: 'fail',
-        message: `Р Р°СЃРїРёСЃР°РЅРёРµ ${schedule.name}: РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ cron (${schedule.cron}).`
+        message: `Расписание ${schedule.name}: некорректный cron (${schedule.cron}).`
       });
-      hints.add(`РСЃРїСЂР°РІСЊС‚Рµ cron РґР»СЏ ${schedule.name} РІ \`src/infra/queue/scheduler.ts\`.`);
+      hints.add(`Исправьте cron для ${schedule.name} в \`src/infra/queue/scheduler.ts\`.`);
       continue;
     }
 
@@ -291,24 +291,24 @@ export async function buildAdminDoctorReport(guild: Guild): Promise<string> {
     if (ownerFeature && schedule.enabled && ownerState && !ownerState.enabled) {
       findings.push({
         level: 'warn',
-        message: `Р Р°СЃРїРёСЃР°РЅРёРµ ${schedule.name} РІРєР»СЋС‡РµРЅРѕ, РЅРѕ С„РёС‡Р° В«${featureLabel(ownerFeature)}В» РІС‹РєР»СЋС‡РµРЅР°.`
+        message: `Расписание ${schedule.name} включено, но фича «${featureLabel(ownerFeature)}» выключена.`
       });
-      hints.add(`Р’С‹РєР»СЋС‡РёС‚Рµ ${schedule.name} С‡РµСЂРµР· \`/admin schedule\` РёР»Рё РІРєР»СЋС‡РёС‚Рµ С„РёС‡Сѓ В«${featureLabel(ownerFeature)}В».`);
+      hints.add(`Выключите ${schedule.name} через \`/admin schedule\` или включите фичу «${featureLabel(ownerFeature)}».`);
       continue;
     }
 
     if (ownerFeature && !schedule.enabled && ownerState?.enabled && ownerState.configured) {
       findings.push({
         level: 'warn',
-        message: `Р Р°СЃРїРёСЃР°РЅРёРµ ${schedule.name} РІС‹РєР»СЋС‡РµРЅРѕ, С…РѕС‚СЏ С„РёС‡Р° В«${featureLabel(ownerFeature)}В» РіРѕС‚РѕРІР° Рє СЂР°Р±РѕС‚Рµ.`
+        message: `Расписание ${schedule.name} выключено, хотя фича «${featureLabel(ownerFeature)}» готова к работе.`
       });
-      hints.add(`Р’РєР»СЋС‡РёС‚Рµ ${schedule.name} С‡РµСЂРµР· \`/admin schedule ${schedule.name} on\`.`);
+      hints.add(`Включите ${schedule.name} через \`/admin schedule ${schedule.name} on\`.`);
       continue;
     }
 
     findings.push({
       level: 'ok',
-      message: `Р Р°СЃРїРёСЃР°РЅРёРµ ${schedule.name}: ${schedule.enabled ? 'РІРєР»СЋС‡РµРЅРѕ' : 'РІС‹РєР»СЋС‡РµРЅРѕ'} (cron: \`${schedule.cron}\`).`
+      message: `Расписание ${schedule.name}: ${schedule.enabled ? 'включено' : 'выключено'} (cron: \`${schedule.cron}\`).`
     });
   }
 
@@ -318,18 +318,17 @@ export async function buildAdminDoctorReport(guild: Guild): Promise<string> {
 
   const hintLines = hints.size > 0
     ? [...hints].map((hint, index) => `${index + 1}. ${hint}`)
-    : ['1. РџСЂРѕР±Р»РµРј РЅРµ РѕР±РЅР°СЂСѓР¶РµРЅРѕ.'];
+    : ['1. Проблем не обнаружено.'];
 
   return [
-    '## РђРґРјРёРЅ-РґРѕРєС‚РѕСЂ',
-    `- РЎРµСЂРІРµСЂ: \`${guild.id}\``,
-    `- РћР±С‰РёР№ СЃС‚Р°С‚СѓСЃ: **${overall}**`,
+    '## Админ-доктор',
+    `- Сервер: \`${guild.id}\``,
+    `- Общий статус: **${overall}**`,
     '',
-    '### РџСЂРѕРІРµСЂРєРё',
+    '### Проверки',
     ...findings.map((finding) => buildLine(finding)),
     '',
-    '### Р§С‚Рѕ РґРµР»Р°С‚СЊ',
+    '### Что делать',
     ...hintLines,
   ].join('\n');
 }
-

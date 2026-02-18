@@ -1,4 +1,4 @@
-﻿import { MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { type JobName, JobNames } from '../../infra/queue/jobs';
 import { setRecurringScheduleEnabled } from '../../infra/queue/scheduler';
 import {
@@ -21,12 +21,12 @@ type ToggleValue = 'on' | 'off';
 type ConfigName = 'locale';
 
 const featureChoiceLabels: Record<GuildFeatureName, string> = {
-  oracle: 'РћСЂР°РєСѓР»',
-  anon: 'РђРЅРѕРЅРёРјРЅС‹Рµ РІРѕРїСЂРѕСЃС‹',
-  raid: 'Р РµР№Рґ СЃРµСЂРІРµСЂР°',
-  checkin: 'Р•Р¶РµРЅРµРґРµР»СЊРЅС‹Р№ С‡РµРє-РёРЅ',
-  hall: 'Р—Р°Р» СЃР»Р°РІС‹',
-  public_post: 'РџСѓР±Р»РёС‡РЅС‹Рµ РїРѕСЃС‚С‹'
+  oracle: 'Оракул',
+  anon: 'Анонимные вопросы',
+  raid: 'Рейд сервера',
+  checkin: 'Еженедельный чек-ин',
+  hall: 'Зал славы',
+  public_post: 'Публичные посты'
 };
 
 const featureChoices = guildFeatureNames.map((feature) => ({
@@ -35,7 +35,8 @@ const featureChoices = guildFeatureNames.map((feature) => ({
 }));
 
 const scheduleChoices: Array<{ name: JobName; value: JobName }> = [
-  JobNames.WeeklyOraclePublish,
+  JobNames.OracleWeeklyPublish,
+  JobNames.AstroTickDaily,
   JobNames.WeeklyCheckinNudge,
   JobNames.WeeklyRaidStart,
   JobNames.WeeklyRaidEnd,
@@ -104,39 +105,39 @@ export const adminCommand: CommandModule = {
   data: new SlashCommandBuilder()
     .setName('admin')
     .setNameLocalizations({ ru: 'admin', 'en-US': 'admin' })
-    .setDescription('РђРґРјРёРЅ-РґРёР°РіРЅРѕСЃС‚РёРєР° Рё СѓРїСЂР°РІР»РµРЅРёРµ С„СѓРЅРєС†РёСЏРјРё/СЂР°СЃРїРёСЃР°РЅРёСЏРјРё')
+    .setDescription('Админ-диагностика и управление функциями/расписаниями')
     .setDescriptionLocalizations({ 'en-US': 'Admin diagnostics and feature/schedule controls' })
     .addSubcommand((sub) =>
       sub
         .setName('status')
         .setNameLocalizations({ ru: 'status', 'en-US': 'status' })
-        .setDescription('РџРѕРєР°Р·Р°С‚СЊ РєРѕРЅС„РёРі, С„СѓРЅРєС†РёРё, СЂР°СЃРїРёСЃР°РЅРёСЏ Рё РїСЂР°РІР°')
+        .setDescription('Показать конфиг, функции, расписания и права')
         .setDescriptionLocalizations({ 'en-US': 'Show config, features, schedules and permissions' }),
     )
     .addSubcommand((sub) =>
       sub
         .setName('doctor')
         .setNameLocalizations({ ru: 'doctor', 'en-US': 'doctor' })
-        .setDescription('Р СџР С•Р В»Р Р…Р В°РЎРЏ Р Т‘Р С‘Р В°Р С–Р Р…Р С•РЎРѓРЎвЂљР С‘Р С”Р В° Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р ВµР С”, Р С—РЎР‚Р В°Р Р† Р С‘ РЎР‚Р В°РЎРѓР С—Р С‘РЎРѓР В°Р Р…Р С‘Р в„–')
+        .setDescription('Полная диагностика настроек, прав и расписаний')
         .setDescriptionLocalizations({ 'en-US': 'Full diagnostic report: config, permissions, schedules' }),
     )
     .addSubcommandGroup((group) =>
       group
         .setName('feature')
         .setNameLocalizations({ ru: 'feature', 'en-US': 'feature' })
-        .setDescription('РЈРїСЂР°РІР»РµРЅРёРµ С„СѓРЅРєС†РёСЏРјРё СЃРµСЂРІРµСЂР°')
+        .setDescription('Управление функциями сервера')
         .setDescriptionLocalizations({ 'en-US': 'Feature controls for the guild' })
         .addSubcommand((sub) =>
           sub
             .setName('set')
             .setNameLocalizations({ ru: 'set', 'en-US': 'set' })
-            .setDescription('Р’РєР»СЋС‡РёС‚СЊ/РІС‹РєР»СЋС‡РёС‚СЊ РѕРґРЅСѓ С„СѓРЅРєС†РёСЋ')
+            .setDescription('Включить/выключить одну функцию')
             .setDescriptionLocalizations({ 'en-US': 'Toggle one feature' })
             .addStringOption((opt) => {
               const option = opt
                 .setName('name')
                 .setNameLocalizations({ ru: 'name', 'en-US': 'name' })
-                .setDescription('РРјСЏ С„СѓРЅРєС†РёРё')
+                .setDescription('Имя функции')
                 .setDescriptionLocalizations({ 'en-US': 'Feature name' })
                 .setRequired(true);
 
@@ -150,7 +151,7 @@ export const adminCommand: CommandModule = {
               opt
                 .setName('value')
                 .setNameLocalizations({ ru: 'value', 'en-US': 'value' })
-                .setDescription('on РёР»Рё off')
+                .setDescription('on или off')
                 .setDescriptionLocalizations({ 'en-US': 'on or off' })
                 .setRequired(true)
                 .addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' }),
@@ -160,14 +161,14 @@ export const adminCommand: CommandModule = {
           sub
             .setName('enable-all')
             .setNameLocalizations({ ru: 'enable-all', 'en-US': 'enable-all' })
-            .setDescription('Р’РєР»СЋС‡РёС‚СЊ РІСЃРµ С„СѓРЅРєС†РёРё СЃРµСЂРІРµСЂР°')
+            .setDescription('Включить все функции сервера')
             .setDescriptionLocalizations({ 'en-US': 'Enable all guild features' }),
         )
         .addSubcommand((sub) =>
           sub
             .setName('disable-all')
             .setNameLocalizations({ ru: 'disable-all', 'en-US': 'disable-all' })
-            .setDescription('Р’С‹РєР»СЋС‡РёС‚СЊ РІСЃРµ С„СѓРЅРєС†РёРё СЃРµСЂРІРµСЂР°')
+            .setDescription('Выключить все функции сервера')
             .setDescriptionLocalizations({ 'en-US': 'Disable all guild features' }),
         ),
     )
@@ -175,19 +176,19 @@ export const adminCommand: CommandModule = {
       group
         .setName('config')
         .setNameLocalizations({ ru: 'config', 'en-US': 'config' })
-        .setDescription('РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ СЃРµСЂРІРµСЂР°')
+        .setDescription('Конфигурация сервера')
         .setDescriptionLocalizations({ 'en-US': 'Guild configuration' })
         .addSubcommand((sub) =>
           sub
             .setName('set')
             .setNameLocalizations({ ru: 'set', 'en-US': 'set' })
-            .setDescription('РЈСЃС‚Р°РЅРѕРІРёС‚СЊ РїР°СЂР°РјРµС‚СЂ РєРѕРЅС„РёРіСѓСЂР°С†РёРё')
+            .setDescription('Установить параметр конфигурации')
             .setDescriptionLocalizations({ 'en-US': 'Set a configuration value' })
             .addStringOption((opt) =>
               opt
                 .setName('name')
                 .setNameLocalizations({ ru: 'name', 'en-US': 'name' })
-                .setDescription('РРјСЏ РїР°СЂР°РјРµС‚СЂР°')
+                .setDescription('Имя параметра')
                 .setDescriptionLocalizations({ 'en-US': 'Config key' })
                 .setRequired(true)
                 .addChoices({ name: 'locale', value: 'locale' }),
@@ -196,7 +197,7 @@ export const adminCommand: CommandModule = {
               opt
                 .setName('value')
                 .setNameLocalizations({ ru: 'value', 'en-US': 'value' })
-                .setDescription('Р—РЅР°С‡РµРЅРёРµ РїР°СЂР°РјРµС‚СЂР°')
+                .setDescription('Значение параметра')
                 .setDescriptionLocalizations({ 'en-US': 'Config value' })
                 .setRequired(true)
                 .addChoices({ name: 'ru', value: 'ru' }, { name: 'en', value: 'en' }),
@@ -206,13 +207,13 @@ export const adminCommand: CommandModule = {
           sub
             .setName('get')
             .setNameLocalizations({ ru: 'get', 'en-US': 'get' })
-            .setDescription('РџРѕРєР°Р·Р°С‚СЊ РїР°СЂР°РјРµС‚СЂ РєРѕРЅС„РёРіСѓСЂР°С†РёРё')
+            .setDescription('Показать параметр конфигурации')
             .setDescriptionLocalizations({ 'en-US': 'Get a configuration value' })
             .addStringOption((opt) =>
               opt
                 .setName('name')
                 .setNameLocalizations({ ru: 'name', 'en-US': 'name' })
-                .setDescription('РРјСЏ РїР°СЂР°РјРµС‚СЂР°')
+                .setDescription('Имя параметра')
                 .setDescriptionLocalizations({ 'en-US': 'Config key' })
                 .setRequired(true)
                 .addChoices({ name: 'locale', value: 'locale' }),
@@ -223,13 +224,13 @@ export const adminCommand: CommandModule = {
       sub
         .setName('schedule')
         .setNameLocalizations({ ru: 'schedule', 'en-US': 'schedule' })
-        .setDescription('РџРµСЂРµРєР»СЋС‡РёС‚СЊ РіР»РѕР±Р°Р»СЊРЅРѕРµ РїРµСЂРёРѕРґРёС‡РµСЃРєРѕРµ СЂР°СЃРїРёСЃР°РЅРёРµ')
+        .setDescription('Переключить глобальное периодическое расписание')
         .setDescriptionLocalizations({ 'en-US': 'Toggle a global recurring schedule' })
         .addStringOption((opt) => {
           const option = opt
             .setName('name')
             .setNameLocalizations({ ru: 'name', 'en-US': 'name' })
-            .setDescription('РРјСЏ СЂР°СЃРїРёСЃР°РЅРёСЏ')
+            .setDescription('Имя расписания')
             .setDescriptionLocalizations({ 'en-US': 'Schedule name' })
             .setRequired(true);
 
@@ -243,7 +244,7 @@ export const adminCommand: CommandModule = {
           opt
             .setName('value')
             .setNameLocalizations({ ru: 'value', 'en-US': 'value' })
-            .setDescription('on РёР»Рё off')
+            .setDescription('on или off')
             .setDescriptionLocalizations({ 'en-US': 'on or off' })
             .setRequired(true)
             .addChoices({ name: 'on', value: 'on' }, { name: 'off', value: 'off' }),
@@ -350,4 +351,3 @@ export const adminCommand: CommandModule = {
     await interaction.editReply(await buildAdminStatusReport(interaction.guild, { locale: 'ru' }));
   },
 };
-

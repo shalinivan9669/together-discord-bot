@@ -127,9 +127,7 @@ function toFeatures(value: unknown): GuildFeatureMap {
   const source = value as Record<string, unknown>;
   const oracleEnabled = typeof source.oracle === 'boolean'
     ? source.oracle
-    : typeof source.horoscope === 'boolean'
-      ? source.horoscope
-      : featureDefaults.oracle;
+    : featureDefaults.oracle;
 
   return {
     oracle: oracleEnabled,
@@ -283,7 +281,7 @@ export async function updateGuildConfig(
     anonInboxChannelId: patch.anonInboxChannelId,
     anonModRoleId: patch.anonModRoleId,
     features: patch.features,
-    // Keep legacy columns synchronized for compatibility with existing paths.
+    // Keep mirrored fields in sync for shared admin/setup flows.
     duelPublicChannelId: patch.publicPostChannelId,
     questionsChannelId: patch.anonInboxChannelId,
     moderatorRoleId: patch.anonModRoleId,

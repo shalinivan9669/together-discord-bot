@@ -38,6 +38,53 @@ Public behavior:
 - One archetype is shared by the whole guild for a week.
 - Each user can claim exactly one Oracle hint per week.
 
+## Astro Horoscope structure
+Astro loop uses deterministic DB content and 6-day cycles.
+
+Content source:
+- `content_astro_archetypes`
+
+Cycle tables:
+- `astro_cycles`
+- `astro_claims`
+
+User profile key:
+- `users.zodiac_sign`
+
+`content_astro_archetypes.variants_json` shape:
+- `meta.skyTheme`
+- `meta.aboutLine`
+- `signs.<signKey>.<mode>.<context>.{risk,step,keyPhrase,taboo,miniChallenge}`
+
+Required enums:
+- `signKey`: aries, taurus, gemini, cancer, leo, virgo, libra, scorpio, sagittarius, capricorn, aquarius, pisces
+- `mode`: soft | neutral | hard
+- `context`: conflict | ok | boredom | distance | fatigue | jealousy
+
+6-day cycle math:
+1. Anchor: `guild_settings.astro_horoscope_anchor_date`
+2. `days_since = dateDiffDays(today, anchor_date)`
+3. `cycle_index = floor(days_since / 6)`
+4. `cycle_start_date = anchor_date + cycle_index*6`
+5. `cycle_end_date = cycle_start_date + 5`
+
+Deterministic archetype selection:
+1. `active_keys = sorted(keys where active=true)`
+2. `idx = stableHash(guild_id + cycle_start_date) % active_keys.length`
+3. `archetype_key = active_keys[idx]`
+4. `seed = stableHash(guild_id + cycle_start_date + archetype_key) % 10000`
+
+Claim idempotency:
+1. First claim persists `claim_text` in `astro_claims`.
+2. Re-claim in same cycle returns stored `claim_text` exactly, ignoring new inputs.
+
+Public behavior:
+- One persistent Astro message per guild (`astro_horoscope_message_id`).
+- Edit-only via throttled projection refresh.
+- Daily tick (`astro.tick.daily`) enqueues `astro.publish` only when:
+  - new cycle row inserted, or
+  - public message id missing.
+
 ## Check-in structure
 - Agreement choices come from `agreements_library`.
 - Weekly submission writes one row in `checkins`.

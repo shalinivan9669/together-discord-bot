@@ -38,7 +38,6 @@ export type ScheduledPostType =
   | 'anon_question'
   | 'checkin_agreement'
   | 'checkin_nudge'
-  | 'horoscope_weekly'
   | 'oracle_weekly'
   | 'text';
 
@@ -138,7 +137,7 @@ function buildMessageOptions(row: typeof scheduledPosts.$inferSelect): BuiltMess
     };
   }
 
-  if (row.type === 'oracle_weekly' || row.type === 'horoscope_weekly') {
+  if (row.type === 'oracle_weekly') {
     const payload = oracleWeeklyPayloadSchema.parse(row.payloadJson);
     return {
       kind: 'v2',

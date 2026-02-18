@@ -8,8 +8,8 @@ Migrations:
 - `src/infra/db/migrations/0004_step3_stability.sql`
 
 ## Core
-- `guild_settings(guild_id PK, timezone, configured channel ids including hall_channel_id, moderator_role_id, timestamps)`
-- `users(user_id PK, created_at)`
+- `guild_settings(guild_id PK, timezone, configured channel ids including oracle_channel_id, hall_channel_id, moderator_role_id, astro_horoscope_channel_id, astro_horoscope_message_id, astro_horoscope_anchor_date, oracle_message_id, timestamps)`
+- `users(user_id PK, zodiac_sign NULL, created_at)`
 - `pairs(id PK, guild_id, user1_id, user2_id, user_low, user_high, private_channel_id, status, created_at, UNIQUE(guild_id,user_low,user_high))`
 - `monthly_hall_cards(id PK, guild_id, month_key, channel_id, message_id, timestamps, UNIQUE(guild_id,month_key))`
 - `monthly_hall_opt_ins(guild_id,user_id,category,timestamps, PK composite)`
@@ -33,6 +33,11 @@ Migrations:
 - `content_oracle_archetypes(key PK, title, variants_json, active, created_at)`
 - `oracle_weeks(id PK, guild_id, week_start_date, archetype_key, seed, UNIQUE(guild_id,week_start_date))`
 - `oracle_claims(id PK, guild_id, week_start_date, user_id, pair_id, delivered_to, mode, context, claim_text, UNIQUE(guild_id,week_start_date,user_id))`
+
+## Astro Horoscope
+- `content_astro_archetypes(key PK, title, variants_json, active, created_at)`
+- `astro_cycles(id PK, guild_id, cycle_start_date DATE, archetype_key -> content_astro_archetypes.key, seed, UNIQUE(guild_id,cycle_start_date))`
+- `astro_claims(id PK, guild_id, cycle_start_date DATE, user_id, pair_id NULL, delivered_to, sign_key, mode, context, claim_text, UNIQUE(guild_id,cycle_start_date,user_id))`
 
 ## Check-in (Phase 2)
 - `agreements_library(key PK, text, tags_json, active, created_at)`

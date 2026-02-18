@@ -5,6 +5,7 @@ import { checkinCommand } from './commands/checkin';
 import { dateCommand } from './commands/date';
 import { duelCommand } from './commands/duel';
 import { hallCommand } from './commands/hall';
+import { horoscopeCommand } from './commands/horoscope';
 import { oracleCommand } from './commands/oracle';
 import { pairCommand } from './commands/pair';
 import { pingCommand } from './commands/ping';
@@ -25,6 +26,7 @@ export const commandModules: readonly CommandModule[] = [
   dateCommand,
   duelCommand,
   hallCommand,
+  horoscopeCommand,
   oracleCommand,
   checkinCommand,
   anonCommand,

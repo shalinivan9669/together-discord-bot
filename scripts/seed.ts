@@ -2,9 +2,19 @@ import { randomUUID } from 'node:crypto';
 import { db } from '../src/infra/db/drizzle';
 import {
   agreementsLibrary,
+  contentAstroArchetypes,
   contentOracleArchetypes,
   raidQuests
 } from '../src/infra/db/schema';
+import {
+  ASTRO_CONTEXTS,
+  ASTRO_MODES,
+  ASTRO_SIGN_KEYS,
+  astroSignLabelRu,
+  type AstroContext,
+  type AstroMode,
+  type AstroSignKey
+} from '../src/domain/astro';
 
 const sharedVariants = {
   soft: {
@@ -156,6 +166,186 @@ const archetypes = [
   { key: 'horizon', title: 'Горизонт', variantsJson: sharedVariants }
 ];
 
+const astroArchetypeMeta = [
+  {
+    key: 'venus_mirror',
+    title: 'Зеркало Венеры',
+    skyTheme: 'В астрологическом языке это звучит как мягкий аспект Венеры и Меркурия.',
+    aboutLine: 'Метафорически: больше внимания к словам и тону, меньше к правоте.'
+  },
+  {
+    key: 'mars_compass',
+    title: 'Компас Марса',
+    skyTheme: 'Метафорически Марс дает драйв, а Сатурн держит границы.',
+    aboutLine: 'Ритуал цикла: переводить импульс в ясную договоренность.'
+  },
+  {
+    key: 'lunar_bridge',
+    title: 'Лунный мост',
+    skyTheme: 'В астрологическом языке это как лунный аспект на близость и заботу.',
+    aboutLine: 'Метафора недели: сначала контакт, затем решение.'
+  },
+  {
+    key: 'saturn_frame',
+    title: 'Рамка Сатурна',
+    skyTheme: 'Метафорически Сатурн подсказывает: где граница, там спокойнее.',
+    aboutLine: 'Ритуал: коротко назвать правило и держать его 6 дней.'
+  },
+  {
+    key: 'mercury_signal',
+    title: 'Сигнал Меркурия',
+    skyTheme: 'В астрологическом языке это аспект Меркурия: точность слов важнее громкости.',
+    aboutLine: 'Метафора: один ясный запрос лучше трех намеков.'
+  },
+  {
+    key: 'solar_core',
+    title: 'Солнечное ядро',
+    skyTheme: 'Метафорически Солнце держит фокус на ценностях пары.',
+    aboutLine: 'Ритуал: каждый день подтверждать одно общее намерение.'
+  },
+  {
+    key: 'tidal_orbit',
+    title: 'Орбита прилива',
+    skyTheme: 'В астрологическом языке это прилив Луны и устойчивость Земли.',
+    aboutLine: 'Метафора цикла: ритм маленьких шагов сильнее рывков.'
+  },
+  {
+    key: 'air_rhythm',
+    title: 'Ритм Воздуха',
+    skyTheme: 'Метафорически воздушные знаки зовут к любопытству, не к контролю.',
+    aboutLine: 'Ритуал: задавать уточняющий вопрос до реакции.'
+  },
+  {
+    key: 'earth_pulse',
+    title: 'Пульс Земли',
+    skyTheme: 'В астрологическом языке это аспект Земли: стабильность через простые действия.',
+    aboutLine: 'Метафора недели: меньше обещаний, больше коротких выполнений.'
+  },
+  {
+    key: 'fire_arc',
+    title: 'Огненная дуга',
+    skyTheme: 'Метафорически огненные знаки дают энергию, если есть направление.',
+    aboutLine: 'Ритуал: направить энергию в один согласованный шаг.'
+  },
+  {
+    key: 'water_echo',
+    title: 'Эхо Воды',
+    skyTheme: 'В астрологическом языке это водный аспект эмпатии и мягкой ясности.',
+    aboutLine: 'Метафора цикла: назвать чувство и попросить действие.'
+  },
+  {
+    key: 'constellation_rule',
+    title: 'Правило Созвездия',
+    skyTheme: 'Метафорически созвездие недели напоминает о ритуале вместо спора.',
+    aboutLine: 'Ритуал: одно правило на 6 дней и ежедневная микро-проверка.'
+  }
+] as const;
+
+const astroSignStyle: Record<AstroSignKey, string> = {
+  aries: 'импульс',
+  taurus: 'устойчивость',
+  gemini: 'любопытство',
+  cancer: 'забота',
+  leo: 'тепло',
+  virgo: 'точность',
+  libra: 'баланс',
+  scorpio: 'глубина',
+  sagittarius: 'простор',
+  capricorn: 'опора',
+  aquarius: 'свобода',
+  pisces: 'мягкость'
+};
+
+const astroModeLead: Record<AstroMode, string> = {
+  soft: 'Бережно',
+  neutral: 'Ровно',
+  hard: 'Прямо'
+};
+
+const astroContextRisk: Record<AstroContext, string> = {
+  conflict: 'напряжение уходит в взаимные уколы вместо правил разговора.',
+  ok: 'спокойствие превращается в автоматизм и теряется внимание.',
+  boredom: 'рутина заглушает интерес друг к другу.',
+  distance: 'неясность контакта растит обиду и догадки.',
+  fatigue: 'усталость снижает эмпатию и поднимает раздражение.',
+  jealousy: 'тревога маскируется под контроль и проверки.'
+};
+
+const astroContextStep: Record<AstroContext, string> = {
+  conflict: '7 минут: по очереди 90 секунд без перебиваний, затем 1 общий пункт решения.',
+  ok: '6 минут: назовите по одному «оставляем» и «улучшаем» на этот цикл.',
+  boredom: '8 минут: смените привычный сценарий одним новым микроритуалом.',
+  distance: '9 минут: договоритесь о стабильной точке связи на каждый день.',
+  fatigue: '6 минут: выберите одно действие, которое реально снимает нагрузку сегодня.',
+  jealousy: '8 минут: переведите страх в один уточняющий вопрос и одну просьбу.'
+};
+
+const astroContextTaboo: Record<AstroContext, string> = {
+  conflict: 'Не перебивайте и не возвращайте старые обиды в текущий разговор.',
+  ok: 'Не откладывайте договоренности на «потом как-нибудь».',
+  boredom: 'Не уходите вдвоем в параллельный скролл вместо контакта.',
+  distance: 'Не наказывайте тишиной и исчезновением.',
+  fatigue: 'Не выясняйте сложные темы в состоянии «ресурс на нуле».',
+  jealousy: 'Не устраивайте проверок и скрытого контроля.'
+};
+
+const astroContextChallenge: Record<AstroContext, string> = {
+  conflict: 'Сегодня до полуночи каждый пишет одно «я беру ответственность за...».',
+  ok: 'Сделайте 1 микро-обновление быта и отметьте это реакцией в Discord.',
+  boredom: 'Сфотографируйте свой мини-ритуал и отправьте партнеру с одним теплым словом.',
+  distance: 'Поставьте ежедневный 10-минутный слот связи на все 6 дней.',
+  fatigue: 'Введите код-фразу «ресурс 0-5» и используйте ее каждый день цикла.',
+  jealousy: 'Зафиксируйте одну границу и один способ успокоения в одном сообщении.'
+};
+
+function buildAstroLeaf(sign: AstroSignKey, mode: AstroMode, context: AstroContext): {
+  risk: string;
+  step: string;
+  keyPhrase: string;
+  taboo: string;
+  miniChallenge: string;
+} {
+  const signLabel = astroSignLabelRu[sign];
+  const style = astroSignStyle[sign];
+  const lead = astroModeLead[mode];
+
+  return {
+    risk: `${lead}, метафора знака ${signLabel} (${style}) подсказывает: ${astroContextRisk[context]}`,
+    step: astroContextStep[context],
+    keyPhrase: `${lead}: «В астрологическом языке это звучит как забота о границах. Давай сделаем один ясный шаг вместе».`,
+    taboo: astroContextTaboo[context],
+    miniChallenge: astroContextChallenge[context]
+  };
+}
+
+function buildAstroVariants(meta: { skyTheme: string; aboutLine: string }) {
+  const signs: Record<AstroSignKey, Record<AstroMode, Record<AstroContext, ReturnType<typeof buildAstroLeaf>>>> = {} as never;
+
+  for (const sign of ASTRO_SIGN_KEYS) {
+    signs[sign] = {} as Record<AstroMode, Record<AstroContext, ReturnType<typeof buildAstroLeaf>>>;
+    for (const mode of ASTRO_MODES) {
+      signs[sign][mode] = {} as Record<AstroContext, ReturnType<typeof buildAstroLeaf>>;
+      for (const context of ASTRO_CONTEXTS) {
+        signs[sign][mode][context] = buildAstroLeaf(sign, mode, context);
+      }
+    }
+  }
+
+  return {
+    meta: {
+      skyTheme: meta.skyTheme,
+      aboutLine: meta.aboutLine
+    },
+    signs
+  };
+}
+
+const astroArchetypes = astroArchetypeMeta.map((meta) => ({
+  key: meta.key,
+  title: meta.title,
+  variantsJson: buildAstroVariants(meta)
+}));
+
 const agreements = [
   'После 23:00 ставим паузу в горячих разговорах.',
   'Сначала уточняем тон, потом делаем вывод.',
@@ -217,6 +407,27 @@ async function seedArchetypes() {
   }
 }
 
+async function seedAstroArchetypes() {
+  for (const archetype of astroArchetypes) {
+    await db
+      .insert(contentAstroArchetypes)
+      .values({
+        key: archetype.key,
+        title: archetype.title,
+        variantsJson: archetype.variantsJson,
+        active: true
+      })
+      .onConflictDoUpdate({
+        target: contentAstroArchetypes.key,
+        set: {
+          title: archetype.title,
+          variantsJson: archetype.variantsJson,
+          active: true
+        }
+      });
+  }
+}
+
 async function seedAgreements() {
   for (const agreement of agreements) {
     await db
@@ -266,6 +477,7 @@ async function seedRaidQuests() {
 
 async function main() {
   await seedArchetypes();
+  await seedAstroArchetypes();
   await seedAgreements();
   await seedRaidQuests();
   console.log('Seed completed.');

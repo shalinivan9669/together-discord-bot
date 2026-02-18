@@ -62,6 +62,9 @@ Optional but recommended:
 - [ ] No unexpected startup errors in logs.
 - [ ] No repeated projection edit failures.
 - [ ] In a test guild, run `/setup start` -> complete wizard -> verify `/admin status` and `/admin doctor` return `OK`/expected warnings only.
+- [ ] Run `/horoscope setup channel:#astro-channel post_test:true` and verify Astro public card exists as single edit-only message.
+- [ ] Run `/horoscope publish-now` twice and verify no duplicate public Astro messages.
+- [ ] Run `/horoscope me` twice in the same cycle and verify second response reuses the same stored claim text.
 - [ ] Manual smoke path from `docs/SMOKE_TEST.md` passed.
 - [ ] Server setup checklist from `docs/SERVER_SETUP_CHECKLIST.md` completed.
 

@@ -101,7 +101,7 @@
 
 ### `/oracle publish-now`
 - Доступ: админ/мод.
-- Эффект: enqueue `weekly.oracle.publish`.
+- Эффект: enqueue `oracle.publish`.
 
 Публичная карточка включает:
 - `Получить подсказку` (tone/context picker)
@@ -112,6 +112,45 @@
 - один публичный пост на сервер (edit-only);
 - одна тема на весь сервер в текущем недельном периоде;
 - один пользователь получает 1 подсказку за неделю (повтор вернет ту же).
+
+## `/horoscope`
+Команда Astro Horoscope (6-дневный цикл, метафора/ритуал).
+
+### `/horoscope setup channel:#channel [post_test:true|false]`
+- Доступ: админ/мод.
+- Эффект:
+  - сохраняет `astro_horoscope_channel_id`,
+  - включает фичу `astro`,
+  - при пустом anchor ставит `astro_horoscope_anchor_date`,
+  - опционально ставит `astro.publish` в очередь.
+
+### `/horoscope status`
+- Доступ: админ/мод.
+- Показывает:
+  - configured канал,
+  - наличие `astro_horoscope_message_id`,
+  - `astro_horoscope_anchor_date`,
+  - текущий диапазон 6-дневного цикла.
+
+### `/horoscope publish-now`
+- Доступ: админ/мод.
+- Эффект: enqueue `astro.publish` (идемпотентный refresh public card).
+
+### `/horoscope me`
+- Доступ: любой пользователь.
+- Эфемерный flow:
+  - выбор знака (и опция «Сохранить как мой знак»),
+  - выбор тона и контекста,
+  - выдача приватной карты.
+- Идемпотентность claim:
+  - 1 claim на пользователя за цикл `(guild_id, cycle_start_date, user_id)`,
+  - повтор возвращает тот же `claim_text`.
+
+### `/horoscope pair`
+- Доступ: участник пары.
+- Эфемерный flow:
+  - если у партнера есть сохраненный знак - сразу строится «Синастрия на 6 дней»,
+  - иначе пользователь выбирает знак партнера для текущего просмотра без сохранения по умолчанию.
 
 ## `/checkin start`
 

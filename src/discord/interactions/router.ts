@@ -38,6 +38,9 @@ import { dateOnly } from '../../lib/time';
 import { logInteraction } from '../interactionLog';
 import {
   buildAnonAskModal,
+  buildAstroClaimPicker,
+  buildAstroPairPicker,
+  buildAstroSignPicker,
   buildCheckinAgreementSelect,
   buildCheckinShareButton,
   buildCheckinSubmitModal,
@@ -50,7 +53,6 @@ import {
 } from './components';
 import { buildAnonQueueView } from './anonQueueView';
 import { decodeCustomId } from './customId';
-import type { CustomIdEnvelope } from './customId';
 import {
   approveAnonQuestion,
   buildAnonMascotAnswer,
@@ -63,30 +65,34 @@ import {
   parseOracleContext,
   parseOracleMode
 } from '../../app/services/oracleService';
+import {
+  buildAstroPairView,
+  claimAstroHoroscope,
+  getAstroFeatureState,
+  getUserZodiacSign,
+  markAstroClaimDelivery,
+  resolveCurrentAstroCycle,
+  ASTRO_PUBLIC_DISCLAIMER,
+  setUserZodiacSign
+} from '../../app/services/astroHoroscopeService';
 import { getPairForUser } from '../../infra/db/queries/pairs';
 import { getGuildSettings } from '../../infra/db/queries/guildSettings';
 import { claimRaidQuest, confirmRaidClaim, getRaidContributionForUser, getTodayRaidOffers } from '../../app/services/raidService';
 import { renderDateIdeasResult } from '../projections/dateIdeasRenderer';
 import { COMPONENTS_V2_FLAGS, toComponentsV2EditBody } from '../ui-v2';
 import { parseDateBudget, parseDateEnergy, parseDateTimeWindow, type DateFilters } from '../../domain/date';
+import {
+  astroSignLabelRu,
+  parseAstroContext,
+  parseAstroMode,
+  parseAstroSignKey,
+  type AstroSignKey
+} from '../../domain/astro';
 import { handleSetupWizardComponent } from './setupWizard';
 import { ANON_MASCOT_DAILY_LIMIT, ANON_PROPOSE_DAILY_LIMIT } from '../../config/constants';
 import { t, type AppLocale } from '../../i18n';
 import { createInteractionTranslator } from '../locale';
 import { formatFeatureUnavailableError } from '../featureErrors';
-
-const LEGACY_ORACLE_FEATURE = 'horoscope';
-
-function withOracleFeatureCompatibility(decoded: CustomIdEnvelope): CustomIdEnvelope {
-  if (decoded.feature !== LEGACY_ORACLE_FEATURE) {
-    return decoded;
-  }
-
-  return {
-    ...decoded,
-    feature: 'oracle',
-  };
-}
 
 export type InteractionContext = {
   client: Client;
@@ -132,6 +138,19 @@ const oraclePickerPayloadSchema = z.object({
   w: z.string().min(1),
   m: z.string().optional(),
   c: z.string().optional()
+});
+const astroClaimPayloadSchema = z.object({
+  c: z.string().min(1).optional(),
+  s: z.string().optional(),
+  m: z.string().optional(),
+  x: z.string().optional(),
+  v: z.string().optional()
+});
+const astroPairPayloadSchema = z.object({
+  a: z.string().optional(),
+  b: z.string().optional(),
+  u: z.string().optional(),
+  p: z.string().optional()
 });
 const anonQueuePayloadSchema = z.object({
   p: z.string().optional()
@@ -203,8 +222,77 @@ function parseOracleSelection(payload: Record<string, string>): {
   };
 }
 
+function parseAstroClaimSelection(payload: Record<string, string>): {
+  cycleStartDate?: string;
+  sign: AstroSignKey;
+  mode: 'soft' | 'neutral' | 'hard';
+  context: 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
+  saveSign: 'save' | 'nosave';
+} | null {
+  const parsed = astroClaimPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const sign = parseAstroSignKey(parsed.data.s ?? 'aries');
+  const mode = parsed.data.m === 's'
+    ? parseAstroMode('soft')
+    : parsed.data.m === 'h'
+      ? parseAstroMode('hard')
+      : parseAstroMode('neutral');
+  const context = parsed.data.x === 'c'
+    ? parseAstroContext('conflict')
+    : parsed.data.x === 'b'
+      ? parseAstroContext('boredom')
+      : parsed.data.x === 'd'
+        ? parseAstroContext('distance')
+        : parsed.data.x === 'f'
+          ? parseAstroContext('fatigue')
+          : parsed.data.x === 'j'
+            ? parseAstroContext('jealousy')
+            : parseAstroContext('ok');
+  const saveSign = parsed.data.v === 'y' ? 'save' : 'nosave';
+
+  if (!sign || !mode || !context) {
+    return null;
+  }
+
+  return {
+    cycleStartDate: parsed.data.c,
+    sign,
+    mode,
+    context,
+    saveSign
+  };
+}
+
+function parseAstroPairSelection(payload: Record<string, string>): {
+  selfSign: AstroSignKey;
+  partnerSign: AstroSignKey;
+  selfSource: 'saved' | 'temp';
+  partnerSource: 'saved' | 'temp';
+} | null {
+  const parsed = astroPairPayloadSchema.safeParse(payload);
+  if (!parsed.success) {
+    return null;
+  }
+
+  const selfSign = parseAstroSignKey(parsed.data.a ?? 'aries');
+  const partnerSign = parseAstroSignKey(parsed.data.b ?? 'aries');
+  if (!selfSign || !partnerSign) {
+    return null;
+  }
+
+  return {
+    selfSign,
+    partnerSign,
+    selfSource: parsed.data.u === 's' ? 'saved' : 'temp',
+    partnerSource: parsed.data.p === 's' ? 'saved' : 'temp'
+  };
+}
+
 async function handleButton(ctx: InteractionContext, interaction: ButtonInteraction): Promise<void> {
-  const decoded = withOracleFeatureCompatibility(decodeCustomId(interaction.customId));
+  const decoded = decodeCustomId(interaction.customId);
   const correlationId = createCorrelationId();
   const tr = await createInteractionTranslator(interaction);
 
@@ -875,6 +963,226 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
     return;
   }
 
+  if (decoded.feature === 'astro' && decoded.action === 'about') {
+    await interaction.reply({
+      flags: MessageFlags.Ephemeral,
+      content: [
+        'Astro Horoscope использует астрологический язык как метафору ритуалов общения.',
+        'Формат: знак, аспект и короткие практические шаги на 6 дней.',
+        ASTRO_PUBLIC_DISCLAIMER
+      ].join('\n'),
+    });
+    return;
+  }
+
+  if (decoded.feature === 'astro' && decoded.action === 'sign_open') {
+    if (!interaction.guildId) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
+      return;
+    }
+
+    const state = await getAstroFeatureState(interaction.guildId);
+    if (!state.enabled || !state.configured) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Astro Horoscope не настроен. Обратитесь к администратору.',
+      });
+      return;
+    }
+
+    const savedSign = await getUserZodiacSign(interaction.user.id);
+    const payload = astroClaimPayloadSchema.safeParse(decoded.payload);
+    const cycleStartDate = payload.success && payload.data.c
+      ? payload.data.c
+      : (await resolveCurrentAstroCycle(interaction.guildId)).cycleStartDate;
+
+    await interaction.reply({
+      flags: MessageFlags.Ephemeral,
+      content: 'Выберите знак по умолчанию.',
+      components: buildAstroSignPicker({
+        cycleStartDate,
+        sign: savedSign ?? 'aries'
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'astro' && decoded.action === 'claim_open') {
+    if (!interaction.guildId) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
+      return;
+    }
+
+    const state = await getAstroFeatureState(interaction.guildId);
+    if (!state.enabled || !state.configured) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Astro Horoscope не настроен. Обратитесь к администратору.',
+      });
+      return;
+    }
+
+    const parsed = parseAstroClaimSelection(decoded.payload);
+    const savedSign = await getUserZodiacSign(interaction.user.id);
+
+    await interaction.reply({
+      flags: MessageFlags.Ephemeral,
+      content: 'Выберите знак, тон и контекст, затем нажмите «Получить приватно».',
+      components: buildAstroClaimPicker({
+        sign: savedSign ?? parsed?.sign ?? 'aries',
+        mode: parsed?.mode ?? 'neutral',
+        context: parsed?.context ?? 'ok',
+        saveSign: savedSign ? 'nosave' : 'save'
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'astro' && decoded.action === 'claim_submit') {
+    if (!interaction.guildId) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
+      return;
+    }
+
+    const state = await getAstroFeatureState(interaction.guildId);
+    if (!state.enabled || !state.configured) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Astro Horoscope не настроен. Обратитесь к администратору.',
+      });
+      return;
+    }
+
+    const selection = parseAstroClaimSelection(decoded.payload);
+    if (!selection) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Некорректный выбор Astro Horoscope.',
+      });
+      return;
+    }
+
+    await interaction.deferUpdate();
+
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    const claimed = await claimAstroHoroscope({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      pairId: pair?.id ?? null,
+      sign: selection.sign,
+      mode: selection.mode,
+      context: selection.context,
+      saveSign: selection.saveSign === 'save'
+    });
+
+    await markAstroClaimDelivery(claimed.claim.id, 'ephemeral');
+    await interaction.editReply({
+      content: claimed.text,
+      components: []
+    });
+    return;
+  }
+
+  if (decoded.feature === 'astro' && decoded.action === 'pair_open') {
+    if (!interaction.guildId) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
+      return;
+    }
+
+    const state = await getAstroFeatureState(interaction.guildId);
+    if (!state.enabled || !state.configured) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Astro Horoscope не настроен. Обратитесь к администратору.',
+      });
+      return;
+    }
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    if (!pair) {
+      await interaction.editReply('Сначала создайте пару: `/pair create`.');
+      return;
+    }
+
+    const partnerUserId = pair.user1Id === interaction.user.id ? pair.user2Id : pair.user1Id;
+    const selfSign = await getUserZodiacSign(interaction.user.id);
+    const partnerSign = await getUserZodiacSign(partnerUserId);
+
+    if (selfSign && partnerSign) {
+      const text = await buildAstroPairView({
+        guildId: interaction.guildId,
+        userSign: selfSign,
+        partnerSign
+      });
+
+      await interaction.editReply(text);
+      return;
+    }
+
+    await interaction.editReply({
+      content: partnerSign
+        ? 'Выберите ваш знак для просмотра.'
+        : 'У партнера нет сохраненного знака. Выберите знак для этого просмотра.',
+      components: buildAstroPairPicker({
+        selfSign: selfSign ?? 'aries',
+        partnerSign: partnerSign ?? 'aries',
+        selfSource: selfSign ? 'saved' : 'temp',
+        partnerSource: partnerSign ? 'saved' : 'temp'
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'astro' && decoded.action === 'pair_submit') {
+    if (!interaction.guildId) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
+      return;
+    }
+
+    const state = await getAstroFeatureState(interaction.guildId);
+    if (!state.enabled || !state.configured) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Astro Horoscope не настроен. Обратитесь к администратору.',
+      });
+      return;
+    }
+
+    const selection = parseAstroPairSelection(decoded.payload);
+    if (!selection) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Некорректный выбор пары для Astro.',
+      });
+      return;
+    }
+
+    await interaction.deferUpdate();
+
+    const pair = await getPairForUser(interaction.guildId, interaction.user.id);
+    if (!pair) {
+      await interaction.editReply({
+        content: 'Сначала создайте пару: `/pair create`.',
+        components: []
+      });
+      return;
+    }
+
+    const text = await buildAstroPairView({
+      guildId: interaction.guildId,
+      userSign: selection.selfSign,
+      partnerSign: selection.partnerSign
+    });
+
+    await interaction.editReply({
+      content: text,
+      components: []
+    });
+    return;
+  }
+
   if (decoded.feature === 'checkin' && decoded.action === 'share_agreement') {
     if (!interaction.guildId) {
       await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
@@ -1077,7 +1385,7 @@ function parseCheckinScores(locale: AppLocale, interaction: ModalSubmitInteracti
 }
 
 async function handleModal(ctx: InteractionContext, interaction: ModalSubmitInteraction): Promise<void> {
-  const decoded = withOracleFeatureCompatibility(decodeCustomId(interaction.customId));
+  const decoded = decodeCustomId(interaction.customId);
   const correlationId = createCorrelationId();
   const tr = await createInteractionTranslator(interaction);
 
@@ -1275,7 +1583,7 @@ async function handleSelect(
   ctx: InteractionContext,
   interaction: StringSelectMenuInteraction | ChannelSelectMenuInteraction | RoleSelectMenuInteraction,
 ): Promise<void> {
-  const decoded = withOracleFeatureCompatibility(decodeCustomId(interaction.customId));
+  const decoded = decodeCustomId(interaction.customId);
   const tr = await createInteractionTranslator(interaction);
 
   if (decoded.feature === 'setup_wizard') {
@@ -1341,6 +1649,163 @@ async function handleSelect(
         mode: nextMode,
         context: nextContext
       }, tr.locale) as never
+    });
+    return;
+  }
+
+  if (
+    decoded.feature === 'astro'
+    && (
+      decoded.action === 'pick_sign'
+      || decoded.action === 'pick_mode'
+      || decoded.action === 'pick_context'
+      || decoded.action === 'pick_save'
+    )
+  ) {
+    if (!interaction.isStringSelectMenu()) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Неподдерживаемый селектор Astro.',
+      });
+      return;
+    }
+
+    if (!interaction.guildId) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.guild_only_action') });
+      return;
+    }
+
+    const parsed = parseAstroClaimSelection(decoded.payload);
+    const selected = interaction.values[0];
+    if (!selected) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.no_selection_value') });
+      return;
+    }
+
+    let sign = parsed?.sign ?? 'aries';
+    let mode = parsed?.mode ?? 'neutral';
+    let context = parsed?.context ?? 'ok';
+    let saveSign = parsed?.saveSign ?? 'nosave';
+
+    if (decoded.action === 'pick_sign') {
+      const nextSign = parseAstroSignKey(selected);
+      if (!nextSign) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Некорректный знак.' });
+        return;
+      }
+      sign = nextSign;
+    }
+
+    if (decoded.action === 'pick_mode') {
+      const nextMode = parseAstroMode(selected);
+      if (!nextMode) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Некорректный тон.' });
+        return;
+      }
+      mode = nextMode;
+    }
+
+    if (decoded.action === 'pick_context') {
+      const nextContext = parseAstroContext(selected);
+      if (!nextContext) {
+        await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Некорректный контекст.' });
+        return;
+      }
+      context = nextContext;
+    }
+
+    if (decoded.action === 'pick_save') {
+      saveSign = selected === 'save' ? 'save' : 'nosave';
+    }
+
+    await interaction.update({
+      content: 'Выберите знак, тон и контекст, затем нажмите «Получить приватно».',
+      components: buildAstroClaimPicker({
+        sign,
+        mode,
+        context,
+        saveSign
+      }) as never
+    });
+    return;
+  }
+
+  if (decoded.feature === 'astro' && decoded.action === 'set_sign') {
+    if (!interaction.isStringSelectMenu()) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Неподдерживаемый селектор Astro.',
+      });
+      return;
+    }
+
+    const selected = interaction.values[0];
+    if (!selected) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.no_selection_value') });
+      return;
+    }
+
+    const sign = parseAstroSignKey(selected);
+    if (!sign) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: 'Некорректный знак.' });
+      return;
+    }
+
+    await setUserZodiacSign(interaction.user.id, sign);
+    await interaction.update({
+      content: `Ваш знак сохранен: ${astroSignLabelRu[sign]} (${sign}).`,
+      components: []
+    });
+    return;
+  }
+
+  if (
+    decoded.feature === 'astro'
+    && (decoded.action === 'pair_pick_self' || decoded.action === 'pair_pick_partner')
+  ) {
+    if (!interaction.isStringSelectMenu()) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Неподдерживаемый селектор Astro пары.',
+      });
+      return;
+    }
+
+    const parsed = parseAstroPairSelection(decoded.payload);
+    if (!parsed) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Некорректный payload Astro пары.',
+      });
+      return;
+    }
+
+    const selected = interaction.values[0];
+    if (!selected) {
+      await interaction.reply({ flags: MessageFlags.Ephemeral, content: tr.t('error.no_selection_value') });
+      return;
+    }
+
+    const selectedSign = parseAstroSignKey(selected);
+    if (!selectedSign) {
+      await interaction.reply({
+        flags: MessageFlags.Ephemeral,
+        content: 'Некорректный знак.',
+      });
+      return;
+    }
+
+    const nextSelfSign = decoded.action === 'pair_pick_self' ? selectedSign : parsed.selfSign;
+    const nextPartnerSign = decoded.action === 'pair_pick_partner' ? selectedSign : parsed.partnerSign;
+
+    await interaction.update({
+      content: 'Нажмите «Показать синастрию».',
+      components: buildAstroPairPicker({
+        selfSign: nextSelfSign,
+        partnerSign: nextPartnerSign,
+        selfSource: decoded.action === 'pair_pick_self' ? 'temp' : parsed.selfSource,
+        partnerSource: decoded.action === 'pair_pick_partner' ? 'temp' : parsed.partnerSource
+      }) as never
     });
     return;
   }

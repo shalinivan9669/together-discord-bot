@@ -15,12 +15,22 @@ import {
   type DateEnergy,
   type DateTimeWindow,
 } from '../../domain/date';
+import {
+  ASTRO_CONTEXTS,
+  ASTRO_MODES,
+  ASTRO_SIGN_KEYS,
+  astroSignLabelRu,
+  type AstroContext,
+  type AstroMode,
+  type AstroSignKey
+} from '../../domain/astro';
 import { t, type AppLocale } from '../../i18n';
 import { encodeCustomId } from './customId';
 
 type SayTone = 'soft' | 'direct' | 'short';
 type OracleMode = 'soft' | 'neutral' | 'hard';
 type OracleContext = 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
+type AstroSaveSign = 'save' | 'nosave';
 
 function datePayload(filters: { energy: DateEnergy; budget: DateBudget; timeWindow: DateTimeWindow }) {
   return {
@@ -148,6 +158,235 @@ export function buildOracleClaimPicker(params: {
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(claimButtonId).setLabel(t(locale, 'component.oracle.get_privately')).setStyle(ButtonStyle.Primary),
     )
+  ];
+}
+
+function astroClaimPayload(params: {
+  sign: AstroSignKey;
+  mode: AstroMode;
+  context: AstroContext;
+  saveSign: AstroSaveSign;
+}) {
+  return {
+    s: params.sign,
+    m: params.mode === 'soft' ? 's' : params.mode === 'neutral' ? 'n' : 'h',
+    x:
+      params.context === 'conflict'
+        ? 'c'
+        : params.context === 'ok'
+          ? 'o'
+          : params.context === 'boredom'
+            ? 'b'
+            : params.context === 'distance'
+              ? 'd'
+              : params.context === 'fatigue'
+                ? 'f'
+                : 'j',
+    v: params.saveSign === 'save' ? 'y' : 'n'
+  };
+}
+
+export function buildAstroClaimPicker(params: {
+  sign: AstroSignKey;
+  mode: AstroMode;
+  context: AstroContext;
+  saveSign: AstroSaveSign;
+}) {
+  const signSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'pick_sign',
+    payload: astroClaimPayload(params)
+  });
+
+  const modeSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'pick_mode',
+    payload: astroClaimPayload(params)
+  });
+
+  const contextSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'pick_context',
+    payload: astroClaimPayload(params)
+  });
+
+  const saveSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'pick_save',
+    payload: astroClaimPayload(params)
+  });
+
+  const claimButtonId = encodeCustomId({
+    feature: 'astro',
+    action: 'claim_submit',
+    payload: astroClaimPayload(params)
+  });
+
+  return [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(signSelectId)
+        .setPlaceholder('Выберите знак')
+        .addOptions(
+          ASTRO_SIGN_KEYS.map((sign) => ({
+            label: astroSignLabelRu[sign],
+            value: sign,
+            default: sign === params.sign
+          })),
+        ),
+    ),
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(modeSelectId)
+        .setPlaceholder('Выберите тон')
+        .addOptions(
+          ASTRO_MODES.map((mode) => ({
+            label: mode === 'soft' ? 'Мягко' : mode === 'neutral' ? 'Нейтрально' : 'Жёстко',
+            value: mode,
+            default: mode === params.mode
+          })),
+        ),
+    ),
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(contextSelectId)
+        .setPlaceholder('Выберите контекст')
+        .addOptions(
+          ASTRO_CONTEXTS.map((context) => ({
+            label:
+              context === 'conflict'
+                ? 'Конфликт'
+                : context === 'ok'
+                  ? 'Все ок'
+                  : context === 'boredom'
+                    ? 'Скука'
+                    : context === 'distance'
+                      ? 'Дистанция'
+                      : context === 'fatigue'
+                        ? 'Усталость'
+                        : 'Ревность',
+            value: context,
+            default: context === params.context
+          })),
+        ),
+    ),
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(saveSelectId)
+        .setPlaceholder('Выберите режим сохранения знака')
+        .addOptions([
+          {
+            label: 'Сохранить как мой знак',
+            value: 'save',
+            default: params.saveSign === 'save'
+          },
+          {
+            label: 'Не сохранять',
+            value: 'nosave',
+            default: params.saveSign === 'nosave'
+          }
+        ]),
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(claimButtonId).setLabel('Получить приватно').setStyle(ButtonStyle.Primary),
+    )
+  ];
+}
+
+export function buildAstroSignPicker(input: {
+  cycleStartDate: string;
+  sign: AstroSignKey;
+}) {
+  const signSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'set_sign',
+    payload: {
+      c: input.cycleStartDate
+    }
+  });
+
+  return [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(signSelectId)
+        .setPlaceholder('Выберите знак и сохраните')
+        .addOptions(
+          ASTRO_SIGN_KEYS.map((sign) => ({
+            label: astroSignLabelRu[sign],
+            value: sign,
+            default: sign === input.sign
+          })),
+        ),
+    ),
+  ];
+}
+
+function astroPairPayload(input: {
+  selfSign: AstroSignKey;
+  partnerSign: AstroSignKey;
+  selfSource: 'saved' | 'temp';
+  partnerSource: 'saved' | 'temp';
+}) {
+  return {
+    a: input.selfSign,
+    b: input.partnerSign,
+    u: input.selfSource === 'saved' ? 's' : 't',
+    p: input.partnerSource === 'saved' ? 's' : 't'
+  };
+}
+
+export function buildAstroPairPicker(input: {
+  selfSign: AstroSignKey;
+  partnerSign: AstroSignKey;
+  selfSource: 'saved' | 'temp';
+  partnerSource: 'saved' | 'temp';
+}) {
+  const selfSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'pair_pick_self',
+    payload: astroPairPayload(input)
+  });
+
+  const partnerSelectId = encodeCustomId({
+    feature: 'astro',
+    action: 'pair_pick_partner',
+    payload: astroPairPayload(input)
+  });
+
+  const submitId = encodeCustomId({
+    feature: 'astro',
+    action: 'pair_submit',
+    payload: astroPairPayload(input)
+  });
+
+  return [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(selfSelectId)
+        .setPlaceholder('Ваш знак')
+        .addOptions(
+          ASTRO_SIGN_KEYS.map((sign) => ({
+            label: astroSignLabelRu[sign],
+            value: sign,
+            default: sign === input.selfSign
+          })),
+        ),
+    ),
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(partnerSelectId)
+        .setPlaceholder('Знак партнёра')
+        .addOptions(
+          ASTRO_SIGN_KEYS.map((sign) => ({
+            label: astroSignLabelRu[sign],
+            value: sign,
+            default: sign === input.partnerSign
+          })),
+        ),
+    ),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId(submitId).setLabel('Показать синастрию').setStyle(ButtonStyle.Primary),
+    ),
   ];
 }
 

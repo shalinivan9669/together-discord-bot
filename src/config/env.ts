@@ -60,17 +60,7 @@ const envSchema = z.object({
   RAID_PROGRESS_EDIT_THROTTLE_SECONDS: z.coerce.number().int().min(5).max(60).default(15)
 });
 
-const rawEnv = {
-  ...process.env,
-  // Backward compatibility for one release:
-  // PHASE2_ORACLE_ENABLED <- PHASE2_HOROSCOPE_ENABLED fallback.
-  PHASE2_ORACLE_ENABLED:
-    process.env.PHASE2_ORACLE_ENABLED
-    ?? process.env.PHASE2_HOROSCOPE_ENABLED
-    ?? 'false',
-};
-
-const parsed = envSchema.safeParse(rawEnv);
+const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
   const flattened = parsed.error.flatten();

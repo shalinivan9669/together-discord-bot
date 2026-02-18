@@ -16,7 +16,7 @@ import { runPermissionsCheck } from '../permissions/check';
 import { t, type I18nKey } from '../../i18n';
 
 const scheduleOwnerFeature: Partial<Record<JobName, GuildFeatureName>> = {
-  [JobNames.WeeklyOraclePublish]: 'oracle',
+  [JobNames.OracleWeeklyPublish]: 'oracle',
   [JobNames.WeeklyCheckinNudge]: 'checkin',
   [JobNames.WeeklyRaidStart]: 'raid',
   [JobNames.WeeklyRaidEnd]: 'raid',

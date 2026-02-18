@@ -27,10 +27,16 @@ export type RecurringScheduleStatus = {
 
 const recurringScheduleDefinitions: readonly RecurringScheduleDefinition[] = [
   {
-    name: JobNames.WeeklyOraclePublish,
+    name: JobNames.OracleWeeklyPublish,
     cron: '0 10 * * 1',
     payloadFeature: 'oracle',
     payloadAction: 'weekly_publish'
+  },
+  {
+    name: JobNames.AstroTickDaily,
+    cron: '0 9 * * *',
+    payloadFeature: 'astro',
+    payloadAction: 'tick_daily'
   },
   {
     name: JobNames.WeeklyCheckinNudge,

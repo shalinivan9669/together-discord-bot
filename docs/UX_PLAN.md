@@ -94,6 +94,23 @@
 - Pair panel keeps primary row for core actions.
 - Contextual helper CTA row appears when duel/raid are active, routing to rules/how/contribution actions.
 
+### Astro Horoscope (Implemented)
+- Added `/horoscope` command group:
+  - `setup`, `status`, `publish-now` (admin/mod)
+  - `me`, `pair` (user flows)
+- Public Astro card:
+  - one persistent message (`astro_horoscope_message_id`)
+  - edit-only projection updates
+  - CTA row: `Получить приватно`, `Для пары`, `About`, `Настроить знак`
+- Private claim flow:
+  - sign + tone + context selection
+  - optional sign save as default
+  - one idempotent claim per user per 6-day cycle
+- Pair flow:
+  - if both signs saved -> direct synastry result
+  - otherwise partner sign picker for one-time view (no default save)
+- Required disclaimers are shown on public and private Astro surfaces.
+
 ## Step 3 (Plan)
 
 ### UX Goals

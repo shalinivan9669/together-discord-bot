@@ -64,6 +64,13 @@
       "when": 1772380800000,
       "tag": "0008_oracle_rename",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772467200000,
+      "tag": "0009_astro_horoscope",
+      "breakpoints": true
     }
   ]
 }

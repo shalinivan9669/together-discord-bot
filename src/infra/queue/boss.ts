@@ -23,11 +23,13 @@ import type { ThrottledMessageEditor } from '../../discord/projections/messageEd
 import { refreshRaidProgressProjection } from '../../discord/projections/raidProgress';
 import { refreshPairHomeProjection } from '../../discord/projections/pairHome';
 import { refreshWeeklyOracleProjection } from '../../discord/projections/oracleWeekly';
+import { refreshAstroHoroscopeProjection } from '../../discord/projections/astroHoroscope';
 import { refreshMonthlyHallProjection } from '../../discord/projections/monthlyHall';
 import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2';
 import { configureRecurringSchedules, type RecurringScheduleStatus } from './scheduler';
 import { publishDueScheduledPosts } from '../../app/services/publicPostService';
 import { scheduleWeeklyCheckinNudges } from '../../app/services/checkinService';
+import { queueAstroPublishForTick } from '../../app/services/astroHoroscopeService';
 import {
   endExpiredRaids,
   generateDailyRaidOffers,
@@ -323,13 +325,108 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
       }
     });
 
-    await boss.work(JobNames.WeeklyOraclePublish, async (jobs) => {
+    for (const oracleJobName of [JobNames.OracleWeeklyPublish, JobNames.OraclePublish] as const) {
+      await boss.work(oracleJobName, async (jobs) => {
+        for (const job of jobs) {
+          const parsed = genericScheduledPayloadSchema.parse(
+            job.data ?? {
+              correlationId: randomUUID(),
+              guildId: 'scheduler',
+              feature: oracleJobName,
+              action: 'tick'
+            },
+          );
+
+          logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+
+          if (!messageEditor) {
+            throw new Error('Message editor not initialized for oracle publish');
+          }
+
+          if (!discordClient) {
+            throw new Error('Discord client not initialized for oracle publish');
+          }
+
+          const refreshed = await refreshWeeklyOracleProjection({
+            client: discordClient,
+            messageEditor,
+            weekStartDate: parsed.weekStartDate,
+            guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId
+          });
+
+          if (refreshed.failed > 0) {
+            throw new Error(`Oracle refresh failed for ${refreshed.failed} guild(s)`);
+          }
+
+          logger.info(
+            {
+              feature: parsed.feature,
+              action: parsed.action,
+              job_id: job.id,
+              processed: refreshed.processed,
+              created: refreshed.created,
+              updated: refreshed.updated,
+              failed: refreshed.failed
+            },
+            'job completed',
+          );
+        }
+      });
+    }
+
+    await boss.work(JobNames.AstroTickDaily, async (jobs) => {
       for (const job of jobs) {
         const parsed = genericScheduledPayloadSchema.parse(
           job.data ?? {
             correlationId: randomUUID(),
             guildId: 'scheduler',
-            feature: JobNames.WeeklyOraclePublish,
+            feature: JobNames.AstroTickDaily,
+            action: 'tick'
+          },
+        );
+
+        logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
+
+        const ticked = await queueAstroPublishForTick({
+          now: new Date(),
+          enqueue: async ({ guildId, reason }) => {
+            await boss.send(
+              JobNames.AstroPublish,
+              {
+                correlationId: parsed.correlationId,
+                guildId,
+                feature: 'astro',
+                action: reason
+              },
+              {
+                singletonKey: `astro.publish:${guildId}`,
+                singletonSeconds: 10,
+                retryLimit: 3
+              },
+            );
+          }
+        });
+
+        logger.info(
+          {
+            feature: parsed.feature,
+            action: parsed.action,
+            job_id: job.id,
+            processed: ticked.processed,
+            queued: ticked.queued
+          },
+          'job completed',
+        );
+      }
+    });
+
+    await boss.work(JobNames.AstroPublish, async (jobs) => {
+      for (const job of jobs) {
+        const parsed = genericScheduledPayloadSchema.parse(
+          job.data ?? {
+            correlationId: randomUUID(),
+            guildId: 'scheduler',
+            feature: JobNames.AstroPublish,
             action: 'tick'
           },
         );
@@ -337,22 +434,21 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         logger.info({ feature: parsed.feature, action: parsed.action, job_id: job.id }, 'job started');
 
         if (!messageEditor) {
-          throw new Error('Message editor not initialized for weekly oracle publish');
+          throw new Error('Message editor not initialized for astro publish');
         }
 
         if (!discordClient) {
-          throw new Error('Discord client not initialized for weekly oracle publish');
+          throw new Error('Discord client not initialized for astro publish');
         }
 
-        const refreshed = await refreshWeeklyOracleProjection({
+        const refreshed = await refreshAstroHoroscopeProjection({
           client: discordClient,
           messageEditor,
-          weekStartDate: parsed.weekStartDate,
           guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId
         });
 
         if (refreshed.failed > 0) {
-          throw new Error(`Weekly oracle refresh failed for ${refreshed.failed} guild(s)`);
+          throw new Error(`Astro projection refresh failed for ${refreshed.failed} guild(s)`);
         }
 
         logger.info(

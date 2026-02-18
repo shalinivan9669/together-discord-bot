@@ -1,6 +1,7 @@
 ﻿import {
   bigint,
   boolean,
+  date,
   integer,
   jsonb,
   pgTable,
@@ -17,6 +18,10 @@ export const guildSettings = pgTable('guild_settings', {
   timezone: varchar('timezone', { length: 64 }).notNull().default('Asia/Almaty'),
   pairCategoryId: varchar('pair_category_id', { length: 32 }),
   oracleChannelId: varchar('oracle_channel_id', { length: 32 }),
+  oracleMessageId: varchar('oracle_message_id', { length: 32 }),
+  astroHoroscopeChannelId: varchar('astro_horoscope_channel_id', { length: 32 }),
+  astroHoroscopeMessageId: varchar('astro_horoscope_message_id', { length: 32 }),
+  astroHoroscopeAnchorDate: date('astro_horoscope_anchor_date', { mode: 'string' }),
   publicPostChannelId: varchar('public_post_channel_id', { length: 32 }),
   anonInboxChannelId: varchar('anon_inbox_channel_id', { length: 32 }),
   anonModRoleId: varchar('anon_mod_role_id', { length: 32 }),
@@ -38,6 +43,7 @@ export const schedulerSettings = pgTable('scheduler_settings', {
 
 export const users = pgTable('users', {
   userId: varchar('user_id', { length: 32 }).primaryKey(),
+  zodiacSign: text('zodiac_sign'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
@@ -274,6 +280,53 @@ export const oracleClaims = pgTable(
     uniqueClaim: unique('oracle_claims_guild_week_user_uq').on(
       table.guildId,
       table.weekStartDate,
+      table.userId,
+    )
+  }),
+);
+
+export const contentAstroArchetypes = pgTable('content_astro_archetypes', {
+  key: varchar('key', { length: 64 }).primaryKey(),
+  title: varchar('title', { length: 100 }).notNull(),
+  variantsJson: jsonb('variants_json').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+});
+
+export const astroCycles = pgTable(
+  'astro_cycles',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    guildId: varchar('guild_id', { length: 32 }).notNull(),
+    cycleStartDate: date('cycle_start_date', { mode: 'string' }).notNull(),
+    archetypeKey: varchar('archetype_key', { length: 64 }).notNull().references(() => contentAstroArchetypes.key),
+    seed: integer('seed').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    uniqueCycle: unique('astro_cycles_guild_cycle_uq').on(table.guildId, table.cycleStartDate)
+  }),
+);
+
+export const astroClaims = pgTable(
+  'astro_claims',
+  {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    guildId: varchar('guild_id', { length: 32 }).notNull(),
+    cycleStartDate: date('cycle_start_date', { mode: 'string' }).notNull(),
+    userId: varchar('user_id', { length: 32 }).notNull(),
+    pairId: varchar('pair_id', { length: 36 }),
+    deliveredTo: varchar('delivered_to', { length: 32 }).notNull().default('ephemeral'),
+    signKey: varchar('sign_key', { length: 16 }).notNull(),
+    mode: varchar('mode', { length: 16 }).notNull(),
+    context: varchar('context', { length: 24 }).notNull(),
+    claimText: text('claim_text').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    uniqueClaim: unique('astro_claims_guild_cycle_user_uq').on(
+      table.guildId,
+      table.cycleStartDate,
       table.userId,
     )
   }),

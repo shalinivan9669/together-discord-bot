@@ -71,7 +71,7 @@ export const oracleCommand: CommandModule = {
       const settings = await getGuildSettings(interaction.guildId);
       assertAdminOrConfiguredModerator(interaction, settings?.moderatorRoleId ?? null);
 
-      await ctx.boss.send(JobNames.WeeklyOraclePublish, {
+      await ctx.boss.send(JobNames.OraclePublish, {
         correlationId,
         interactionId: interaction.id,
         guildId: interaction.guildId,

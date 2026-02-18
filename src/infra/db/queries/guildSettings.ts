@@ -18,6 +18,10 @@ export async function upsertGuildSettings(
     timezone: string;
     pairCategoryId: string | null;
     oracleChannelId: string | null;
+    oracleMessageId: string | null;
+    astroHoroscopeChannelId: string | null;
+    astroHoroscopeMessageId: string | null;
+    astroHoroscopeAnchorDate: string | null;
     publicPostChannelId: string | null;
     anonInboxChannelId: string | null;
     anonModRoleId: string | null;

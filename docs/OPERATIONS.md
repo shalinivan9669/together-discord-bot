@@ -32,7 +32,10 @@ Endpoint: `GET /healthz`
 - `monthly.hall.refresh`
 - `mediator.repair.tick`
 - `public.post.publish`
-- `weekly.oracle.publish`
+- `oracle.weekly.publish`
+- `oracle.publish`
+- `astro.tick.daily`
+- `astro.publish`
 - `weekly.checkin.nudge`
 - `weekly.raid.start`
 - `weekly.raid.end`
@@ -40,7 +43,8 @@ Endpoint: `GET /healthz`
 
 Recurring schedule:
 
-- Oracle: weekly Monday `10:00`
+- Oracle weekly publish: Monday `10:00` (`oracle.weekly.publish`)
+- Astro tick: daily `09:00`
 - Weekly check-in nudge: Wednesday `12:00`
 - Weekly raid start: Monday `09:00`
 - Weekly raid end: Monday `09:05`
@@ -48,6 +52,10 @@ Recurring schedule:
 - Raid projection refresh: every 10 minutes
 - Monthly hall refresh: day `1` at `10:00`
 - Public post publish sweep: every 2 minutes
+
+Astro notes:
+- `astro.tick.daily` scans configured guilds and enqueues `astro.publish` only for new cycle or missing public message.
+- `astro.publish` is idempotent and maintains one edit-only public message per guild.
 
 ## Админ-управление
 
