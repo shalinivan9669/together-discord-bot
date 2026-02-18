@@ -142,7 +142,6 @@ function buildMessageOptions(row: typeof scheduledPosts.$inferSelect): BuiltMess
     return {
       kind: 'v2',
       message: renderWeeklyOraclePost({
-        guildId: payload.guildId,
         weekStartDate: payload.weekStartDate
       })
     };

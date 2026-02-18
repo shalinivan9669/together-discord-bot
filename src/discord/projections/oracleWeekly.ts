@@ -161,7 +161,6 @@ export async function refreshWeeklyOracleProjection(input: {
       await ensureOracleWeek(guildId, weekStartDate);
       step = 'render_view';
       const view = renderWeeklyOraclePost({
-        guildId,
         weekStartDate,
       });
 

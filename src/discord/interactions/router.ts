@@ -136,7 +136,6 @@ const datePayloadSchema = z.object({
 });
 const anonQuestionPayloadSchema = z.object({ q: z.string().uuid() });
 const oraclePickerPayloadSchema = z.object({
-  g: z.string().min(1),
   w: z.string().min(1),
   m: z.string().optional(),
   c: z.string().optional()
@@ -200,7 +199,6 @@ function parseSayToneOrDefault(value: string): 'soft' | 'direct' | 'short' {
 }
 
 function parseOracleSelection(payload: Record<string, string>): {
-  guildId: string;
   weekStartDate: string;
   mode: 'soft' | 'neutral' | 'hard';
   context: 'conflict' | 'ok' | 'boredom' | 'distance' | 'fatigue' | 'jealousy';
@@ -217,7 +215,6 @@ function parseOracleSelection(payload: Record<string, string>): {
   }
 
   return {
-    guildId: parsed.data.g,
     weekStartDate: parsed.data.w,
     mode,
     context
@@ -861,7 +858,6 @@ async function handleButton(ctx: InteractionContext, interaction: ButtonInteract
       flags: MessageFlags.Ephemeral,
       content: tr.t('interaction.oracle.pick_mode_context'),
       components: buildOracleClaimPicker({
-        guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: selection.mode,
         context: selection.context
@@ -1642,7 +1638,6 @@ async function handleSelect(
     await interaction.update({
       content: tr.t('interaction.oracle.pick_mode_context'),
       components: buildOracleClaimPicker({
-        guildId: selection.guildId,
         weekStartDate: selection.weekStartDate,
         mode: nextMode,
         context: nextContext
@@ -1916,6 +1911,7 @@ type InteractionLogContext = {
   type: string;
   component_type?: string;
   custom_id?: string;
+  custom_id_len?: number;
   command_name?: string;
   guild_id: string | null;
   channel_id: string | null;
@@ -1928,14 +1924,6 @@ type ErrorInfo = {
   name: string;
   message: string;
   stack?: string;
-  code?: string | number;
-  status?: number;
-  cause?: {
-    name?: string;
-    message?: string;
-    code?: string | number;
-    status?: number;
-  };
 };
 
 type RouteDecision = {
@@ -1993,6 +1981,7 @@ function interactionCtx(
 
   if (customId) {
     context.custom_id = customId;
+    context.custom_id_len = customId.length;
   }
 
   if (interaction.isChatInputCommand()) {
@@ -2010,73 +1999,12 @@ function interactionCtx(
   return context;
 }
 
-function parseCode(value: unknown): string | number | undefined {
-  if (typeof value === 'string' || typeof value === 'number') {
-    return value;
-  }
-
-  return undefined;
-}
-
-function parseStatus(value: unknown): number | undefined {
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  return undefined;
-}
-
-function parseCause(value: unknown): ErrorInfo['cause'] {
-  if (value instanceof Error) {
-    const errorLike = value as Error & {
-      code?: unknown;
-      status?: unknown;
-    };
-
-    return {
-      name: value.name,
-      message: value.message,
-      code: parseCode(errorLike.code),
-      status: parseStatus(errorLike.status)
-    };
-  }
-
-  if (!isObjectRecord(value)) {
-    return undefined;
-  }
-
-  const name = typeof value.name === 'string' ? value.name : undefined;
-  const message = typeof value.message === 'string' ? value.message : undefined;
-  const code = parseCode(value.code);
-  const status = parseStatus(value.status);
-
-  if (!name && !message && code === undefined && status === undefined) {
-    return undefined;
-  }
-
-  return {
-    name,
-    message,
-    code,
-    status
-  };
-}
-
 function errInfo(error: unknown): ErrorInfo {
   if (error instanceof Error) {
-    const errorLike = error as Error & {
-      code?: unknown;
-      status?: unknown;
-      cause?: unknown;
-    };
-
     return {
       name: error.name,
       message: error.message,
-      stack: error.stack,
-      code: parseCode(errorLike.code),
-      status: parseStatus(errorLike.status),
-      cause: parseCause(errorLike.cause)
+      stack: error.stack
     };
   }
 
@@ -2090,10 +2018,7 @@ function errInfo(error: unknown): ErrorInfo {
   return {
     name: typeof error.name === 'string' ? error.name : 'NonErrorThrown',
     message: typeof error.message === 'string' ? error.message : 'Non-error value thrown',
-    stack: typeof error.stack === 'string' ? error.stack : undefined,
-    code: parseCode(error.code),
-    status: parseStatus(error.status),
-    cause: parseCause(error.cause)
+    stack: typeof error.stack === 'string' ? error.stack : undefined
   };
 }
 
@@ -2259,6 +2184,7 @@ export async function routeInteractionComponent(
         routeKey,
         decision_path: decisionPath,
         custom_id: customIdOf(interaction),
+        custom_id_len: customIdOf(interaction)?.length,
         component_type: componentTypeOf(interaction),
         deferred: hasReplyState(interaction) ? interaction.deferred : undefined,
         replied: hasReplyState(interaction) ? interaction.replied : undefined,

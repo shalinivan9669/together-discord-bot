@@ -92,7 +92,6 @@ const oracleModes: readonly OracleMode[] = ['soft', 'neutral', 'hard'];
 const oracleContexts: readonly OracleContext[] = ['conflict', 'ok', 'boredom', 'distance', 'fatigue', 'jealousy'];
 
 export function buildOracleClaimPicker(params: {
-  guildId: string;
   weekStartDate: string;
   mode: OracleMode;
   context: OracleContext;
@@ -101,7 +100,6 @@ export function buildOracleClaimPicker(params: {
     feature: 'oracle',
     action: 'pick_mode',
     payload: {
-      g: params.guildId,
       w: params.weekStartDate,
       m: params.mode,
       c: params.context
@@ -112,7 +110,6 @@ export function buildOracleClaimPicker(params: {
     feature: 'oracle',
     action: 'pick_context',
     payload: {
-      g: params.guildId,
       w: params.weekStartDate,
       m: params.mode,
       c: params.context
@@ -123,7 +120,6 @@ export function buildOracleClaimPicker(params: {
     feature: 'oracle',
     action: 'claim_submit',
     payload: {
-      g: params.guildId,
       w: params.weekStartDate,
       m: params.mode,
       c: params.context

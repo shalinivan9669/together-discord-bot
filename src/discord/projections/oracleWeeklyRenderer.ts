@@ -10,14 +10,12 @@
 import { encodeCustomId } from '../interactions/customId';
 
 export function renderWeeklyOraclePost(params: {
-  guildId: string;
   weekStartDate: string;
 }): ComponentsV2Message {
   const claimId = encodeCustomId({
     feature: 'oracle',
     action: 'claim_open',
     payload: {
-      g: params.guildId,
       w: params.weekStartDate,
     },
   });
@@ -26,7 +24,6 @@ export function renderWeeklyOraclePost(params: {
     feature: 'oracle',
     action: 'about',
     payload: {
-      g: params.guildId,
       w: params.weekStartDate,
     },
   });
@@ -35,7 +32,6 @@ export function renderWeeklyOraclePost(params: {
     feature: 'oracle',
     action: 'start_pair_ritual',
     payload: {
-      g: params.guildId,
       w: params.weekStartDate,
     },
   });
