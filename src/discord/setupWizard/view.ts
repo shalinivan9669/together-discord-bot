@@ -37,6 +37,14 @@ function localeLine(locale: AppLocale): string {
   return `${t(locale, 'setup.wizard.line.locale')}: \`${locale}\``;
 }
 
+function horoscopeEnabledLine(locale: AppLocale, enabled: boolean): string {
+  return `${t(locale, 'setup.wizard.line.horoscope_enabled')}: ${enabled ? t(locale, 'common.enabled') : t(locale, 'common.disabled')}`;
+}
+
+function horoscopeFrequencyLine(locale: AppLocale, everyDays: number): string {
+  return `${t(locale, 'setup.wizard.line.horoscope_frequency')}: ${t(locale, 'setup.wizard.frequency.days', { days: everyDays })}`;
+}
+
 function setupCustomId(action: string, userId: string): string {
   return encodeCustomId({
     feature: 'setup_wizard',
@@ -88,6 +96,59 @@ function timezoneSelect(locale: AppLocale, current: string, userId: string) {
   ]);
 }
 
+function horoscopeEnabledSelect(locale: AppLocale, enabled: boolean, userId: string) {
+  return actionRowSelects([
+    {
+      type: ComponentType.StringSelect,
+      custom_id: setupCustomId('pick_horoscope_enabled', userId),
+      placeholder: t(locale, 'setup.wizard.placeholder.horoscope_enabled'),
+      min_values: 1,
+      max_values: 1,
+      options: [
+        {
+          label: t(locale, 'setup.wizard.option.horoscope_enabled'),
+          value: 'enabled',
+          default: enabled
+        },
+        {
+          label: t(locale, 'setup.wizard.option.horoscope_disabled'),
+          value: 'disabled',
+          default: !enabled
+        }
+      ]
+    }
+  ]);
+}
+
+function horoscopeFrequencySelect(locale: AppLocale, everyDays: number, userId: string) {
+  return actionRowSelects([
+    {
+      type: ComponentType.StringSelect,
+      custom_id: setupCustomId('pick_horoscope_frequency', userId),
+      placeholder: t(locale, 'setup.wizard.placeholder.horoscope_frequency'),
+      min_values: 1,
+      max_values: 1,
+      options: [
+        {
+          label: t(locale, 'setup.wizard.frequency.days', { days: 4 }),
+          value: '4',
+          default: everyDays === 4
+        },
+        {
+          label: t(locale, 'setup.wizard.frequency.days', { days: 7 }),
+          value: '7',
+          default: everyDays === 7
+        },
+        {
+          label: t(locale, 'setup.wizard.frequency.days', { days: 1 }),
+          value: '1',
+          default: everyDays === 1
+        }
+      ]
+    }
+  ]);
+}
+
 export type SetupWizardPanelMode = 'draft' | 'completed';
 
 function statusLine(
@@ -112,7 +173,12 @@ export function buildSetupWizardV2View(
   },
 ): ComponentsV2Message {
   const missingKeys = getSetupMissingRequirementKeys(draft);
+  const horoscopeConfigMissing = draft.horoscopeEnabled && !draft.horoscopeChannelId;
+  const totalMissingCount = missingKeys.length + (horoscopeConfigMissing ? 1 : 0);
   const missingLabels = missingKeys.map((key) => formatRequirementLabel(locale, key));
+  if (horoscopeConfigMissing) {
+    missingLabels.push(t(locale, 'setup.wizard.line.horoscope_channel'));
+  }
   const mode = options?.mode ?? 'draft';
 
   const instructionSummary = [
@@ -122,8 +188,8 @@ export function buildSetupWizardV2View(
   ].join('\n');
 
   const statusSummary = [
-    `${t(locale, 'setup.wizard.line.status')}: ${statusLine(locale, mode, missingKeys.length)}`,
-    missingKeys.length === 0
+    `${t(locale, 'setup.wizard.line.status')}: ${statusLine(locale, mode, totalMissingCount)}`,
+    totalMissingCount === 0
       ? t(locale, 'setup.wizard.line.missing.none')
       : t(locale, 'setup.wizard.line.missing.some', {
           missing: missingLabels.join(', ')
@@ -133,6 +199,9 @@ export function buildSetupWizardV2View(
   const selectionsSummary = [
     categoryLine(locale, draft.pairCategoryId),
     channelLine(locale, t(locale, 'setup.wizard.line.oracle_channel'), draft.oracleChannelId),
+    channelLine(locale, t(locale, 'setup.wizard.line.horoscope_channel'), draft.horoscopeChannelId),
+    horoscopeEnabledLine(locale, draft.horoscopeEnabled),
+    horoscopeFrequencyLine(locale, draft.horoscopeEveryDays),
     channelLine(locale, t(locale, 'setup.wizard.line.raid_channel'), draft.raidChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.hall_channel'), draft.hallChannelId),
     channelLine(locale, t(locale, 'setup.wizard.line.public_post_channel'), draft.publicPostChannelId),
@@ -160,6 +229,11 @@ export function buildSetupWizardV2View(
         components: [
           categorySelect('pick_pair_category', t(locale, 'setup.wizard.placeholder.pair_category'), draft.userId),
           channelSelect('pick_oracle_channel', t(locale, 'setup.wizard.placeholder.oracle_channel'), draft.userId),
+          channelSelect(
+            'pick_horoscope_channel',
+            t(locale, 'setup.wizard.placeholder.horoscope_channel'),
+            draft.userId,
+          ),
           channelSelect('pick_raid_channel', t(locale, 'setup.wizard.placeholder.raid_channel'), draft.userId),
           channelSelect('pick_hall_channel', t(locale, 'setup.wizard.placeholder.hall_channel'), draft.userId),
           channelSelect(
@@ -171,7 +245,15 @@ export function buildSetupWizardV2View(
             'pick_anon_inbox_channel',
             t(locale, 'setup.wizard.placeholder.anon_inbox_channel'),
             draft.userId,
-          ),
+          )
+        ]
+      }),
+      uiCard({
+        title: t(locale, 'setup.wizard.title'),
+        accentColor: 0x3d5a80,
+        components: [
+          horoscopeEnabledSelect(locale, draft.horoscopeEnabled, draft.userId),
+          horoscopeFrequencySelect(locale, draft.horoscopeEveryDays, draft.userId),
           actionRowSelects([
             {
               type: ComponentType.RoleSelect,
@@ -188,7 +270,7 @@ export function buildSetupWizardV2View(
               style: ButtonStyle.Success,
               custom_id: setupCustomId('complete', draft.userId),
               label: t(locale, 'setup.wizard.button.complete'),
-              disabled: missingKeys.length > 0
+              disabled: totalMissingCount > 0
             },
             {
               type: ComponentType.Button,

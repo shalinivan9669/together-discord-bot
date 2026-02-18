@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-describe('astro tick idempotency', () => {
+describe('astro tick queueing', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env.NODE_ENV = 'test';
@@ -14,10 +14,10 @@ describe('astro tick idempotency', () => {
     process.env.PHASE2_RAID_ENABLED = 'false';
   });
 
-  it('does not enqueue duplicate publish after cycle already exists', async () => {
+  it('enqueues due guild with stable dedupe key', async () => {
     const { queueAstroPublishForTick } = await import('../../src/app/services/astroHoroscopeService');
-    let createdOnce = false;
     const enqueue = vi.fn().mockResolvedValue(undefined);
+    const now = new Date('2026-02-14T09:00:00.000Z');
 
     const deps = {
       listTickGuilds: vi.fn().mockResolvedValue([
@@ -25,63 +25,29 @@ describe('astro tick idempotency', () => {
           guildId: 'g1',
           channelId: 'astro-ch',
           messageId: 'astro-msg',
-          anchorDate: '2026-02-01'
+          anchorDate: '2026-02-01',
+          timezone: 'Asia/Almaty',
+          everyDays: 4,
+          nextRunAt: new Date('2026-02-14T08:00:00.000Z')
         }
       ]),
-      resolveCycle: vi.fn().mockResolvedValue({
-        anchorDate: '2026-02-01',
-        cycleIndex: 2,
-        cycleStartDate: '2026-02-13',
-        cycleEndDate: '2026-02-18'
-      }),
-      ensureCycle: vi.fn().mockImplementation(async () => {
-        if (!createdOnce) {
-          createdOnce = true;
-          return {
-            row: {
-              id: 'cycle-1',
-              guildId: 'g1',
-              cycleStartDate: '2026-02-13',
-              archetypeKey: 'a1',
-              seed: 100,
-              createdAt: new Date()
-            },
-            created: true
-          };
-        }
-
-        return {
-          row: {
-            id: 'cycle-1',
-            guildId: 'g1',
-            cycleStartDate: '2026-02-13',
-            archetypeKey: 'a1',
-            seed: 100,
-            createdAt: new Date()
-          },
-          created: false
-        };
-      })
     };
 
-    const first = await queueAstroPublishForTick(
+    const result = await queueAstroPublishForTick(
       {
-        now: new Date('2026-02-14T09:00:00.000Z'),
+        now,
         enqueue
       },
       deps,
     );
 
-    const second = await queueAstroPublishForTick(
-      {
-        now: new Date('2026-02-14T12:00:00.000Z'),
-        enqueue
-      },
-      deps,
-    );
-
-    expect(first.queued).toBe(1);
-    expect(second.queued).toBe(0);
+    expect(result.queued).toBe(1);
     expect(enqueue).toHaveBeenCalledTimes(1);
+    expect(enqueue).toHaveBeenCalledWith({
+      guildId: 'g1',
+      reason: 'due_run',
+      runAt: new Date('2026-02-14T08:00:00.000Z'),
+      dedupeKey: 'horoscope:g1:2026-02-14'
+    });
   });
 });

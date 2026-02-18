@@ -29,7 +29,7 @@ import { sendComponentsV2Message, textBlock, uiCard } from '../../discord/ui-v2'
 import { configureRecurringSchedules, type RecurringScheduleStatus } from './scheduler';
 import { publishDueScheduledPosts } from '../../app/services/publicPostService';
 import { scheduleWeeklyCheckinNudges } from '../../app/services/checkinService';
-import { queueAstroPublishForTick } from '../../app/services/astroHoroscopeService';
+import { markHoroscopePublished, queueAstroPublishForTick } from '../../app/services/astroHoroscopeService';
 import {
   endExpiredRaids,
   generateDailyRaidOffers,
@@ -389,18 +389,20 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
 
         const ticked = await queueAstroPublishForTick({
           now: new Date(),
-          enqueue: async ({ guildId, reason }) => {
+          enqueue: async ({ guildId, reason, runAt, dedupeKey }) => {
             await boss.send(
               JobNames.AstroPublish,
               {
                 correlationId: parsed.correlationId,
                 guildId,
+                runAtIso: runAt.toISOString(),
+                dedupeKey,
                 feature: 'astro',
                 action: reason
               },
               {
-                singletonKey: `astro.publish:${guildId}`,
-                singletonSeconds: 10,
+                singletonKey: dedupeKey,
+                singletonSeconds: 86_400,
                 retryLimit: 3
               },
             );
@@ -444,11 +446,19 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
         const refreshed = await refreshAstroHoroscopeProjection({
           client: discordClient,
           messageEditor,
-          guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId
+          guildId: parsed.guildId === 'scheduler' ? undefined : parsed.guildId,
+          isTest: parsed.isTest === true
         });
 
         if (refreshed.failed > 0) {
           throw new Error(`Astro projection refresh failed for ${refreshed.failed} guild(s)`);
+        }
+
+        if (parsed.guildId !== 'scheduler' && refreshed.processed > 0) {
+          await markHoroscopePublished({
+            guildId: parsed.guildId,
+            isTest: parsed.isTest === true
+          });
         }
 
         logger.info(

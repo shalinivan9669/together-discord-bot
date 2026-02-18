@@ -7,6 +7,12 @@ export type GuildSettingsPatch = Partial<{
   publicPostChannelId: string | null;
   anonInboxChannelId: string | null;
   anonModRoleId: string | null;
+  horoscopeEnabled: boolean;
+  horoscopeChannelId: string | null;
+  horoscopeEveryDays: number;
+  horoscopeNextRunAt: Date | null;
+  horoscopeLastPostAt: Date | null;
+  horoscopePostMessageId: string | null;
   features: Record<string, boolean>;
   questionsChannelId: string | null;
   raidChannelId: string | null;

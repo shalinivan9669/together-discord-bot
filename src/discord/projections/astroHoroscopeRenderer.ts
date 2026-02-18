@@ -15,6 +15,7 @@ export function renderAstroHoroscopeCard(input: {
   cycleEndDate: string;
   skyTheme: string;
   aboutLine: string;
+  isTest?: boolean;
 }): ComponentsV2Message {
   const claimId = encodeCustomId({
     feature: 'astro',
@@ -51,7 +52,7 @@ export function renderAstroHoroscopeCard(input: {
   return {
     components: [
       uiCard({
-        title: 'Гороскоп на 6 дней',
+        title: input.isTest ? 'Гороскоп на 6 дней [TEST]' : 'Гороскоп на 6 дней',
         status: `${input.cycleStartDate} → ${input.cycleEndDate}`,
         accentColor: 0x2d4c8f,
         components: [

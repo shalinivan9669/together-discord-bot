@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { dateOnly } from '../../lib/time';
 import { db } from '../../infra/db/drizzle';
@@ -56,9 +56,10 @@ type AstroVariants = {
   signs: Record<AstroSignKey, Record<AstroMode, Record<AstroContext, AstroVariantLeaf>>>;
 };
 
-type AstroFeatures = {
-  astro: boolean;
-};
+const DEFAULT_TIMEZONE = 'UTC';
+const DEFAULT_HOROSCOPE_EVERY_DAYS = 4;
+const HOROSCOPE_ALLOWED_FREQUENCY = new Set([1, 4, 7]);
+const HOROSCOPE_LOCAL_RUN_HOUR = 10;
 
 export type AstroFeatureState = {
   guildId: string;
@@ -67,6 +68,10 @@ export type AstroFeatureState = {
   channelId: string | null;
   messageId: string | null;
   anchorDate: string | null;
+  timezone: string;
+  everyDays: number;
+  nextRunAt: Date | null;
+  lastPostAt: Date | null;
 };
 
 export type AstroCycleRuntime = {
@@ -81,15 +86,130 @@ type AstroClaimRow = typeof astroClaims.$inferSelect;
 export const ASTRO_PUBLIC_DISCLAIMER = 'Астрология здесь — метафора и ритуал, не предсказание и не наука.';
 export const ASTRO_PRIVATE_DISCLAIMER = 'Метафора/ритуал, не прогноз и не научное утверждение.';
 
-function readAstroFeatures(raw: unknown): AstroFeatures {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return { astro: false };
+type TimeZoneParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+};
+
+function normalizeEveryDays(value: number | null | undefined): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || !HOROSCOPE_ALLOWED_FREQUENCY.has(value)) {
+    return DEFAULT_HOROSCOPE_EVERY_DAYS;
   }
 
-  const value = raw as Record<string, unknown>;
-  return {
-    astro: typeof value.astro === 'boolean' ? value.astro : false
+  return value;
+}
+
+function safeTimezone(timezone: string | null | undefined): string {
+  if (!timezone) {
+    return DEFAULT_TIMEZONE;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+    return timezone;
+  } catch {
+    return DEFAULT_TIMEZONE;
+  }
+}
+
+function toTimeZoneParts(date: Date, timeZone: string): TimeZoneParts {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  });
+
+  const parts = formatter.formatToParts(date);
+  const read = (type: Intl.DateTimeFormatPartTypes): number => {
+    const raw = parts.find((part) => part.type === type)?.value ?? '0';
+    return Number.parseInt(raw, 10);
   };
+
+  return {
+    year: read('year'),
+    month: read('month'),
+    day: read('day'),
+    hour: read('hour'),
+    minute: read('minute'),
+    second: read('second')
+  };
+}
+
+function addDaysUtc(input: TimeZoneParts, days: number): TimeZoneParts {
+  const next = new Date(Date.UTC(input.year, input.month - 1, input.day + days, input.hour, input.minute, input.second));
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+    hour: next.getUTCHours(),
+    minute: next.getUTCMinutes(),
+    second: next.getUTCSeconds()
+  };
+}
+
+function zonedLocalToUtc(input: TimeZoneParts, timeZone: string): Date {
+  let candidateUtcMs = Date.UTC(input.year, input.month - 1, input.day, input.hour, input.minute, input.second);
+
+  for (let i = 0; i < 4; i += 1) {
+    const seen = toTimeZoneParts(new Date(candidateUtcMs), timeZone);
+    const targetMs = Date.UTC(input.year, input.month - 1, input.day, input.hour, input.minute, input.second);
+    const seenMs = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute, seen.second);
+    const deltaMs = targetMs - seenMs;
+    if (deltaMs === 0) {
+      break;
+    }
+
+    candidateUtcMs += deltaMs;
+  }
+
+  return new Date(candidateUtcMs);
+}
+
+export function computeNextRun(input: {
+  now: Date;
+  timezone: string | null | undefined;
+  everyDays: number | null | undefined;
+  localHour?: number;
+}): Date {
+  const timezone = safeTimezone(input.timezone);
+  const everyDays = normalizeEveryDays(input.everyDays);
+  const localHour = input.localHour ?? HOROSCOPE_LOCAL_RUN_HOUR;
+
+  const nowLocal = toTimeZoneParts(input.now, timezone);
+  const todayAtLocal = {
+    year: nowLocal.year,
+    month: nowLocal.month,
+    day: nowLocal.day,
+    hour: localHour,
+    minute: 0,
+    second: 0
+  };
+
+  const shouldRunToday = nowLocal.hour < localHour || (nowLocal.hour === localHour && nowLocal.minute === 0 && nowLocal.second === 0);
+  const scheduledLocal = shouldRunToday ? todayAtLocal : addDaysUtc(todayAtLocal, everyDays);
+  return zonedLocalToUtc(scheduledLocal, timezone);
+}
+
+export function buildHoroscopeDedupeKey(input: {
+  guildId: string;
+  runAt: Date;
+  isTest?: boolean;
+}): string {
+  if (input.isTest) {
+    return `horoscope:test:${input.guildId}`;
+  }
+
+  const day = input.runAt.toISOString().slice(0, 10);
+  return `horoscope:${input.guildId}:${day}`;
 }
 
 function parseVariantsJson(raw: unknown): AstroVariants {
@@ -218,17 +338,25 @@ async function getAstroArchetypeByKey(key: string) {
 
 export async function getAstroFeatureState(guildId: string): Promise<AstroFeatureState> {
   const settings = await getGuildSettings(guildId);
-  const features = readAstroFeatures(settings?.features);
-  const channelId = settings?.astroHoroscopeChannelId ?? null;
-  const enabled = features.astro;
+  const channelId = settings?.horoscopeChannelId
+    ?? settings?.astroHoroscopeChannelId
+    ?? settings?.oracleChannelId
+    ?? null;
+  const enabled = settings?.horoscopeEnabled ?? true;
+  const timezone = safeTimezone(settings?.timezone ?? DEFAULT_TIMEZONE);
+  const everyDays = normalizeEveryDays(settings?.horoscopeEveryDays);
 
   return {
     guildId,
     enabled,
     configured: enabled && Boolean(channelId),
     channelId,
-    messageId: settings?.astroHoroscopeMessageId ?? null,
-    anchorDate: settings?.astroHoroscopeAnchorDate ?? null
+    messageId: settings?.horoscopePostMessageId ?? settings?.astroHoroscopeMessageId ?? null,
+    anchorDate: settings?.astroHoroscopeAnchorDate ?? null,
+    timezone,
+    everyDays,
+    nextRunAt: settings?.horoscopeNextRunAt ?? null,
+    lastPostAt: settings?.horoscopeLastPostAt ?? null
   };
 }
 
@@ -236,24 +364,43 @@ export async function configureAstroFeature(input: {
   guildId: string;
   channelId: string;
   enable: boolean;
+  everyDays?: number;
   postAnchorIfMissing?: boolean;
+  recomputeNextRun?: boolean;
   now?: Date;
 }): Promise<AstroFeatureState> {
   const current = await getGuildSettings(input.guildId);
-  const currentFeatures = readAstroFeatures(current?.features);
   const nextFeatures = {
     ...(current?.features && typeof current.features === 'object' && !Array.isArray(current.features) ? current.features : {}),
     astro: input.enable
   } as Record<string, boolean>;
+  const now = input.now ?? new Date();
 
-  const today = dateOnly(input.now ?? new Date());
+  const today = dateOnly(now);
   const anchorDate = current?.astroHoroscopeAnchorDate
     ?? (input.postAnchorIfMissing ?? true ? today : null);
-  const nextMessageId = current?.astroHoroscopeChannelId === input.channelId
-    ? current?.astroHoroscopeMessageId ?? null
+  const currentChannel = current?.horoscopeChannelId ?? current?.astroHoroscopeChannelId ?? null;
+  const currentMessageId = current?.horoscopePostMessageId ?? current?.astroHoroscopeMessageId ?? null;
+  const nextMessageId = currentChannel === input.channelId
+    ? currentMessageId
     : null;
+  const everyDays = normalizeEveryDays(input.everyDays ?? current?.horoscopeEveryDays);
+  const timezone = safeTimezone(current?.timezone ?? DEFAULT_TIMEZONE);
+  const recomputeNextRun = input.recomputeNextRun ?? true;
+  const nextRunAt = recomputeNextRun
+    ? computeNextRun({
+        now,
+        timezone,
+        everyDays
+      })
+    : current?.horoscopeNextRunAt ?? null;
 
   await upsertGuildSettings(input.guildId, {
+    horoscopeEnabled: input.enable,
+    horoscopeChannelId: input.channelId,
+    horoscopeEveryDays: everyDays,
+    horoscopeNextRunAt: nextRunAt,
+    horoscopePostMessageId: nextMessageId,
     astroHoroscopeChannelId: input.channelId,
     astroHoroscopeMessageId: nextMessageId,
     astroHoroscopeAnchorDate: anchorDate,
@@ -626,39 +773,58 @@ export async function listAstroTickGuilds(): Promise<Array<{
   channelId: string;
   messageId: string | null;
   anchorDate: string | null;
+  timezone: string;
+  everyDays: number;
+  nextRunAt: Date | null;
 }>> {
+  const now = new Date();
   const rows = await db
     .select({
       guildId: guildSettings.guildId,
-      channelId: guildSettings.astroHoroscopeChannelId,
-      messageId: guildSettings.astroHoroscopeMessageId,
+      channelId: guildSettings.horoscopeChannelId,
+      messageId: guildSettings.horoscopePostMessageId,
       anchorDate: guildSettings.astroHoroscopeAnchorDate,
-      features: guildSettings.features
+      timezone: guildSettings.timezone,
+      everyDays: guildSettings.horoscopeEveryDays,
+      nextRunAt: guildSettings.horoscopeNextRunAt
     })
     .from(guildSettings)
-    .where(isNotNull(guildSettings.astroHoroscopeChannelId));
+    .where(
+      and(
+        eq(guildSettings.horoscopeEnabled, true),
+        isNotNull(guildSettings.horoscopeChannelId),
+        or(
+          isNull(guildSettings.horoscopeNextRunAt),
+          lte(guildSettings.horoscopeNextRunAt, now)
+        )
+      )
+    );
 
   return rows
-    .filter((row) => row.channelId && readAstroFeatures(row.features).astro)
+    .filter((row) => row.channelId)
     .map((row) => ({
       guildId: row.guildId,
       channelId: row.channelId!,
       messageId: row.messageId ?? null,
-      anchorDate: row.anchorDate ?? null
+      anchorDate: row.anchorDate ?? null,
+      timezone: safeTimezone(row.timezone),
+      everyDays: normalizeEveryDays(row.everyDays),
+      nextRunAt: row.nextRunAt ?? null
     }));
 }
 
 export async function queueAstroPublishForTick(input: {
   now: Date;
-  enqueue: (params: { guildId: string; reason: 'new_cycle' | 'missing_message' }) => Promise<void>;
+  enqueue: (params: {
+    guildId: string;
+    reason: 'due_run';
+    runAt: Date;
+    dedupeKey: string;
+  }) => Promise<void>;
 }, deps?: {
   listTickGuilds?: typeof listAstroTickGuilds;
-  resolveCycle?: typeof resolveCurrentAstroCycle;
-  ensureCycle?: typeof ensureAstroCycle;
 }): Promise<{ processed: number; queued: number }> {
   const listTickGuilds = deps?.listTickGuilds ?? listAstroTickGuilds;
-  const resolveCycle = deps?.resolveCycle ?? resolveCurrentAstroCycle;
-  const ensureCycle = deps?.ensureCycle ?? ensureAstroCycle;
 
   const guilds = await listTickGuilds();
   let processed = 0;
@@ -666,28 +832,17 @@ export async function queueAstroPublishForTick(input: {
 
   for (const guild of guilds) {
     processed += 1;
-    const cycle = await resolveCycle(guild.guildId, input.now);
-    const ensured = await ensureCycle({
+    const runAt = guild.nextRunAt ?? input.now;
+    await input.enqueue({
       guildId: guild.guildId,
-      cycleStartDate: cycle.cycleStartDate
+      reason: 'due_run',
+      runAt,
+      dedupeKey: buildHoroscopeDedupeKey({
+        guildId: guild.guildId,
+        runAt
+      })
     });
-
-    if (ensured.created) {
-      await input.enqueue({
-        guildId: guild.guildId,
-        reason: 'new_cycle'
-      });
-      queued += 1;
-      continue;
-    }
-
-    if (!guild.messageId) {
-      await input.enqueue({
-        guildId: guild.guildId,
-        reason: 'missing_message'
-      });
-      queued += 1;
-    }
+    queued += 1;
   }
 
   logger.info(
@@ -701,4 +856,35 @@ export async function queueAstroPublishForTick(input: {
   );
 
   return { processed, queued };
+}
+
+export async function markHoroscopePublished(input: {
+  guildId: string;
+  publishedAt?: Date;
+  isTest?: boolean;
+}): Promise<void> {
+  if (input.isTest) {
+    return;
+  }
+
+  const publishedAt = input.publishedAt ?? new Date();
+  const settings = await getGuildSettings(input.guildId);
+  const timezone = safeTimezone(settings?.timezone ?? DEFAULT_TIMEZONE);
+  const everyDays = normalizeEveryDays(settings?.horoscopeEveryDays);
+  const publishedLocal = toTimeZoneParts(publishedAt, timezone);
+  const nextLocalDate = addDaysUtc(
+    {
+      ...publishedLocal,
+      hour: HOROSCOPE_LOCAL_RUN_HOUR,
+      minute: 0,
+      second: 0
+    },
+    everyDays
+  );
+  const nextRunAt = zonedLocalToUtc(nextLocalDate, timezone);
+
+  await upsertGuildSettings(input.guildId, {
+    horoscopeLastPostAt: publishedAt,
+    horoscopeNextRunAt: nextRunAt
+  });
 }

@@ -25,6 +25,7 @@ async function clearAstroMessageId(guildId: string): Promise<void> {
   await db
     .update(guildSettings)
     .set({
+      horoscopePostMessageId: null,
       astroHoroscopeMessageId: null,
       updatedAt: new Date()
     })
@@ -38,10 +39,16 @@ async function setAstroMessageIdIfUnset(input: {
   const updated = await db
     .update(guildSettings)
     .set({
+      horoscopePostMessageId: input.messageId,
       astroHoroscopeMessageId: input.messageId,
       updatedAt: new Date()
     })
-    .where(and(eq(guildSettings.guildId, input.guildId), isNull(guildSettings.astroHoroscopeMessageId)))
+    .where(
+      and(
+        eq(guildSettings.guildId, input.guildId),
+        isNull(guildSettings.horoscopePostMessageId)
+      )
+    )
     .returning({
       messageId: guildSettings.astroHoroscopeMessageId
     });
@@ -109,6 +116,7 @@ export async function refreshAstroHoroscopeProjection(input: {
   messageEditor: ThrottledMessageEditor;
   guildId?: string;
   now?: Date;
+  isTest?: boolean;
 }, deps?: {
   loadTargetGuilds?: typeof loadTargetGuilds;
   getPublicSnapshot?: typeof getAstroPublicSnapshot;
@@ -144,7 +152,8 @@ export async function refreshAstroHoroscopeProjection(input: {
         cycleStartDate: snapshot.cycleStartDate,
         cycleEndDate: snapshot.cycleEndDate,
         skyTheme: snapshot.skyTheme,
-        aboutLine: snapshot.aboutLine
+        aboutLine: snapshot.aboutLine,
+        isTest: input.isTest
       });
 
       if (guild.messageId) {

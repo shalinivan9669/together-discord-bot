@@ -60,6 +60,12 @@ export type GuildConfig = {
   publicPostChannelId: string | null;
   anonInboxChannelId: string | null;
   anonModRoleId: string | null;
+  horoscopeEnabled: boolean;
+  horoscopeChannelId: string | null;
+  horoscopeEveryDays: number;
+  horoscopeNextRunAt: Date | null;
+  horoscopeLastPostAt: Date | null;
+  horoscopePostMessageId: string | null;
   features: GuildFeatureMap;
   updatedAt: Date | null;
 };
@@ -74,6 +80,12 @@ export type GuildConfigPatch = Partial<{
   publicPostChannelId: string | null;
   anonInboxChannelId: string | null;
   anonModRoleId: string | null;
+  horoscopeEnabled: boolean;
+  horoscopeChannelId: string | null;
+  horoscopeEveryDays: number;
+  horoscopeNextRunAt: Date | null;
+  horoscopeLastPostAt: Date | null;
+  horoscopePostMessageId: string | null;
   features: GuildFeatureMap;
 }>;
 
@@ -163,6 +175,12 @@ function normalizeConfig(
     publicPostChannelId: row?.publicPostChannelId ?? row?.duelPublicChannelId ?? null,
     anonInboxChannelId: row?.anonInboxChannelId ?? row?.questionsChannelId ?? null,
     anonModRoleId: row?.anonModRoleId ?? row?.moderatorRoleId ?? null,
+    horoscopeEnabled: row?.horoscopeEnabled ?? true,
+    horoscopeChannelId: row?.horoscopeChannelId ?? row?.astroHoroscopeChannelId ?? row?.oracleChannelId ?? null,
+    horoscopeEveryDays: row?.horoscopeEveryDays ?? 4,
+    horoscopeNextRunAt: row?.horoscopeNextRunAt ?? null,
+    horoscopeLastPostAt: row?.horoscopeLastPostAt ?? null,
+    horoscopePostMessageId: row?.horoscopePostMessageId ?? row?.astroHoroscopeMessageId ?? null,
     features: toFeatures(row?.features),
     updatedAt: row?.updatedAt ?? null,
   };
@@ -280,6 +298,12 @@ export async function updateGuildConfig(
     publicPostChannelId: patch.publicPostChannelId,
     anonInboxChannelId: patch.anonInboxChannelId,
     anonModRoleId: patch.anonModRoleId,
+    horoscopeEnabled: patch.horoscopeEnabled,
+    horoscopeChannelId: patch.horoscopeChannelId,
+    horoscopeEveryDays: patch.horoscopeEveryDays,
+    horoscopeNextRunAt: patch.horoscopeNextRunAt,
+    horoscopeLastPostAt: patch.horoscopeLastPostAt,
+    horoscopePostMessageId: patch.horoscopePostMessageId,
     features: patch.features,
     // Keep mirrored fields in sync for shared admin/setup flows.
     duelPublicChannelId: patch.publicPostChannelId,

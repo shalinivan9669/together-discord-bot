@@ -112,6 +112,9 @@ export const ru = {
   'setup.wizard.status.incomplete': 'Не хватает обязательных полей ({count})',
   'setup.wizard.line.pair_category': 'Категория пар',
   'setup.wizard.line.oracle_channel': 'Канал Оракула (публичный канал)',
+  'setup.wizard.line.horoscope_channel': 'Канал Гороскопа (публичный канал)',
+  'setup.wizard.line.horoscope_enabled': 'Гороскоп включен',
+  'setup.wizard.line.horoscope_frequency': 'Частота Гороскопа',
   'setup.wizard.line.raid_channel': 'Прогресс рейда',
   'setup.wizard.line.hall_channel': 'Зал славы',
   'setup.wizard.line.public_post_channel': 'Публичные посты',
@@ -121,6 +124,9 @@ export const ru = {
   'setup.wizard.line.locale': 'Язык',
   'setup.wizard.placeholder.pair_category': 'Выберите категорию пар',
   'setup.wizard.placeholder.oracle_channel': 'Выберите канал недельного Оракула',
+  'setup.wizard.placeholder.horoscope_channel': 'Выберите канал Гороскопа',
+  'setup.wizard.placeholder.horoscope_enabled': 'Выберите статус Гороскопа',
+  'setup.wizard.placeholder.horoscope_frequency': 'Выберите частоту Гороскопа',
   'setup.wizard.placeholder.raid_channel': 'Выберите канал рейда',
   'setup.wizard.placeholder.hall_channel': 'Выберите канал зала славы',
   'setup.wizard.placeholder.public_post_channel': 'Выберите канал публичных постов',
@@ -130,6 +136,9 @@ export const ru = {
   'setup.wizard.button.complete': 'Завершить настройку',
   'setup.wizard.button.reset': 'Сбросить',
   'setup.wizard.button.test_post': 'Тестовый пост',
+  'setup.wizard.option.horoscope_enabled': 'Включено',
+  'setup.wizard.option.horoscope_disabled': 'Отключено',
+  'setup.wizard.frequency.days': 'Каждые {days} дн.',
   'setup.wizard.followup.draft_updated': 'Черновик обновлён.',
   'setup.wizard.followup.complete': 'Настройка завершена.',
   'setup.wizard.followup.complete_short': '✅ Настройка сохранена в базе и применена.',
@@ -138,6 +147,10 @@ export const ru = {
   'setup.wizard.followup.test_post_queued': 'Тестовый пост поставлен в очередь для <#{channelId}>.',
   'setup.wizard.followup.test_post_already':
     'Тестовый пост для <#{channelId}> уже стоит в очереди в этой минуте.',
+  'setup.wizard.followup.horoscope_test_queued':
+    'Тестовый пост опубликован в <#{channelId}>.',
+  'setup.wizard.followup.horoscope_test_already':
+    'Тестовый пост Гороскопа для <#{channelId}> уже стоит в очереди.',
   'setup.wizard.error.role_selector': 'Для этого действия используйте селект роли.',
   'setup.wizard.error.timezone_selector': 'Для этого действия используйте селект таймзоны.',
   'setup.wizard.error.channel_selector': 'Для этого действия используйте селект канала.',
@@ -146,6 +159,10 @@ export const ru = {
   'setup.wizard.error.pair_category_not_category': 'Категория пар должна быть каналом-категорией.',
   'setup.wizard.error.channel_not_text': 'Выбранный канал должен быть текстовым или announcement.',
   'setup.wizard.error.invalid_channel_type': 'Неверный тип канала для «{target}».',
+  'setup.wizard.error.horoscope_channel_required':
+    'Канал Гороскопа обязателен, когда Гороскоп включен.',
+  'setup.wizard.error.horoscope_permissions_missing':
+    'Для канала Гороскопа не хватает прав бота: {missing}.',
   'setup.wizard.error.mod_role_not_found': 'Выбранная роль модератора больше не существует.',
   'setup.wizard.error.not_owner': 'Этот setup-панель принадлежит другому администратору. Запустите `/setup start`.',
   'setup.wizard.error.commit_validation_failed':
@@ -462,4 +479,3 @@ export const ru = {
 } as const;
 
 export type I18nKey = keyof typeof ru;
-

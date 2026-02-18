@@ -68,7 +68,10 @@ export const publicPostPublishPayloadSchema = baseJobSchema.extend({
 });
 
 export const genericScheduledPayloadSchema = baseJobSchema.extend({
-  weekStartDate: z.string().optional()
+  weekStartDate: z.string().optional(),
+  runAtIso: z.string().optional(),
+  dedupeKey: z.string().optional(),
+  isTest: z.boolean().optional()
 });
 
 export type DuelRoundClosePayload = z.infer<typeof duelRoundClosePayloadSchema>;

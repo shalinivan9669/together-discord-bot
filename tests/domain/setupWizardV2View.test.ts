@@ -5,6 +5,9 @@ type SetupWizardDraft = {
   userId: string;
   pairCategoryId: string | null;
   oracleChannelId: string | null;
+  horoscopeEnabled: boolean;
+  horoscopeChannelId: string | null;
+  horoscopeEveryDays: number;
   raidChannelId: string | null;
   hallChannelId: string | null;
   publicPostChannelId: string | null;
@@ -20,6 +23,9 @@ function draft(overrides?: Partial<SetupWizardDraft>): SetupWizardDraft {
     userId: 'u1',
     pairCategoryId: null,
     oracleChannelId: null,
+    horoscopeEnabled: true,
+    horoscopeChannelId: null,
+    horoscopeEveryDays: 4,
     raidChannelId: null,
     hallChannelId: null,
     publicPostChannelId: null,
@@ -126,10 +132,11 @@ describe('setup wizard v2 view', () => {
   });
 
   it('renders required selectors and toggles complete button by readiness', async () => {
-    const [{ buildSetupWizardV2View }, { ChannelType, ComponentType }, { decodeCustomId }] = await Promise.all([
+    const [{ buildSetupWizardV2View }, { ChannelType, ComponentType }, { decodeCustomId }, { t }] = await Promise.all([
       import('../../src/discord/setupWizard/view'),
       import('../../src/discord/ui-v2'),
-      import('../../src/discord/interactions/customId')
+      import('../../src/discord/interactions/customId'),
+      import('../../src/i18n')
     ]);
 
     const incompleteView = buildSetupWizardV2View(draft() as never, 'ru');
@@ -137,10 +144,11 @@ describe('setup wizard v2 view', () => {
       draft({
         pairCategoryId: 'cat1',
         oracleChannelId: 'ch1',
-        raidChannelId: 'ch2',
-        hallChannelId: 'ch3',
-        publicPostChannelId: 'ch4',
-        anonInboxChannelId: 'ch5'
+        horoscopeChannelId: 'ch2',
+        raidChannelId: 'ch3',
+        hallChannelId: 'ch4',
+        publicPostChannelId: 'ch5',
+        anonInboxChannelId: 'ch6'
       }) as never,
       'ru',
     );
@@ -156,6 +164,7 @@ describe('setup wizard v2 view', () => {
 
     const textChannelActions = [
       'pick_oracle_channel',
+      'pick_horoscope_channel',
       'pick_raid_channel',
       'pick_hall_channel',
       'pick_public_post_channel',
@@ -171,10 +180,7 @@ describe('setup wizard v2 view', () => {
       expect(selector?.channel_types).toEqual([ChannelType.GuildText, ChannelType.GuildAnnouncement]);
     }
 
-    const roleSelect = controls.find((item) => {
-      const customId = item.custom_id;
-      return typeof customId === 'string' && decodeCustomId(customId).action === 'pick_mod_role';
-    });
+    const roleSelect = controls.find((item) => item.type === ComponentType.RoleSelect);
     expect(roleSelect?.type).toBe(ComponentType.RoleSelect);
 
     const timezoneSelect = controls.find((item) => {
@@ -183,17 +189,23 @@ describe('setup wizard v2 view', () => {
     });
     expect(timezoneSelect?.type).toBe(ComponentType.StringSelect);
 
-    const completeButtonIncomplete = controls.find((item) => {
+    const horoscopeEnabledSelect = controls.find((item) => {
       const customId = item.custom_id;
-      return typeof customId === 'string' && decodeCustomId(customId).action === 'complete';
+      return typeof customId === 'string' && decodeCustomId(customId).action === 'pick_horoscope_enabled';
     });
+    expect(horoscopeEnabledSelect?.type).toBe(ComponentType.StringSelect);
+
+    const horoscopeFrequencySelect = controls.find((item) => {
+      const customId = item.custom_id;
+      return typeof customId === 'string' && decodeCustomId(customId).action === 'pick_horoscope_frequency';
+    });
+    expect(horoscopeFrequencySelect?.type).toBe(ComponentType.StringSelect);
+
+    const completeButtonIncomplete = controls.find((item) => item.label === t('ru', 'setup.wizard.button.complete'));
     expect(completeButtonIncomplete?.disabled).toBe(true);
 
     const completeControls = getActionRowControls(completeView as never, ComponentType);
-    const completeButtonReady = completeControls.find((item) => {
-      const customId = item.custom_id;
-      return typeof customId === 'string' && decodeCustomId(customId).action === 'complete';
-    });
+    const completeButtonReady = completeControls.find((item) => item.label === t('ru', 'setup.wizard.button.complete'));
     expect(completeButtonReady?.disabled).toBe(false);
 
     const resetButton = completeControls.find((item) => {
@@ -206,5 +218,32 @@ describe('setup wizard v2 view', () => {
     });
     expect(resetButton?.type).toBe(ComponentType.Button);
     expect(testPostButton?.type).toBe(ComponentType.Button);
+  });
+
+  it('disables complete when horoscope is enabled but channel is missing', async () => {
+    const [{ buildSetupWizardV2View }, { ComponentType }, { t }] = await Promise.all([
+      import('../../src/discord/setupWizard/view'),
+      import('../../src/discord/ui-v2'),
+      import('../../src/i18n')
+    ]);
+
+    const view = buildSetupWizardV2View(
+      draft({
+        pairCategoryId: 'cat1',
+        oracleChannelId: 'ch1',
+        horoscopeEnabled: true,
+        horoscopeChannelId: null,
+        raidChannelId: 'ch2',
+        hallChannelId: 'ch3',
+        publicPostChannelId: 'ch4',
+        anonInboxChannelId: 'ch5'
+      }) as never,
+      'ru',
+    );
+
+    const controls = getActionRowControls(view as never, ComponentType);
+    const completeButton = controls.find((item) => item.label === t('ru', 'setup.wizard.button.complete'));
+
+    expect(completeButton?.disabled).toBe(true);
   });
 });

@@ -19,6 +19,12 @@ export async function upsertGuildSettings(
     pairCategoryId: string | null;
     oracleChannelId: string | null;
     oracleMessageId: string | null;
+    horoscopeEnabled: boolean;
+    horoscopeChannelId: string | null;
+    horoscopeEveryDays: number;
+    horoscopeNextRunAt: Date | null;
+    horoscopeLastPostAt: Date | null;
+    horoscopePostMessageId: string | null;
     astroHoroscopeChannelId: string | null;
     astroHoroscopeMessageId: string | null;
     astroHoroscopeAnchorDate: string | null;
