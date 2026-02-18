@@ -60,6 +60,39 @@ function hashNumber(input: string): number {
   return digest.readUInt32BE(0);
 }
 
+const ORACLE_SEED_MODULO = 2147483647n;
+const ORACLE_SEED_MIN = 1;
+const ORACLE_SEED_MAX = 2147483646;
+
+function hashToPositiveInt31(input: string): bigint {
+  const digest = createHash('sha256').update(input).digest();
+  const full = digest.readBigUInt64BE(0);
+  return full % ORACLE_SEED_MODULO;
+}
+
+export function computeOracleSeed(guildId: string, weekStartDate: string): number {
+  let guildSeed: bigint;
+  try {
+    guildSeed = (BigInt(guildId) % ORACLE_SEED_MODULO) || 1n;
+  } catch {
+    guildSeed = hashToPositiveInt31(guildId) || 1n;
+  }
+  const weekMix = hashToPositiveInt31(weekStartDate);
+  const mixed = (guildSeed + weekMix) % ORACLE_SEED_MODULO;
+  const normalized = mixed === 0n ? 1n : mixed;
+  const seed = Number(normalized);
+  assertOracleSeed(seed, { guildId, weekStartDate });
+  return seed;
+}
+
+function assertOracleSeed(seed: number, context: { guildId: string; weekStartDate: string }): void {
+  if (!Number.isInteger(seed) || seed < ORACLE_SEED_MIN || seed > ORACLE_SEED_MAX) {
+    throw new Error(
+      `Oracle seed out of int32-safe range: ${seed} for guild ${context.guildId} week ${context.weekStartDate}`,
+    );
+  }
+}
+
 function pickDeterministic<T>(list: readonly T[], key: string): T {
   const idx = hashNumber(key) % list.length;
   return list[idx]!;
@@ -137,7 +170,7 @@ export async function ensureOracleWeek(guildId: string, weekStartDate: string) {
   }
 
   const selected = pickDeterministic(archetypes, `${guildId}:${weekStartDate}`);
-  const seed = hashNumber(`${guildId}:${weekStartDate}:${selected.key}`);
+  const seed = computeOracleSeed(guildId, weekStartDate);
 
   await db
     .insert(oracleWeeks)

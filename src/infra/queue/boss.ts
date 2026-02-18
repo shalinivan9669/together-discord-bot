@@ -57,6 +57,16 @@ type PgErrorLike = {
   message?: string;
 };
 
+type SerializedError = {
+  error_name: string;
+  error_message: string;
+  error_stack?: string;
+  error_code?: string;
+  error_routine?: string;
+  error_detail?: string;
+  error_hint?: string;
+};
+
 function isQueueExistsError(error: unknown): boolean {
   if (!error || typeof error !== 'object') {
     return false;
@@ -70,6 +80,26 @@ function isQueueExistsError(error: unknown): boolean {
 
   const message = parsed.message?.toLowerCase() ?? '';
   return message.includes('queue') && message.includes('already exists');
+}
+
+function serializeError(error: unknown): SerializedError {
+  if (error instanceof Error) {
+    const extra = error as Error & Record<string, unknown>;
+    return {
+      error_name: error.name,
+      error_message: error.message,
+      error_stack: error.stack,
+      error_code: typeof extra.code === 'string' ? extra.code : undefined,
+      error_routine: typeof extra.routine === 'string' ? extra.routine : undefined,
+      error_detail: typeof extra.detail === 'string' ? extra.detail : undefined,
+      error_hint: typeof extra.hint === 'string' ? extra.hint : undefined,
+    };
+  }
+
+  return {
+    error_name: 'NonError',
+    error_message: typeof error === 'string' ? error : JSON.stringify(error),
+  };
 }
 
 function toUserSafeQueueError(error: unknown): string {
@@ -419,7 +449,7 @@ export function createQueueRuntime(params: QueueRuntimeParams): QueueRuntime {
                 job_id: job.id,
                 correlation_id: parsed.correlationId,
                 guild_id: parsed.guildId,
-                error
+                ...serializeError(error)
               },
               'Oracle publish job failed',
             );

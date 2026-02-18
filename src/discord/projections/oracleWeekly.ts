@@ -19,6 +19,16 @@ export type WeeklyOracleRefreshStats = {
   failed: number;
 };
 
+type SerializedError = {
+  error_name: string;
+  error_message: string;
+  error_stack?: string;
+  error_code?: string;
+  error_routine?: string;
+  error_detail?: string;
+  error_hint?: string;
+};
+
 async function clearOracleMessageId(guildId: string): Promise<void> {
   await db.execute(sql`
     update guild_settings
@@ -260,7 +270,7 @@ export async function refreshWeeklyOracleProjection(input: {
           week_start_date: weekStartDate,
           step,
           correlation_id: input.correlationId,
-          error,
+          ...serializeError(error),
         },
         'Weekly oracle projection refresh failed',
       );
@@ -286,4 +296,24 @@ function normalizeSnowflake(value: unknown): string | null {
     return value.toString();
   }
   return null;
+}
+
+function serializeError(error: unknown): SerializedError {
+  if (error instanceof Error) {
+    const extra = error as Error & Record<string, unknown>;
+    return {
+      error_name: error.name,
+      error_message: error.message,
+      error_stack: error.stack,
+      error_code: typeof extra.code === 'string' ? extra.code : undefined,
+      error_routine: typeof extra.routine === 'string' ? extra.routine : undefined,
+      error_detail: typeof extra.detail === 'string' ? extra.detail : undefined,
+      error_hint: typeof extra.hint === 'string' ? extra.hint : undefined,
+    };
+  }
+
+  return {
+    error_name: 'NonError',
+    error_message: typeof error === 'string' ? error : JSON.stringify(error),
+  };
 }
