@@ -120,7 +120,40 @@ END
 $$;
 
 DO $$
+DECLARE
+  queue_has_name boolean := false;
+  queue_has_options boolean := false;
 BEGIN
+  IF to_regclass('public.queue') IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'queue'
+        AND column_name = 'name'
+    ) INTO queue_has_name;
+
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'queue'
+        AND column_name = 'options'
+    ) INTO queue_has_options;
+
+    IF queue_has_name THEN
+      IF queue_has_options THEN
+        INSERT INTO public.queue (name, options)
+        VALUES ('weekly.oracle.publish', '{}'::jsonb)
+        ON CONFLICT (name) DO NOTHING;
+      ELSE
+        INSERT INTO public.queue (name)
+        VALUES ('weekly.oracle.publish')
+        ON CONFLICT (name) DO NOTHING;
+      END IF;
+    END IF;
+  END IF;
+
   IF to_regclass('public.schedule') IS NOT NULL THEN
     IF EXISTS (
       SELECT 1 FROM public.schedule WHERE name = 'weekly.horoscope.publish'
